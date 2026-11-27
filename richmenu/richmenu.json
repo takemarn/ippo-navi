@@ -17,7 +17,7 @@
       "action": {
         "type": "uri",
         "label": "経費勤怠申請",
-        "uri": "https://liff.line.me/LIFF_ID#apply"
+        "uri": "https://liff.line.me/2012837301-x3JBZNQj#apply"
       }
     },
     {
@@ -30,7 +30,7 @@
       "action": {
         "type": "uri",
         "label": "申請状況",
-        "uri": "https://liff.line.me/LIFF_ID#status"
+        "uri": "https://liff.line.me/2012837301-x3JBZNQj#status"
       }
     },
     {
@@ -43,7 +43,7 @@
       "action": {
         "type": "uri",
         "label": "タスク管理",
-        "uri": "https://liff.line.me/LIFF_ID#task"
+        "uri": "https://liff.line.me/2012837301-x3JBZNQj#task"
       }
     },
     {
@@ -56,7 +56,7 @@
       "action": {
         "type": "uri",
         "label": "利用者一覧",
-        "uri": "https://liff.line.me/LIFF_ID#users"
+        "uri": "https://liff.line.me/2012837301-x3JBZNQj#users"
       }
     },
     {
@@ -69,7 +69,7 @@
       "action": {
         "type": "uri",
         "label": "シフト管理",
-        "uri": "https://liff.line.me/LIFF_ID#shift"
+        "uri": "https://liff.line.me/2012837301-x3JBZNQj#shift"
       }
     },
     {
@@ -82,7 +82,7 @@
       "action": {
         "type": "uri",
         "label": "相談AI",
-        "uri": "https://liff.line.me/LIFF_ID#portal"
+        "uri": "https://liff.line.me/2012837301-x3JBZNQj#portal"
       }
     }
   ]
