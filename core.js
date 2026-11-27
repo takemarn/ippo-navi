@@ -246,15 +246,15 @@
   // ---------- 起動 ----------
   function start() {
     document.getElementById('demo').hidden = !DEMO;
-    var first = (location.hash || '#menu').slice(1);
-    app.innerHTML = MENUS.indexOf(first) > 0 ? menuLoading() : bootLoading();
     // liff.line.me/LIFF_ID#apply で開かれたとき、行き先が liff.state に入って届くことがあるので拾っておく
     var st = new URLSearchParams(location.search).get('liff.state') || '';
+    var stHash = st.indexOf('#') >= 0 ? st.slice(st.indexOf('#')) : '';
+    if (!location.hash && stHash) history.replaceState(null, '', location.pathname + location.search + stHash);
+    var first = (location.hash || '#menu').slice(1);
+    app.innerHTML = MENUS.indexOf(first) > 0 ? menuLoading() : bootLoading();
     var ready = DEMO ? Promise.resolve() : liff.init({ liffId: CFG.LIFF_ID }).then(function () {
       if (!liff.isLoggedIn()) { liff.login({ redirectUri: location.href }); return new Promise(function () {}); }
       state.idToken = liff.getIDToken();
-      var h = st.indexOf('#') >= 0 ? st.slice(st.indexOf('#')) : '';
-      if (!location.hash && h) history.replaceState(null, '', location.pathname + h);
     });
     ready.then(function () { return Promise.all([api('me'), api('options')]); })
       .then(function (r) {
