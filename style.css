@@ -128,10 +128,6 @@ button:disabled { opacity: .5; cursor: default; }
 .detail { font-size: 12px; display: grid; grid-template-columns: auto 1fr; gap: 2px 12px; }
 .detail dt { color: var(--muted); }
 .detail dd { margin: 0; font-variant-numeric: tabular-nums; }
-.back {
-  align-self: flex-start; color: var(--blue); text-decoration: none; font-size: 12px; font-weight: 700;
-  background: #fff; border: 1px solid #b9d3f3; border-radius: 999px; padding: 3px 12px;
-}
 
 /* ---------- 読み込み中（参考 0-6） ---------- */
 /* 一覧などの中の「読み込み中...」: 白い角丸バー */
@@ -163,6 +159,14 @@ button:disabled { opacity: .5; cursor: default; }
   width: max-content; max-width: calc(100% - 32px); text-align: center; box-shadow: 0 6px 20px rgba(0, 0, 0, .2);
 }
 @media (prefers-reduced-motion: no-preference) { .toast { transition: opacity .2s; } }
+
+/* 共通の戻るリンク（IPPO.backHtml）。フォーム・一覧・メニューの下に中央寄せで置く。矢印は ‹ */
+.ipp-back {
+  align-self: center; display: inline-flex; align-items: center; justify-content: center; gap: 4px;
+  min-height: 44px; padding: 0 16px; color: var(--navy); font-size: 13px; font-weight: 700; text-decoration: none;
+}
+.ipp-back span { font-size: 16px; line-height: 1; }
+.ipp-back:active { opacity: .6; }
 
 /* 開けなかったときのカード */
 .fail { background: #fff; text-align: left; }

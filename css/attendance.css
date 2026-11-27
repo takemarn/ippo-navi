@@ -111,5 +111,6 @@
 }
 .att-note { display: block; font-size: 11px; color: #8A6A1E; margin-top: 2px; white-space: normal; }
 
-/* 送信ボタンの下の小さな戻るリンク（他画面の「メニューに戻る」と揃える） */
-.att-menu { align-self: center; display: inline-flex; align-items: center; min-height: 36px; padding: 0 12px; font-size: 12px; color: #2F7BD6; text-decoration: none; }
+
+/* 共通の戻るリンク（core.js の backHtml）をフォームの下で詰めて置く */
+.att-form > .ipp-back, .att-actions > .ipp-back { align-self: center; min-height: 36px; margin-top: -8px; }

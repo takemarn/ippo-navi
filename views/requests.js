@@ -5,14 +5,12 @@
   'use strict';
   var I = window.IPPO, app = I.app, api = I.api, esc = I.esc, yen = I.yen, toast = I.toast;
 
-  // 来たメニューを覚える（「メニューに戻る」用。approvals.js も使う）。hashchange は core の route より先にここで受ける
-  var lastMenu = '', moved = false, MENUS = I.MENUS || ['menu', 'apply', 'status', 'task', 'users', 'shift', 'portal'];
-  function menuOf(url) { var h = String(url || '').split('#')[1] || ''; return MENUS.indexOf(h) >= 0 ? '#' + h : ''; }
-  lastMenu = menuOf(location.href);
-  window.addEventListener('hashchange', function (e) { moved = true; var m = menuOf(e.oldURL); if (m) lastMenu = m; });
-  I.apvLastMenu = function () { return lastMenu; };
-  I.apvCameFromApp = function () { return moved; };
-  function backHref() { return lastMenu || '#status'; }
+  // 「メニューに戻る」は core の共通部品（来たメニューへ戻る）。まだ無いときは同じ見た目の文字リンクで代用
+  function backHtml(fallback) {
+    if (I.backHtml) return I.backHtml();
+    var href = (I.lastMenu && I.lastMenu()) || fallback;
+    return '<a class="ipp-back" href="' + href + '">‹ メニューに戻る</a>';
+  }
 
   var STATUS = ['承認待ち', '承認済み', '差戻し', '取消'];
   var CLS = { '承認待ち': 'wait', '承認済み': 'ok', '差戻し': 'back', '取消': 'cancel' };
@@ -20,9 +18,6 @@
 
   function loadingBar() {
     return '<div class="apv-loading" role="status"><span class="apv-spin" aria-hidden="true"></span>読み込み中...</div>';
-  }
-  function badge(s) {
-    return '<span class="req-badge req-' + (CLS[s] || 'cancel') + '"><span class="req-dot" aria-hidden="true"></span>' + esc(s || '—') + '</span>';
   }
   function count(s) { return view.list.filter(function (r) { return r.状態 === s; }).length; }
 
@@ -83,7 +78,7 @@
     var meta = ['申請日時：' + esc(String(r.申請日時 || '').slice(0, 16)), '<span class="apv-nw">申請ID：' + id + '</span>'];
     var st = stageText(r); if (st) meta.push(st);
     return '<article class="apv-item req-item req-is-' + (CLS[s] || 'cancel') + '" data-id="' + id + '">' +
-      '<div class="apv-item-head"><h3>' + esc(r.申請種類) + '申請</h3>' + badge(s) + '</div>' +
+      '<div class="apv-item-head"><h3>' + esc(r.申請種類) + '申請</h3>' + I.pill(s) + '</div>' +
       '<p class="apv-meta">' + meta.join(' / ') + '</p>' +
       contentLines(r) + note + ops +
       '<div class="apv-err" role="alert"></div>' +
@@ -112,7 +107,7 @@
     view = { list: [], filter: 'すべて', confirm: null };
     app.innerHTML = '<h1 class="apv-title">自分の申請</h1>' +
       '<div class="apv-shell" id="req-body">' + loadingBar() + '</div>' +
-      '<div class="req-foot"><a class="apv-menu" href="#apply">申請する</a><a class="apv-menu" href="' + backHref() + '">メニューに戻る</a></div>';
+      '<a class="req-new" href="#apply">申請する</a>' + backHtml('#status');
     load();
     app.addEventListener('click', onClick);
     I.cleanup.push(function () { app.removeEventListener('click', onClick); });

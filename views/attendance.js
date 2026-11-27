@@ -29,11 +29,11 @@
   var FULL_DAY = ['欠勤', '有給', '冬期休暇', '夏季休暇', '特別休暇'];
   var isFullDay = function (k) { return FULL_DAY.indexOf(k) >= 0; };
 
-  // 当月の残業合計。me の返事の 当月残業合計（'H:mm'）を出す。無いときは 0:00
+  // 当月の残業合計。me の返事の 当月残業合計（'H:mm'）を出す。値が無いときは誤解を避けて何も出さない
   function overtimeLabel() {
-    var m = new Date().getMonth() + 1;
-    var v = (state.me && state.me.当月残業合計) || '0:00';
-    return '（' + m + '月の残業合計：' + esc(v) + '）';
+    var v = state.me && state.me.当月残業合計;
+    if (v === undefined || v === null || v === '') return '';
+    return '（' + (new Date().getMonth() + 1) + '月の残業合計：' + esc(v) + '）';
   }
   function fmtSize(n) { return n >= 1048576 ? (n / 1048576).toFixed(1) + 'MB' : Math.max(1, Math.round(n / 1024)) + 'KB'; }
 
@@ -75,7 +75,7 @@
         '</div>' +
         '<p class="att-formerr" id="att-formerr" role="alert" hidden></p>' +
         '<button type="submit" class="att-send">送信</button>' +
-        '<a class="att-menu" href="#apply">← メニューに戻る</a>' +
+        (I.backHtml ? I.backHtml('#apply') : '') +
       '</form>' +
       '<div id="att-after"></div>' +
       '</div>';
@@ -95,8 +95,8 @@
       // 欠勤・有給・各種休暇は時間を任意にする（使えるが (任意) 表示）
       $('時間-mark').className = optional ? 'att-opt' : 'att-req';
       $('時間-mark').textContent = optional ? '(任意)' : '(必須)';
-      if (!useRange) clearErr($('開始'));
-      if (!useStamp) clearErr($('打刻時刻'));
+      // 項目を変えたら、時間・打刻時間の古いエラーは消す（必須・任意が変わるため）
+      clearErr($('開始')); clearErr($('打刻時刻'));
     }
     $('項目').addEventListener('change', syncKind);
     syncKind();
@@ -206,10 +206,13 @@
       go.disabled = true; fix.disabled = true; box.hidden = true;
       go.innerHTML = '<span class="att-spin" aria-hidden="true"></span>送信中…';
       go.setAttribute('aria-busy', 'true');
+      if (I.busy) I.busy(true); // 送信中は画面全体をぼかして「読み込み中・・・」（core.js）
       api('submitAttendance', d).then(function (res) {
+        if (I.busy) I.busy(false); // 完了カードを同じ画面に出すので自分で消す
         showDone(res || {});
         toast('送信しました');
       }).catch(function (e) {
+        if (I.busy) I.busy(false);
         go.disabled = false; fix.disabled = false; go.textContent = 'もう一度送信する'; go.removeAttribute('aria-busy');
         var list = e && e.details && e.details.length ? e.details : [];
         box.innerHTML = '<strong>' + esc((e && e.message) || '送信できませんでした') + '</strong>' +
@@ -230,6 +233,7 @@
         '<div class="att-actions">' +
           '<a class="att-send" href="#requests">自分の申請を見る</a>' +
           '<button type="button" class="att-back" id="att-again">続けて勤怠申請する</button>' +
+          (I.backHtml ? I.backHtml('#apply') : '') +
         '</div>';
       window.scrollTo(0, 0);
       $('done-h').setAttribute('tabindex', '-1'); $('done-h').focus();

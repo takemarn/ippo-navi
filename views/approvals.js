@@ -130,25 +130,21 @@
     });
   }
 
-  // 「メニューに戻る」は来たメニュー（#apply・#status・#task など）へ。覚えていなければ前の画面、それも無ければ #menu
-  function backHref() { return (I.apvLastMenu && I.apvLastMenu()) || '#menu'; }
-  function onBack(e) {
-    var a = e.target.closest('a[data-back]'); if (!a) return;
-    if (!(I.apvLastMenu && I.apvLastMenu()) && I.apvCameFromApp && I.apvCameFromApp()) {
-      e.preventDefault(); history.back();
-    }
+  // 「メニューに戻る」は core の共通部品（来たメニューへ戻る）。まだ無いときは同じ見た目の文字リンクで代用
+  function backHtml() {
+    if (I.backHtml) return I.backHtml();
+    return '<a class="ipp-back" href="' + ((I.lastMenu && I.lastMenu()) || '#menu') + '">‹ メニューに戻る</a>';
   }
 
   function viewApprovals() {
     view = { list: [], who: null, confirm: null, cmts: {} };
     app.innerHTML = '<h1 class="apv-title">承認待ち一覧</h1>' +
       '<div class="apv-shell" id="apv-body">' + loadingBar() + '</div>' +
-      '<a class="apv-menu" href="' + backHref() + '" data-back>メニューに戻る</a>';
+      backHtml();
     load();
     app.addEventListener('click', onClick);
     app.addEventListener('input', onInput);
-    app.addEventListener('click', onBack);
-    I.cleanup.push(function () { app.removeEventListener('click', onClick); app.removeEventListener('input', onInput); app.removeEventListener('click', onBack); });
+    I.cleanup.push(function () { app.removeEventListener('click', onClick); app.removeEventListener('input', onInput); });
   }
   function onInput(e) {
     if (!e.target.classList.contains('apv-cmt') || !e.target.value.trim()) return;

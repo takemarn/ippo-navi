@@ -50,9 +50,3 @@
 
 .mbtn .badge { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); }
 
-/* 入口（6タイル）へ戻る文字リンク。ブラウザで開いたとき用。指で押しやすいよう高さ 44px */
-.mhome {
-  align-self: center; display: inline-flex; align-items: center; gap: 4px; min-height: 44px; padding: 0 14px;
-  color: var(--blue); font-size: 12px; text-decoration: none;
-}
-.mhome:active { opacity: .6; }

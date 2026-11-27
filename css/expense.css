@@ -10,7 +10,6 @@
 .exp-field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .exp-lab { display: flex; align-items: center; gap: 6px; min-height: 22px; }
 .exp-field[data-f="物品"] > .exp-lab { gap: 12px; }
-.exp-field[data-f="物品"] > .exp-lab .exp-lab-name { margin-right: -2px; }
 .exp-lab label, .exp-lab .exp-lab-name { display: inline; font-size: 12px; font-weight: 700; color: #333; line-height: 1.3; }
 .exp-req, .exp-opt { margin-left: auto; font-size: 11px; font-weight: 700; white-space: nowrap; }
 .exp-req { color: #C0283A; }
@@ -41,10 +40,11 @@
 
 /* 物品: 追加（緑）・削除（赤）のピル。見た目は小ピル寄りだが、指で押し分けられるよう高さ 36px・間隔 12px */
 .exp-pill {
-  font: inherit; font-size: 12px; font-weight: 700; line-height: 1; padding: 0 14px; border-radius: 10px; cursor: pointer;
-  min-height: 36px; min-width: 52px; box-shadow: none; width: auto;
+  position: relative; font: inherit; font-size: 12px; font-weight: 700; line-height: 1; padding: 0 12px; border-radius: 9px; cursor: pointer;
+  min-height: 30px; height: 30px; min-width: 48px; box-shadow: none; width: auto;
 }
-.exp-pill + .exp-pill { margin-left: 6px; }
+/* 見た目は 30px、当たり判定は透明に上下左右 4px 広げる（38px） */
+.exp-pill::before { content: ""; position: absolute; inset: -4px -4px; }
 .exp-add { background: #DFF3E3; color: #1E8A3A; border: 1px solid #9CD6AA; }
 .exp-del { background: #FCE1E4; color: #C0283A; border: 1px solid #EFA9B2; }
 .exp-items { display: flex; flex-direction: column; gap: 8px; }
@@ -56,7 +56,7 @@
 
 /* エラー: 項目の下に赤字、欄は赤枠 */
 .exp-err { margin: 0; font-size: 11px; color: #C0283A; line-height: 1.4; }
-.exp-bad > input, .exp-bad > select, .exp-bad > textarea, .exp-bad .exp-item-row > *, .exp-bad > .exp-free { border-color: #E0707E; }
+.exp-field.exp-bad > input, .exp-field.exp-bad > select, .exp-field.exp-bad > textarea, .exp-item .exp-bad-in { border-color: #E0707E; }
 .exp-formerr { margin: 0; text-align: center; font-size: 12px; font-weight: 700; color: #C0283A; }
 
 /* 送信ボタン: カードの外、全幅・濃紺・白文字 */
@@ -100,5 +100,6 @@
 .exp-done-note { font-size: 12px; color: #5B6572; }
 .exp-form input:disabled::-webkit-calendar-picker-indicator { display: none; }
 
-/* 送信ボタンの下の小さな戻るリンク（他画面の「メニューに戻る」と揃える） */
-.exp-menu { align-self: center; display: inline-flex; align-items: center; min-height: 36px; padding: 0 12px; font-size: 12px; color: #2F7BD6; text-decoration: none; }
+
+/* 共通の戻るリンク（core.js の backHtml）をフォームの下で詰めて置く */
+.exp-form > .ipp-back, .exp-actions > .ipp-back { align-self: center; min-height: 36px; margin-top: -8px; }

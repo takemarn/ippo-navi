@@ -31,7 +31,8 @@
     var cls = { '承認待ち': 'wait', '承認済み': 'ok', '差戻し': 'back', '取消': 'cancel' }[status] || 'cancel';
     return '<span class="pill ' + cls + '">' + esc(status) + '</span>';
   }
-  function backLink(href, label) { return '<a class="back" href="' + href + '">← ' + label + '</a>'; }
+  // 昔の名前。今は共通の戻る部品 backHtml と同じものを返す
+  function backLink(href, label) { return backHtml(href, label); }
 
   // ---------- GAS とのやりとり ----------
   function api(action, data) {
@@ -87,16 +88,29 @@
     },
     handle: function (action, data) {
       var self = this;
-      function newReq(type, prefix) {
+      // 見本モードで送った申請も「自分の申請」で中身が見えるよう、受け取った data から明細を作って残す
+      function newReq(type, prefix, d) {
+        d = d || {};
         var r = { 申請ID: prefix + '-' + today().replace(/-/g, '') + '-DEMO' + ('0' + (++self.seq)).slice(-2), 申請種類: type,
           申請者職員ID: self.me.職員ID, 申請日時: today() + ' 12:00:00', 状態: '承認待ち', 現在段階: 1 };
+        if (type === '経費') {
+          r.小口先出 = d.小口先出 || ''; r.備考 = d.備考 || '';
+          r.明細 = (d.物品 || []).map(function (it, i) {
+            return { 行番号: i + 1, 対象日: d.対象日 || '', 経費区分: d.経費区分 || '',
+              物品: it.物品 === 'フリー入力' ? (it.自由入力 || 'フリー入力') : (it.物品 || ''), 個数: Number(it.個数) || 0, 金額: Number(it.金額) || 0 };
+          });
+        } else {
+          var m = { 項目: d.項目 || '', 対象日: d.対象日 || '', 備考: d.備考 || '' };
+          if (d.打刻時刻) m.打刻時刻 = d.打刻時刻; else { m.開始 = d.開始 || ''; m.終了 = d.終了 || ''; }
+          r.備考 = d.備考 || ''; r.明細 = [m];
+        }
         self.requests.unshift(r); return { 申請ID: r.申請ID, 状態: r.状態 };
       }
       switch (action) {
         case 'me': return this.me;
         case 'options': return this.options;
-        case 'submitExpense': return newReq('経費', 'EXP');
-        case 'submitAttendance': return newReq('勤怠', 'ATT');
+        case 'submitExpense': return newReq('経費', 'EXP', data);
+        case 'submitAttendance': return newReq('勤怠', 'ATT', data);
         case 'myRequests': return this.requests.slice();
         case 'cancelRequest':
           this.requests.forEach(function (r) { if (r.申請ID === data.申請ID) { r.状態 = '取消'; r.現在段階 = ''; } });
@@ -177,7 +191,7 @@
       : '<button type="button" class="mbtn locked" data-locked="1">承認待ち一覧<span class="mtag">承認者のみ</span></button>';
     app.innerHTML = '<h1>メニュー</h1><nav class="mgroup" aria-label="メニュー">' + items.map(btn).join('') + '</nav>' +
       '<div class="msolo">' + appr + '</div>' +
-      '<a class="mhome" href="#menu"><span aria-hidden="true">‹</span> メニュー一覧に戻る</a>';
+      backHtml('#menu', 'メニュー一覧に戻る');
     function onTap(e) {
       var b = e.target.closest('button.mbtn');
       if (!b) return;
@@ -198,10 +212,20 @@
   // 各画面は views/*.js が IPPO.views に登録する。画面を離れるときの後片付けは IPPO.cleanup に積む
   // メニュー画面（リッチメニューの各タイルの行き先）。開いた直後はメニュー用の読み込み中表示を出す
   var MENUS = ['menu', 'apply', 'status', 'task', 'users', 'shift', 'portal'];
+  // 最後に開いたメニュー画面を覚えておく（「戻る」の行き先に使う）。再読み込みしても残るよう sessionStorage にも置く
+  var last = null;
+  try { last = sessionStorage.getItem('ippo.lastMenu'); } catch (_) {}
+  function lastMenu() { return last && MENUS.indexOf(last.slice(1)) >= 0 ? last : '#menu'; }
+  // 共通の戻る部品。href 省略 → 最後に開いたメニュー、label 省略 →「メニューに戻る」。フォームや一覧の下に置く
+  function backHtml(href, label) {
+    return '<a class="ipp-back" href="' + esc(href || lastMenu()) + '"><span aria-hidden="true">‹</span> ' + esc(label || 'メニューに戻る') + '</a>';
+  }
   function route() {
     busy(false);
     IPPO.cleanup.splice(0).forEach(function (fn) { try { fn(); } catch (_) {} });
     var name = (location.hash || '#menu').slice(1);
+    if (!IPPO.views[name]) name = 'menu';
+    if (MENUS.indexOf(name) >= 0) { last = '#' + name; try { sessionStorage.setItem('ippo.lastMenu', last); } catch (_) {} }
     (IPPO.views[name] || IPPO.views.menu)();
     window.scrollTo(0, 0);
   }
@@ -210,7 +234,7 @@
     app: app, state: state, DEMO: DEMO, api: api, route: route, showError: showError, submit: submit, selectHtml: selectHtml,
     esc: esc, today: today, yen: yen, toast: toast, errorsBox: errorsBox, pill: pill, backLink: backLink,
     busy: busy, bootLoading: bootLoading, menuLoading: menuLoading, subMenu: subMenu, canApprove: canApprove,
-    MENUS: MENUS, views: {}, cleanup: []
+    MENUS: MENUS, lastMenu: lastMenu, backHtml: backHtml, views: {}, cleanup: []
   };
 
   // ---------- 起動 ----------

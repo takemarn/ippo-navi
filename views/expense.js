@@ -53,7 +53,7 @@
         '</div>' +
         '<p class="exp-formerr" id="exp-formerr" role="alert" hidden></p>' +
         '<button type="submit" class="exp-send">送信</button>' +
-        '<a class="exp-menu" href="#apply">← メニューに戻る</a>' +
+        (I.backHtml ? I.backHtml('#apply') : '') +
       '</form>' +
       '<div id="exp-after"></div>' +
       '</div>';
@@ -139,6 +139,12 @@
     function clearErr(el) {
       var f = el && el.closest && el.closest('.exp-field, .exp-item');
       if (!f || !f.classList.contains('exp-bad')) return;
+      // 物品の行は、触った欄の赤枠だけ外し、残っている欄があれば赤字をその欄だけで書き直す
+      if (f.classList.contains('exp-item')) {
+        el.classList.remove('exp-bad-in');
+        var left = f.querySelectorAll('.exp-bad-in');
+        if (left.length) { setRowMsg(f, left); return; }
+      }
       f.classList.remove('exp-bad');
       var p = f.querySelector(':scope > .exp-err'); if (p) { p.hidden = true; p.textContent = ''; }
       refreshFormErr();
@@ -154,7 +160,17 @@
       p.textContent = msg; p.hidden = false;
       p.parentNode.classList.add('exp-bad');
     }
+    var FIELD_NAME = { 物品: '物品', 自由入力: '物品名', 個数: '個数', 金額: '金額' };
+    function setRowMsg(row, bads) {
+      var i = Number(row.dataset.i), need = [], intErr = false;
+      Array.prototype.forEach.call(bads, function (el) {
+        if (el.dataset.err === 'int') intErr = true; else need.push(FIELD_NAME[el.id.replace(/^exp-|_\d+$/g, '')]);
+      });
+      var msg = (need.length ? need.join('・') + 'を入れてください' : '') + (intErr ? (need.length ? '。' : '') + '個数は1以上の整数で入れてください' : '');
+      showErr('物品_' + i, (rows.length > 1 ? (i + 1) + '行目：' : '') + msg);
+    }
     function resetErrs() {
+      form.querySelectorAll('.exp-bad-in').forEach(function (f) { f.classList.remove('exp-bad-in'); delete f.dataset.err; });
       form.querySelectorAll('.exp-bad').forEach(function (f) { f.classList.remove('exp-bad'); });
       form.querySelectorAll('.exp-err').forEach(function (p) { p.hidden = true; p.textContent = ''; });
       $('formerr').hidden = true;
@@ -178,15 +194,14 @@
       if (d.小口先出 && !d.対象日) { showErr('対象日', '対象日を入れてください'); n++; }
       if (!d.経費区分) { showErr('経費区分', '経費区分を選んでください'); n++; }
       d.物品.forEach(function (it, i) {
-        var m = [];
-        if (!it.物品) m.push('物品');
-        else if (it.物品 === 'フリー入力' && !it.自由入力) m.push('物品名');
-        var badCount = it.個数 !== '' && !(it.個数 > 0 && Math.floor(it.個数) === it.個数);
-        if (it.個数 === '') m.push('個数');
-        if (it.金額 === '' || !(it.金額 >= 0)) m.push('金額');
-        var msg = (m.length ? m.join('・') + 'を入れてください' : '') +
-          (badCount ? (m.length ? '。' : '') + '個数は1以上の整数で入れてください' : '');
-        if (msg) { showErr('物品_' + i, (d.物品.length > 1 ? (i + 1) + '行目：' : '') + msg); n++; }
+        var bad = function (k, kind) { var el = $(k + '_' + i); if (el) { el.classList.add('exp-bad-in'); el.dataset.err = kind || 'need'; } };
+        if (!it.物品) bad('物品');
+        else if (it.物品 === 'フリー入力' && !it.自由入力) bad('自由入力');
+        if (it.個数 === '') bad('個数');
+        else if (!(it.個数 > 0 && Math.floor(it.個数) === it.個数)) bad('個数', 'int');
+        if (it.金額 === '' || !(it.金額 >= 0)) bad('金額');
+        var row = $('items').children[i], left = row.querySelectorAll('.exp-bad-in');
+        if (left.length) { setRowMsg(row, left); n++; }
       });
       return n;
     }
@@ -242,10 +257,13 @@
       go.disabled = true; fix.disabled = true; box.hidden = true;
       go.innerHTML = '<span class="exp-spin" aria-hidden="true"></span>送信中…';
       go.setAttribute('aria-busy', 'true');
+      if (I.busy) I.busy(true); // 送信中は画面全体をぼかして「読み込み中・・・」（core.js）
       api('submitExpense', d).then(function (res) {
+        if (I.busy) I.busy(false); // 完了カードを同じ画面に出すので自分で消す
         showDone(res || {});
         toast('送信しました');
       }).catch(function (e) {
+        if (I.busy) I.busy(false);
         go.disabled = false; fix.disabled = false; go.textContent = 'もう一度送信する'; go.removeAttribute('aria-busy');
         var list = e && e.details && e.details.length ? e.details : [];
         box.innerHTML = '<strong>' + esc((e && e.message) || '送信できませんでした') + '</strong>' +
@@ -266,6 +284,7 @@
         '<div class="exp-actions">' +
           '<a class="exp-send" href="#requests">自分の申請を見る</a>' +
           '<button type="button" class="exp-back" id="exp-again">続けて経費申請する</button>' +
+          (I.backHtml ? I.backHtml('#apply') : '') +
         '</div>';
       window.scrollTo(0, 0);
       $('done-h').setAttribute('tabindex', '-1'); $('done-h').focus();
