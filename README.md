@@ -21,6 +21,7 @@
 ## ファイル
 
 - `index.html` … 画面の入口
-- `app.js` … 画面の動き（メニュー、経費申請、勤怠申請、自分の申請、承認待ち一覧）
+- `core.js` … 共通の部品（GAS とのやりとり、見本データ、画面の切り替え）
+- `views/*.js` … 画面ごとの動き（menu, apply, expense, attendance, requests, approvals）
 - `style.css` … 見た目
 - `config.js` … LIFF ID と GAS の URL
