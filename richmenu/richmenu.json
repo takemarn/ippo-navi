@@ -1,0 +1,89 @@
+{
+  "size": {
+    "width": 2500,
+    "height": 1686
+  },
+  "selected": true,
+  "name": "IPPO管理ナビ メニュー",
+  "chatBarText": "メニュー",
+  "areas": [
+    {
+      "bounds": {
+        "x": 0,
+        "y": 0,
+        "width": 833,
+        "height": 843
+      },
+      "action": {
+        "type": "uri",
+        "label": "経費勤怠申請",
+        "uri": "https://liff.line.me/LIFF_ID#apply"
+      }
+    },
+    {
+      "bounds": {
+        "x": 833,
+        "y": 0,
+        "width": 834,
+        "height": 843
+      },
+      "action": {
+        "type": "uri",
+        "label": "申請状況",
+        "uri": "https://liff.line.me/LIFF_ID#status"
+      }
+    },
+    {
+      "bounds": {
+        "x": 1667,
+        "y": 0,
+        "width": 833,
+        "height": 843
+      },
+      "action": {
+        "type": "uri",
+        "label": "タスク管理",
+        "uri": "https://liff.line.me/LIFF_ID#task"
+      }
+    },
+    {
+      "bounds": {
+        "x": 0,
+        "y": 843,
+        "width": 833,
+        "height": 843
+      },
+      "action": {
+        "type": "uri",
+        "label": "利用者一覧",
+        "uri": "https://liff.line.me/LIFF_ID#users"
+      }
+    },
+    {
+      "bounds": {
+        "x": 833,
+        "y": 843,
+        "width": 834,
+        "height": 843
+      },
+      "action": {
+        "type": "uri",
+        "label": "シフト管理",
+        "uri": "https://liff.line.me/LIFF_ID#shift"
+      }
+    },
+    {
+      "bounds": {
+        "x": 1667,
+        "y": 843,
+        "width": 833,
+        "height": 843
+      },
+      "action": {
+        "type": "uri",
+        "label": "相談AI",
+        "uri": "https://liff.line.me/LIFF_ID#portal"
+      }
+    }
+  ]
+}

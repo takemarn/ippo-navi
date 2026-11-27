@@ -23,5 +23,7 @@
 - `index.html` … 画面の入口
 - `core.js` … 共通の部品（GAS とのやりとり、見本データ、画面の切り替え）
 - `views/*.js` … 画面ごとの動き（menu, apply, expense, attendance, requests, approvals）
-- `style.css` … 見た目
+- `style.css` … 共通の見た目
+- `css/*.css` … 画面ごとの見た目
+- `richmenu/` … LINE のリッチメニュー画像（2500×1686）・定義・登録手順
 - `config.js` … LIFF ID と GAS の URL

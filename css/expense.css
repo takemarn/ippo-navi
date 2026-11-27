@@ -1,1 +1,99 @@
-/* views/expense.js 専用の見た目。共通部分は style.css */
+/* views/expense.js 専用の見た目。共通部分（背景・カード・ヘッダー）は style.css。
+   色は参考アプリの役割に合わせる（仕様書 0-4）: 濃紺 #12317D、必須 赤 #C0283A、任意 グレー #8A93A0、無効 #E1EAF6 */
+.exp-title { text-align: center; font-size: 18px; font-weight: 700; margin: 0; color: #111; }
+
+.exp-form { display: flex; flex-direction: column; gap: 12px; }
+.exp-form[hidden] { display: none; }
+.exp-card.card { gap: 12px; padding: 14px 12px 16px; border-radius: 16px; }
+
+/* ラベル行: 左にラベル（太字 12px）、右端に (必須)/(任意) 11px */
+.exp-field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.exp-lab { display: flex; align-items: center; gap: 6px; min-height: 22px; }
+.exp-lab label, .exp-lab .exp-lab-name { display: inline; font-size: 12px; font-weight: 700; color: #333; line-height: 1.3; }
+.exp-req, .exp-opt { margin-left: auto; font-size: 11px; font-weight: 700; white-space: nowrap; }
+.exp-req { color: #C0283A; }
+.exp-opt { color: #8A93A0; font-weight: 400; }
+
+/* 入力欄: 白・枠なし・角丸 10px・高さ 38px・文字 14px */
+.exp-form input, .exp-form select, .exp-form textarea {
+  font: inherit; font-size: 14px; color: #1b1f24; background: #fff; border: 1px solid #fff; border-radius: 10px;
+  height: 38px; padding: 0 12px; width: 100%; min-width: 0; margin: 0; box-shadow: 0 1px 2px rgba(40, 70, 130, .06);
+}
+.exp-form textarea { height: 72px; min-height: 72px; padding: 8px 12px; resize: vertical; line-height: 1.5; }
+.exp-form input::placeholder, .exp-form textarea::placeholder { color: #A4ADB8; }
+.exp-form input[readonly] { color: #1b1f24; }
+.exp-form select {
+  -webkit-appearance: none; appearance: none; padding-right: 32px;
+  background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='14' viewBox='0 0 10 14' fill='none' stroke='%23333' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M2 5l3-3 3 3M2 9l3 3 3-3'/%3E%3C/svg%3E") no-repeat right 12px center;
+}
+.exp-form select.exp-empty { color: #6E7782; }
+.exp-form input:focus, .exp-form select:focus, .exp-form textarea:focus { outline: 2px solid #9DB6E8; outline-offset: 0; border-color: #12317D; }
+
+/* 無効（使えない）項目: 地はカードとほぼ同じ、ラベルも薄く */
+.exp-form input:disabled, .exp-form select:disabled { background-color: #E1EAF6; border-color: #E1EAF6; color: #9AA5B1; box-shadow: none; opacity: 1; -webkit-text-fill-color: #9AA5B1; }
+.exp-off .exp-lab label { color: #9AA5B1; font-weight: 400; }
+/* 参考アプリと同じく、使えない欄は中身を見せない（値は残る） */
+.exp-form input:disabled { color: transparent; -webkit-text-fill-color: transparent; }
+.exp-form [hidden] { display: none !important; }
+.exp-off .exp-req { color: #E3A0A9; font-weight: 400; }
+
+/* 物品: 追加（緑）・削除（赤）の小ピル */
+.exp-pill {
+  font: inherit; font-size: 11px; font-weight: 700; line-height: 1; padding: 6px 9px; border-radius: 8px; cursor: pointer;
+  min-height: 26px; box-shadow: none; width: auto;
+}
+.exp-add { background: #DFF3E3; color: #1E8A3A; border: 1px solid #9CD6AA; }
+.exp-del { background: #FCE1E4; color: #C0283A; border: 1px solid #EFA9B2; }
+.exp-del:disabled { opacity: .55; cursor: default; }
+.exp-items { display: flex; flex-direction: column; gap: 8px; }
+.exp-item { display: flex; flex-direction: column; gap: 6px; }
+.exp-item-row { display: grid; grid-template-columns: minmax(0, 15fr) minmax(0, 5fr) minmax(0, 10fr); gap: 8px; }
+.exp-item-row input { padding: 0 8px; text-align: left; -moz-appearance: textfield; }
+.exp-item-row input::-webkit-outer-spin-button, .exp-item-row input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.exp-total { margin: 0; text-align: right; font-size: 11px; color: #5B6572; font-variant-numeric: tabular-nums; }
+
+/* エラー: 項目の下に赤字、欄は赤枠 */
+.exp-err { margin: 0; font-size: 11px; color: #C0283A; line-height: 1.4; }
+.exp-bad > input, .exp-bad > select, .exp-bad > textarea, .exp-bad .exp-item-row > *, .exp-bad > .exp-free { border-color: #E0707E; }
+.exp-formerr { margin: 0; text-align: center; font-size: 12px; font-weight: 700; color: #C0283A; }
+
+/* 送信ボタン: カードの外、全幅・濃紺・白文字 */
+.exp-send {
+  display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; min-height: 40px; padding: 8px 16px;
+  font: inherit; font-size: 13px; font-weight: 400; color: #fff; background: #12317D; border: 1px solid #12317D; border-radius: 10px;
+  text-decoration: none; cursor: pointer; box-shadow: 0 2px 8px rgba(18, 49, 125, .18);
+}
+.exp-send:disabled { opacity: .7; cursor: default; }
+.exp-back {
+  display: flex; align-items: center; justify-content: center; width: 100%; min-height: 40px; padding: 8px 16px;
+  font: inherit; font-size: 13px; font-weight: 400; color: #12317D; background: #fff; border: 1px solid #C9DBF5; border-radius: 10px; cursor: pointer;
+}
+.exp-back:disabled { opacity: .5; cursor: default; }
+.exp-actions { display: flex; flex-direction: column; gap: 10px; margin-top: 12px; }
+.exp-spin { width: 14px; height: 14px; border: 2px solid rgba(255, 255, 255, .4); border-top-color: #fff; border-radius: 50%; }
+@media (prefers-reduced-motion: no-preference) { .exp-spin { animation: exp-spin .8s linear infinite; } }
+@keyframes exp-spin { to { transform: rotate(360deg); } }
+
+/* 確認カード */
+.exp-cf-h { margin: 0; font-size: 15px; font-weight: 700; text-align: center; color: #111; }
+.exp-dl { display: grid; grid-template-columns: 5.5em minmax(0, 1fr); gap: 0; margin: 0; font-size: 14px; background: #fff; border-radius: 12px; padding: 4px 12px; }
+.exp-dl dt, .exp-dl dd { padding: 9px 0; border-top: 1px solid #E7EDF6; margin: 0; }
+.exp-dl dt:first-of-type, .exp-dl dt:first-of-type + dd { border-top: 0; }
+.exp-dl dt { font-size: 12px; font-weight: 700; color: #5B6572; }
+.exp-dl dd { overflow-wrap: anywhere; white-space: pre-wrap; }
+.exp-none { color: #9AA5B1; }
+.exp-lines { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; white-space: normal; }
+.exp-lines li { display: flex; justify-content: space-between; gap: 8px; font-variant-numeric: tabular-nums; }
+.exp-lines .exp-sum { border-top: 1px dashed #C9DBF5; padding-top: 4px; font-weight: 700; }
+.exp-senderr { background: #FCE1E4; color: #C0283A; border-radius: 10px; padding: 10px 12px; font-size: 13px; }
+.exp-senderr p, .exp-senderr ul { margin: 4px 0 0; }
+.exp-senderr ul { padding-left: 1.2em; }
+
+/* 完了カード */
+.exp-done { align-items: center; text-align: center; padding: 24px 16px; }
+.exp-done h2 { margin: 0; font-size: 16px; font-weight: 700; color: #111; outline: none; }
+.exp-done p { margin: 0; }
+.exp-done-ic { width: 48px; height: 48px; fill: none; stroke: #12317D; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+.exp-done-id { font-size: 12px; color: #5B6572; font-variant-numeric: tabular-nums; }
+.exp-done-note { font-size: 12px; color: #5B6572; }
+.exp-form input:disabled::-webkit-calendar-picker-indicator { display: none; }

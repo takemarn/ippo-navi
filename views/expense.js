@@ -1,80 +1,257 @@
-/* expense の画面 */
+/* 経費申請の画面（#expense）
+   参考アプリの並び: 申請者 → 小口先出 → 対象日 → 施設名 → 経費区分 → 物品（追加/削除） → 備考、カードの外に「送信」。
+   送信の流れ: 送信 → 入力チェック（項目の下に赤字） → ページ内の確認カード → 送信中 → 完了カード。
+   GAS に送る data の形は docs/api.md のまま: {対象日, 小口先出, 経費区分, 物品: [{物品, 自由入力?, 個数, 金額}], 備考?} */
 (function () {
   'use strict';
-  var I = window.IPPO, app = I.app, state = I.state, api = I.api, esc = I.esc, today = I.today, yen = I.yen, toast = I.toast,
-    errorsBox = I.errorsBox, pill = I.pill, backLink = I.backLink, selectHtml = I.selectHtml, submit = I.submit, showError = I.showError, route = I.route;
+  var I = window.IPPO, app = I.app, state = I.state, api = I.api, esc = I.esc, today = I.today, yen = I.yen, toast = I.toast;
+
+  var FACILITIES = ['モア一津屋']; // 施設は1つだけ。表示のみで、送るデータには入れない
+
+  // 空行を先頭に置くセレクト（参考アプリと同じく、未選択は空）
+  function sel(id, list, value, first, disabled) {
+    return '<select id="' + id + '"' + (disabled ? ' disabled' : '') + '>' +
+      (first === null ? '' : '<option value="">' + esc(first || '') + '</option>') +
+      list.map(function (v) { return '<option' + (v === value ? ' selected' : '') + '>' + esc(v) + '</option>'; }).join('') +
+      '</select>';
+  }
+  function head(forId, label, req, extra) {
+    return '<div class="exp-lab"><label for="' + forId + '">' + label + '</label>' + (extra || '') +
+      '<span class="' + (req ? 'exp-req">(必須)' : 'exp-opt">(任意)') + '</span></div>';
+  }
+  function field(key, inner) {
+    return '<div class="exp-field" data-f="' + key + '">' + inner + '<p class="exp-err" id="exp-err-' + key + '" hidden></p></div>';
+  }
 
   function viewExpense() {
-    var o = state.options;
+    var o = state.options || {};
+    var goods = (o.物品 || []).slice();
+    if (goods.indexOf('フリー入力') < 0) goods.unshift('フリー入力');
     var rows = [{}];
-    app.innerHTML = backLink('#apply', '経費勤怠申請') + '<h1>経費申請</h1>' +
-      '<form id="f" class="card" novalidate>' +
-        '<label>申請者<input value="' + esc(state.me.氏名) + '" disabled></label>' +
-        '<div class="two">' +
-          '<label>対象日<span class="req">必須</span><input type="date" id="対象日" value="' + today() + '"></label>' +
-          '<label>小口先出<span class="req">必須</span>' + selectHtml('小口先出', o.小口先出 || []) + '</label>' +
-        '</div>' +
-        '<label>経費区分<span class="req">必須</span>' + selectHtml('経費区分', o.経費区分 || []) + '</label>' +
-        '<div id="items" class="list"></div>' +
-        '<button type="button" class="sub" id="add">＋ 物品を追加</button>' +
-        '<div class="row"><strong>合計</strong><strong id="total">0円</strong></div>' +
-        '<label>備考<span class="opt">任意</span><textarea id="備考"></textarea></label>' +
-        '<div id="err"></div>' +
-        '<button type="submit" id="send">送信</button>' +
-      '</form>';
 
+    app.innerHTML =
+      '<h1 class="exp-title">経費申請</h1>' +
+      '<div id="exp-stage">' +
+      '<form id="exp-form" class="exp-form" novalidate>' +
+        '<div class="card exp-card">' +
+          field('申請者', head('exp-申請者', '申請者', true) +
+            '<input id="exp-申請者" value="' + esc(state.me && state.me.氏名) + '" readonly aria-readonly="true">') +
+          field('小口先出', head('exp-小口先出', '小口先出', true) + sel('exp-小口先出', o.小口先出 || [])) +
+          // 参考アプリと同じく、小口先出を選ぶまで対象日は使えない
+          field('対象日', head('exp-対象日', '対象日', true) + '<input type="date" id="exp-対象日" value="' + today() + '" disabled>') +
+          field('施設名', head('exp-施設名', '施設名', true) + sel('exp-施設名', FACILITIES, FACILITIES[0], null)) +
+          field('経費区分', head('exp-経費区分', '経費区分', true) + sel('exp-経費区分', o.経費区分 || [])) +
+          '<div class="exp-field" data-f="物品">' +
+            '<div class="exp-lab"><span class="exp-lab-name" id="exp-物品-lab">物品</span>' +
+              '<button type="button" class="exp-pill exp-add" id="exp-add">追加</button>' +
+              '<button type="button" class="exp-pill exp-del" id="exp-del">削除</button>' +
+              '<span class="exp-req">(必須)</span></div>' +
+            '<div id="exp-items" class="exp-items" role="group" aria-labelledby="exp-物品-lab"></div>' +
+            '<p class="exp-total" id="exp-total" hidden></p>' +
+          '</div>' +
+          field('備考', head('exp-備考', '備考', false) + '<textarea id="exp-備考"></textarea>') +
+        '</div>' +
+        '<p class="exp-formerr" id="exp-formerr" role="alert" hidden></p>' +
+        '<button type="submit" class="exp-send">送信</button>' +
+      '</form>' +
+      '<div id="exp-after"></div>' +
+      '</div>';
+
+    var form = document.getElementById('exp-form');
+    var after = document.getElementById('exp-after');
+    function $(id) { return document.getElementById('exp-' + id); }
+
+    // ---------- 物品の行 ----------
     function drawItems() {
-      var box = document.getElementById('items');
-      box.innerHTML = rows.map(function (r, i) {
-        return '<div class="item" data-i="' + i + '">' +
-          '<div class="item-head">物品 ' + (i + 1) + (rows.length > 1 ? '<button type="button" class="small danger" data-del="' + i + '">削除</button>' : '') + '</div>' +
-          '<label>物品<span class="req">必須</span>' + selectHtml('物品_' + i, o.物品 || [], r.物品) + '</label>' +
-          (r.物品 === 'フリー入力' ? '<label>物品名<span class="req">必須</span><input id="自由入力_' + i + '" value="' + esc(r.自由入力 || '') + '"></label>' : '') +
-          '<div class="two">' +
-            '<label>個数<span class="req">必須</span><input type="number" inputmode="numeric" min="1" id="個数_' + i + '" value="' + esc(r.個数 || '') + '"></label>' +
-            '<label>金額（円）<span class="req">必須</span><input type="number" inputmode="numeric" min="0" id="金額_' + i + '" value="' + esc(r.金額 === undefined ? '' : r.金額) + '"></label>' +
-          '</div></div>';
+      $('items').innerHTML = rows.map(function (r, i) {
+        var free = r.物品 === 'フリー入力';
+        return '<div class="exp-item" data-i="' + i + '">' +
+          '<div class="exp-item-row">' +
+            sel('exp-物品_' + i, goods, r.物品, '物品').replace('<select', '<select aria-label="物品 ' + (i + 1) + '行目"' + (r.物品 ? '' : ' class="exp-empty"')) +
+            '<input type="number" inputmode="numeric" min="1" step="1" id="exp-個数_' + i + '" placeholder="個数" aria-label="個数 ' + (i + 1) + '行目" value="' + esc(r.個数 || '') + '">' +
+            '<input type="number" inputmode="numeric" min="0" step="1" id="exp-金額_' + i + '" placeholder="金額" aria-label="金額（円） ' + (i + 1) + '行目" value="' + esc(r.金額 === undefined ? '' : r.金額) + '">' +
+          '</div>' +
+          (free ? '<input class="exp-free" id="exp-自由入力_' + i + '" placeholder="物品名を入力" aria-label="物品名 ' + (i + 1) + '行目" value="' + esc(r.自由入力 || '') + '">' : '') +
+          '<p class="exp-err" id="exp-err-物品_' + i + '" hidden></p>' +
+        '</div>';
       }).join('');
+      $('del').disabled = rows.length <= 1;
       updateTotal();
     }
     function collect() {
       rows = rows.map(function (_, i) {
-        var g = function (k) { var el = document.getElementById(k + '_' + i); return el ? el.value : undefined; };
+        var g = function (k) { var el = $(k + '_' + i); return el ? el.value : undefined; };
         return { 物品: g('物品'), 自由入力: g('自由入力'), 個数: g('個数'), 金額: g('金額') };
       });
     }
     function updateTotal() {
-      var sum = 0;
-      rows.forEach(function (_, i) { var el = document.getElementById('金額_' + i); sum += Number(el && el.value || 0); });
-      document.getElementById('total').textContent = yen(sum);
+      var sum = 0, any = false;
+      rows.forEach(function (_, i) { var el = $('金額_' + i); if (el && el.value !== '') { any = true; sum += Number(el.value || 0); } });
+      $('total').hidden = !any;
+      $('total').textContent = '合計 ' + yen(sum);
     }
     drawItems();
-    var form = document.getElementById('f');
-    form.addEventListener('input', function (e) { if (/^金額_/.test(e.target.id)) updateTotal(); });
-    form.addEventListener('change', function (e) { if (/^物品_/.test(e.target.id)) { collect(); drawItems(); } });
-    form.addEventListener('click', function (e) {
-      if (e.target.id === 'add') { collect(); rows.push({}); drawItems(); }
-      if (e.target.dataset && e.target.dataset.del !== undefined) { collect(); rows.splice(Number(e.target.dataset.del), 1); drawItems(); }
-    });
-    form.addEventListener('submit', function (e) {
-      e.preventDefault(); collect();
-      var v = function (id) { return document.getElementById(id).value; };
-      var data = { 対象日: v('対象日'), 小口先出: v('小口先出'), 経費区分: v('経費区分'), 物品: rows.map(function (r) {
-        return { 物品: r.物品, 自由入力: r.自由入力, 個数: Number(r.個数), 金額: r.金額 === '' ? '' : Number(r.金額) };
-      }), 備考: v('備考') };
-      var errs = [];
-      if (!data.対象日) errs.push('対象日を入れてください');
-      if (!data.小口先出) errs.push('小口先出を選んでください');
-      if (!data.経費区分) errs.push('経費区分を選んでください');
-      data.物品.forEach(function (it, i) {
-        if (!it.物品 || (it.物品 === 'フリー入力' && !it.自由入力)) errs.push((i + 1) + '行目の物品を選んでください');
-        if (!(it.個数 > 0)) errs.push((i + 1) + '行目の個数を入れてください');
-        if (it.金額 === '' || !(it.金額 >= 0)) errs.push((i + 1) + '行目の金額を入れてください');
-      });
-      submit(errs, 'submitExpense', data);
-    });
-  }
 
+    // ---------- 入力に応じた切り替え ----------
+    function syncDate() {
+      var on = !!$('小口先出').value;
+      $('対象日').disabled = !on;
+      $('対象日').closest('.exp-field').classList.toggle('exp-off', !on);
+    }
+    syncDate();
+
+    form.addEventListener('input', function (e) {
+      if (/^exp-金額_/.test(e.target.id)) updateTotal();
+      clearErr(e.target);
+    });
+    form.addEventListener('change', function (e) {
+      var id = e.target.id;
+      if (id === 'exp-小口先出') syncDate();
+      if (/^exp-物品_/.test(id)) {
+        collect(); drawItems();
+        var free = $('自由入力_' + id.split('_')[1]); if (free) free.focus();
+      }
+      if (e.target.tagName === 'SELECT') e.target.classList.toggle('exp-empty', !e.target.value);
+      clearErr(e.target);
+    });
+    $('add').addEventListener('click', function () {
+      collect(); rows.push({}); drawItems();
+      var last = $('物品_' + (rows.length - 1)); if (last) last.focus();
+    });
+    // 参考アプリと同じく「削除」は最後の行を消す（1行は残す）
+    $('del').addEventListener('click', function () {
+      if (rows.length <= 1) return;
+      collect(); rows.pop(); drawItems();
+    });
+
+    // ---------- エラー表示（項目の下に赤字） ----------
+    function clearErr(el) {
+      var f = el && el.closest && el.closest('.exp-field, .exp-item');
+      if (!f || !f.classList.contains('exp-bad')) return;
+      f.classList.remove('exp-bad');
+      var p = f.querySelector(':scope > .exp-err'); if (p) { p.hidden = true; p.textContent = ''; }
+      if (!form.querySelector('.exp-bad')) $('formerr').hidden = true;
+    }
+    function showErr(key, msg) {
+      var p = $('err-' + key); if (!p) return;
+      p.textContent = msg; p.hidden = false;
+      p.parentNode.classList.add('exp-bad');
+    }
+    function resetErrs() {
+      form.querySelectorAll('.exp-bad').forEach(function (f) { f.classList.remove('exp-bad'); });
+      form.querySelectorAll('.exp-err').forEach(function (p) { p.hidden = true; p.textContent = ''; });
+      $('formerr').hidden = true;
+    }
+
+    function readData() {
+      collect();
+      return {
+        対象日: $('対象日').value, 小口先出: $('小口先出').value, 経費区分: $('経費区分').value,
+        物品: rows.map(function (r) {
+          var it = { 物品: r.物品 || '', 個数: r.個数 === '' || r.個数 === undefined ? '' : Number(r.個数), 金額: r.金額 === '' || r.金額 === undefined ? '' : Number(r.金額) };
+          if (r.物品 === 'フリー入力') it.自由入力 = (r.自由入力 || '').trim();
+          return it;
+        }),
+        備考: $('備考').value.trim()
+      };
+    }
+    function validate(d) {
+      var n = 0;
+      if (!d.小口先出) { showErr('小口先出', '小口先出を選んでください'); n++; }
+      if (d.小口先出 && !d.対象日) { showErr('対象日', '対象日を入れてください'); n++; }
+      if (!d.経費区分) { showErr('経費区分', '経費区分を選んでください'); n++; }
+      d.物品.forEach(function (it, i) {
+        var m = [];
+        if (!it.物品) m.push('物品を選んでください');
+        else if (it.物品 === 'フリー入力' && !it.自由入力) m.push('物品名を入れてください');
+        if (!(it.個数 > 0) || Math.floor(it.個数) !== it.個数) m.push('個数は1以上の整数で');
+        if (it.金額 === '' || !(it.金額 >= 0)) m.push('金額を入れてください');
+        if (m.length) { showErr('物品_' + i, (d.物品.length > 1 ? (i + 1) + '行目：' : '') + m.join('／')); n++; }
+      });
+      return n;
+    }
+
+    // ---------- 送信 → 確認 → 送信中 → 完了 ----------
+    form.addEventListener('submit', function (e) {
+      e.preventDefault();
+      resetErrs();
+      var d = readData();
+      var n = validate(d);
+      if (n) {
+        $('formerr').textContent = '入力を確認してください（' + n + '件）';
+        $('formerr').hidden = false;
+        var first = form.querySelector('.exp-bad');
+        if (first) { first.scrollIntoView({ block: 'center' }); var f = first.querySelector('select, input, textarea'); if (f && !f.disabled) f.focus({ preventScroll: true }); }
+        return;
+      }
+      showConfirm(d);
+    });
+
+    function showConfirm(d) {
+      var sum = d.物品.reduce(function (a, it) { return a + Number(it.金額 || 0); }, 0);
+      var lines = d.物品.map(function (it) {
+        return '<li><span>' + esc(it.物品 === 'フリー入力' ? it.自由入力 : it.物品) + ' × ' + esc(it.個数) + '</span><span>' + esc(yen(it.金額)) + '</span></li>';
+      }).join('');
+      form.hidden = true;
+      after.innerHTML =
+        '<section class="card exp-card exp-confirm" aria-labelledby="exp-cf-h">' +
+          '<h2 id="exp-cf-h" class="exp-cf-h">この内容で送信しますか？</h2>' +
+          '<dl class="exp-dl">' +
+            '<dt>申請者</dt><dd>' + esc(state.me && state.me.氏名) + '</dd>' +
+            '<dt>小口先出</dt><dd>' + esc(d.小口先出) + '</dd>' +
+            '<dt>対象日</dt><dd>' + esc(d.対象日) + '</dd>' +
+            '<dt>施設名</dt><dd>' + esc($('施設名').value) + '</dd>' +
+            '<dt>経費区分</dt><dd>' + esc(d.経費区分) + '</dd>' +
+            '<dt>物品</dt><dd><ul class="exp-lines">' + lines + '<li class="exp-sum"><span>合計</span><span>' + esc(yen(sum)) + '</span></li></ul></dd>' +
+            '<dt>備考</dt><dd>' + (d.備考 ? esc(d.備考) : '<span class="exp-none">なし</span>') + '</dd>' +
+          '</dl>' +
+          '<div class="exp-senderr" id="exp-senderr" role="alert" hidden></div>' +
+        '</section>' +
+        '<div class="exp-actions">' +
+          '<button type="button" class="exp-send" id="exp-go">この内容で送信</button>' +
+          '<button type="button" class="exp-back" id="exp-fix">戻って直す</button>' +
+        '</div>';
+      window.scrollTo(0, 0);
+      $('fix').addEventListener('click', function () { after.innerHTML = ''; form.hidden = false; window.scrollTo(0, 0); });
+      $('go').addEventListener('click', function () { send(d); });
+      $('go').focus({ preventScroll: true });
+    }
+
+    function send(d) {
+      var go = $('go'), fix = $('fix'), box = $('senderr');
+      go.disabled = true; fix.disabled = true; box.hidden = true;
+      go.innerHTML = '<span class="exp-spin" aria-hidden="true"></span>送信中…';
+      go.setAttribute('aria-busy', 'true');
+      api('submitExpense', d).then(function (res) {
+        showDone(res || {});
+        toast('送信しました');
+      }).catch(function (e) {
+        go.disabled = false; fix.disabled = false; go.textContent = 'もう一度送信する'; go.removeAttribute('aria-busy');
+        var list = e && e.details && e.details.length ? e.details : [];
+        box.innerHTML = '<strong>' + esc((e && e.message) || '送信できませんでした') + '</strong>' +
+          (list.length ? '<ul>' + list.map(function (x) { return '<li>' + esc(x) + '</li>'; }).join('') + '</ul>' : '<p>通信の状態を確かめて、もう一度送信してください。</p>');
+        box.hidden = false;
+      });
+    }
+
+    function showDone(res) {
+      after.innerHTML =
+        '<section class="card exp-card exp-done" aria-labelledby="exp-done-h">' +
+          '<svg class="exp-done-ic" viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="21"/><path d="M14 24.5l7 7 13-14"/></svg>' +
+          '<h2 id="exp-done-h">経費申請を送信しました</h2>' +
+          '<p class="exp-done-id">申請番号 ' + esc(res.申請ID || '—') + '</p>' +
+          (res.状態 ? '<p>' + I.pill(res.状態) + '</p>' : '') +
+          '<p class="exp-done-note">承認されると「自分の申請」の状態が変わります。</p>' +
+        '</section>' +
+        '<div class="exp-actions">' +
+          '<a class="exp-send" href="#requests">自分の申請を見る</a>' +
+          '<button type="button" class="exp-back" id="exp-again">続けて経費申請する</button>' +
+        '</div>';
+      window.scrollTo(0, 0);
+      $('done-h').setAttribute('tabindex', '-1'); $('done-h').focus();
+      $('again').addEventListener('click', viewExpense);
+    }
+  }
 
   I.views.expense = viewExpense;
 })();

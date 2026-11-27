@@ -1,1 +1,51 @@
-/* views/menu.js 専用の見た目。共通部分は style.css */
+/* views/menu.js・views/apply.js 専用の見た目（入口の6タイルと、各メニュー画面）。共通部分は style.css */
+
+/* ---------- 入口: リッチメニューと同じ 3列×2段 ---------- */
+.tiles {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 2px; margin-top: 2px;
+  background: #fff; border: 2px solid #fff; border-radius: 16px; overflow: hidden; box-shadow: var(--glass-shadow);
+}
+.tile {
+  position: relative; overflow: hidden; display: flex; flex-direction: column; align-items: center; justify-content: flex-end;
+  min-height: 140px; padding: 10px 4px 9px; text-decoration: none; color: var(--fg); text-align: center;
+  background: linear-gradient(160deg, #fff 0%, #fff 45%, var(--tint) 100%);
+}
+.tile:active { filter: brightness(.94); }
+.tblob {
+  position: absolute; left: -22px; top: -22px; width: 64px; height: 64px; border-radius: 50%;
+  background: var(--tint); opacity: .9;
+}
+.ticon { position: relative; width: 64px; height: 64px; margin-bottom: 2px; fill: none; stroke: currentColor; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
+.ticon .f { fill: currentColor; fill-opacity: .13; stroke: none; }
+.ticon .w { fill: #fff; }
+.tlabel { position: relative; font-size: 13px; font-weight: 800; letter-spacing: .06em; line-height: 1.3; }
+.ten { position: relative; font-size: 7px; letter-spacing: .08em; color: #9aa3ad; line-height: 1.4; margin-top: 1px; white-space: nowrap; }
+.tno {
+  position: relative; margin-top: 6px; width: 17px; height: 17px; border-radius: 50%; background: var(--badge); color: #fff;
+  font-size: 10px; font-weight: 800; display: grid; place-items: center; line-height: 1;
+}
+.tiles-note { font-size: 10px; color: var(--muted); text-align: center; }
+
+/* ---------- メニュー画面（参考 2章）: すりガラスのグループ＋白い角丸ボタン、下に単独ボタン ---------- */
+.mgroup {
+  background: linear-gradient(180deg, rgba(204, 222, 249, .78), rgba(222, 228, 250, .78)); border: 1px solid #b4cbef; border-radius: 16px;
+  box-shadow: var(--glass-shadow); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+  padding: 12px; display: flex; flex-direction: column; gap: 10px;
+  box-shadow: 0 4px 16px rgba(80, 110, 170, .18), inset 0 0 0 1px rgba(255, 255, 255, .5);
+}
+.mbtn {
+  position: relative; display: flex; align-items: center; justify-content: center; gap: 6px; width: 100%;
+  min-height: 40px; padding: 6px 12px; border: 0; border-radius: 10px; background: #fff; color: #3583da;
+  font: inherit; font-size: 13px; font-weight: 500; text-decoration: none; cursor: pointer;
+  box-shadow: 0 1px 3px rgba(60, 90, 140, .12);
+}
+.mbtn:active { background: #e6e9ee; }
+.mbtn:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+.msolo { margin-top: 2px; }
+.msolo .mbtn { box-shadow: 0 2px 8px rgba(60, 90, 140, .12); }
+.mtag {
+  position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
+  font-size: 10px; font-weight: 700; color: var(--muted); background: #eef1f5; border-radius: 999px; padding: 0 8px; line-height: 1.7;
+}
+
+.mbtn .badge { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); }

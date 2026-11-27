@@ -3,6 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#dcebfa">
+<meta name="color-scheme" content="light">
 <title>IPPO管理ナビ</title>
 <link rel="stylesheet" href="style.css">
 <link rel="stylesheet" href="css/menu.css">
@@ -15,12 +17,13 @@
   <a href="#menu" class="brand">IPPO管理ナビ</a>
   <span id="who" class="who"></span>
 </header>
-<div id="demo" class="demo" hidden>見本モード：架空のデータで表示しています。送信しても保存されません。</div>
-<main id="app" aria-live="polite"><p class="loading">読み込み中…</p></main>
+<main id="app" aria-live="polite"><div class="boot" role="status"><div class="boot-card"><span class="spin" aria-hidden="true"></span>読み込み中...</div></div></main>
+<p id="demo" class="demo" hidden>見本モード：架空のデータで表示しています。送信しても保存されません。</p>
 <div id="toast" class="toast" role="status" hidden></div>
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 <script src="config.js"></script>
 <script src="core.js"></script>
+<script src="richmenu/tiles.js"></script>
 <script src="views/menu.js"></script>
 <script src="views/apply.js"></script>
 <script src="views/expense.js"></script>
