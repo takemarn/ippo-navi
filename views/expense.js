@@ -119,6 +119,10 @@
       if (on && !cur) {
         $('物品_' + i).closest('.exp-item-row').insertAdjacentHTML('afterend',
           '<input class="exp-free" id="exp-自由入力_' + i + '" placeholder="物品名を入力" aria-label="物品名 ' + (i + 1) + '行目">');
+        // エラー表示中の行なら、出てきた物品名の欄も最初からエラー扱いにする（赤字は clearErr で書き直す）
+        if ($('物品_' + i).closest('.exp-item').classList.contains('exp-bad')) {
+          $('自由入力_' + i).classList.add('exp-bad-in'); $('自由入力_' + i).dataset.err = 'need';
+        }
         $('自由入力_' + i).focus();
       } else if (!on && cur) cur.remove();
     }
@@ -166,6 +170,8 @@
       Array.prototype.forEach.call(bads, function (el) {
         if (el.dataset.err === 'int') intErr = true; else need.push(FIELD_NAME[el.id.replace(/^exp-|_\d+$/g, '')]);
       });
+      var ORDER = ['物品', '物品名', '個数', '金額'];
+      need.sort(function (a, b) { return ORDER.indexOf(a) - ORDER.indexOf(b); });
       var msg = (need.length ? need.join('・') + 'を入れてください' : '') + (intErr ? (need.length ? '。' : '') + '個数は1以上の整数で入れてください' : '');
       showErr('物品_' + i, (rows.length > 1 ? (i + 1) + '行目：' : '') + msg);
     }

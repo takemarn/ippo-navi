@@ -216,9 +216,15 @@
   var last = null;
   try { last = sessionStorage.getItem('ippo.lastMenu'); } catch (_) {}
   function lastMenu() { return last && MENUS.indexOf(last.slice(1)) >= 0 ? last : '#menu'; }
-  // 共通の戻る部品。href 省略 → 最後に開いたメニュー、label 省略 →「メニューに戻る」。フォームや一覧の下に置く
+  // メニュー画面の名前（タイル名は richmenu/tiles.js と同じ）。#menu や不明なものは「メニュー」
+  function menuName(h) {
+    var t = (window.IPPO_TILES || []).filter(function (x) { return '#' + x.hash === h; })[0];
+    return t ? t.label : 'メニュー';
+  }
+  // 共通の戻る部品。href 省略 → 最後に開いたメニュー、label 省略 →「<行き先のメニュー名>に戻る」（#apply なら「経費勤怠申請に戻る」）。フォームや一覧の下に置く
   function backHtml(href, label) {
-    return '<a class="ipp-back" href="' + esc(href || lastMenu()) + '"><span aria-hidden="true">‹</span> ' + esc(label || 'メニューに戻る') + '</a>';
+    var to = href || lastMenu();
+    return '<a class="ipp-back" href="' + esc(to) + '"><span aria-hidden="true">‹</span> ' + esc(label || (menuName(to) + 'に戻る')) + '</a>';
   }
   function route() {
     busy(false);
