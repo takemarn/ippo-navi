@@ -1,0 +1,185 @@
+/* views/shift.js 専用の見た目（シフト提出・シフト確認・シフト作成）。共通部分は style.css
+   色の役割（参考アプリ 4:16〜）: 出勤可=淡い水色、出勤不可=淡いピンク、休み希望=淡い緑、確定した勤務=濃い赤 */
+:root {
+  --sft-ok-bg: #dbe8f8; --sft-ok-fg: #2a5fae;
+  --sft-ng-bg: #f9dade; --sft-ng-fg: #b4283a;
+  --sft-off-bg: #daf2df; --sft-off-fg: #1d7a3a;
+  --sft-none-bg: #f3f6fb;
+  --sft-work: #b0300f;
+  --sft-sun: #c0283a; --sft-sat: #2346c8; --sft-wd: #2f7bd6;
+}
+
+/* ---------- 見出し（左寄せ・氏名は小さく灰色） ---------- */
+.sft-head { display: flex; flex-direction: column; gap: 8px; padding: 0 4px; }
+.sft-title { text-align: left; font-size: 20px; font-weight: 800; margin: 4px 0 0; }
+.sft-title small { font-size: 12px; font-weight: 500; color: var(--muted); margin-left: 6px; }
+.sft-info { display: flex; flex-direction: column; gap: 2px; font-size: 11px; }
+.sft-info:empty { display: none; }
+.sft-info p { display: flex; flex-wrap: wrap; gap: 2px 14px; }
+.sft-info em { font-style: normal; color: var(--muted); }
+.sft-info span { font-weight: 700; color: #333; }
+.chk-fac { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block !important; }
+
+/* 凡例（出勤可・出勤不可・休み希望） */
+.sft-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.sft-chip { display: inline-flex; align-items: center; min-height: 28px; padding: 0 12px; border-radius: 999px; font-size: 11px; font-weight: 700; color: #333; background: #e6edf6; }
+.sft-chip.ng { background: var(--sft-ng-bg); color: #7a2430; }
+.sft-chip.off { background: var(--sft-off-bg); color: #1d6a35; }
+.sft-chip.ok { background: #e3eaf3; color: #333; }
+
+/* ---------- カレンダー（白いカード） ---------- */
+.sft-cal { background: #fff; border-radius: 16px; padding: 12px 10px 14px; box-shadow: var(--glass-shadow); }
+.sft-calnav { display: flex; align-items: center; justify-content: center; gap: clamp(8px, 4vw, 18px); margin-bottom: 10px; }
+.sft-calnav b { font-size: 18px; font-weight: 800; white-space: nowrap; text-align: center; font-variant-numeric: tabular-nums; }
+.sft-navbtn { flex: none; white-space: nowrap; min-height: 32px; padding: 0 14px; font-size: 12px; font-weight: 700; color: #333; background: #fff; border: 1px solid #e3e8ef; border-radius: 999px; box-shadow: 0 1px 3px rgba(60, 90, 140, .1); }
+.sft-navbtn:active { background: #eef2f7; }
+.sft-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
+.sft-dow { margin-bottom: 8px; }
+.sft-dow span { text-align: center; font-size: 11px; font-weight: 700; color: #6e7782; }
+.sft-dow .d0 { color: var(--sft-sun); }
+.sft-dow .d6 { color: var(--sft-sat); }
+.sft-day {
+  font: inherit; display: grid; place-items: center; aspect-ratio: 1 / .9; min-height: 0; padding: 0;
+  border-radius: 10px; border: 2px solid transparent; background: var(--sft-none-bg); box-shadow: none;
+  font-size: 15px; font-weight: 800; color: var(--sft-wd); cursor: pointer; position: relative; font-variant-numeric: tabular-nums;
+}
+.sft-day:active { filter: brightness(.95); background-color: inherit; }
+.sft-day.d0 { color: var(--sft-sun); }
+.sft-day.d6 { color: var(--sft-sat); }
+.sft-day.ok { background: var(--sft-ok-bg); }
+.sft-day.ng { background: var(--sft-ng-bg); }
+.sft-day.off { background: var(--sft-off-bg); }
+.sft-day.sel { border-color: #5a78b0; box-shadow: 0 0 0 1px rgba(90, 120, 176, .25); }
+.sft-day.out { opacity: .35; background: #f5f8fc; cursor: default; font-weight: 600; }
+.sft-day:disabled { opacity: .6; cursor: default; }
+/* まだ送っていない日には右上に小さな点 */
+.sft-day.dirty::after { content: ""; position: absolute; top: 4px; right: 4px; width: 6px; height: 6px; border-radius: 50%; background: #e2702a; }
+
+/* ---------- 予定・メモ（白いカード） ---------- */
+.sft-plan { background: #fff; border-radius: 16px; padding: 14px 14px 16px; box-shadow: var(--glass-shadow); display: flex; flex-direction: column; gap: 12px; }
+.sft-plan-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.sft-plan-row b { font-size: 13px; }
+.sft-seldate { font-size: 13px; color: #6e7782; font-variant-numeric: tabular-nums; }
+/* 予定のピル（中身は select。「--」→ 出勤可 / 出勤不可 / 休み希望） */
+.sft-wish {
+  width: auto; min-width: 96px; min-height: 36px; padding: 0 26px 0 14px; border-radius: 999px; border: 1px solid #e3e8ef;
+  font-size: 13px; font-weight: 700; text-align: center; text-align-last: center; color: #333;
+  box-shadow: 0 1px 3px rgba(60, 90, 140, .1); background-position: right 10px center;
+}
+.sft-wish:disabled { background-color: #fff; color: #333; opacity: 1; }
+.sft-wish.ok { background-color: var(--sft-ok-bg); }
+.sft-wish.ng { background-color: var(--sft-ng-bg); }
+.sft-wish.off { background-color: var(--sft-off-bg); }
+.sft-offs { width: 100%; min-height: 40px; font-size: 12px; font-weight: 800; color: var(--link); background: #f0f5ff; border: 1.5px solid #8eaee6; border-radius: 12px; box-shadow: none; }
+.sft-offs:active { background: #e1ebfd; }
+.sft-offs:disabled { opacity: .55; }
+.sft-memo { gap: 4px; font-weight: 400; }
+.sft-memo span { font-size: 11px; color: #6e7782; font-weight: 700; }
+.sft-memo small { font-size: 10px; color: #6e7782; line-height: 1.5; }
+.sft-memo textarea { margin-top: 6px; min-height: 96px; border: 1px solid #e3e8ef; box-shadow: none; }
+.sft-memo textarea:disabled { background: #fff; }
+
+/* 下に固定の「送信」（参考アプリと同じく画面の一番下にずっと出ている） */
+.sft-bar {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 10;
+  padding: 10px max(var(--gutter), env(safe-area-inset-right, 0px)) calc(12px + env(safe-area-inset-bottom, 0px)) max(var(--gutter), env(safe-area-inset-left, 0px));
+  background: rgba(243, 238, 248, .85); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
+}
+.sft-send { display: flex; width: 100%; max-width: 612px; margin: 0 auto; min-height: 46px; border-radius: 12px; font-size: 14px; font-weight: 800; background: #1636b4; border-color: #1636b4; box-shadow: 0 4px 12px rgba(22, 54, 180, .25); }
+body.sft-has-bar main { padding-bottom: 96px; }
+body.sft-has-bar .demo { margin-bottom: 84px; }
+body.sft-has-bar .toast { bottom: calc(84px + env(safe-area-inset-bottom, 0px)); }
+
+/* ---------- 下から出るシート ---------- */
+.sft-sheet-wrap { position: fixed; inset: 0; z-index: 25; background: rgba(30, 40, 60, .45); display: flex; align-items: flex-end; justify-content: center; }
+.sft-sheet {
+  width: 100%; max-width: 640px; max-height: 78vh; max-height: 78dvh; background: #fff; border-radius: 20px 20px 0 0;
+  padding: 8px 16px calc(16px + env(safe-area-inset-bottom, 0px)); display: flex; flex-direction: column; gap: 10px;
+  box-shadow: 0 -6px 24px rgba(0, 0, 0, .15);
+}
+@media (prefers-reduced-motion: no-preference) { .sft-sheet { animation: sft-up .22s ease-out; } }
+@keyframes sft-up { from { transform: translateY(40px); opacity: .4; } to { transform: none; opacity: 1; } }
+.sft-grip { align-self: center; width: 40px; height: 4px; border-radius: 4px; background: #d8dde5; }
+.sft-sheet-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+.sft-sheet-head h2 { font-size: 16px; font-weight: 800; }
+.sft-count { font-size: 11px; color: #6e7782; }
+.sft-x { width: 34px; height: 34px; min-height: 0; padding: 0; border-radius: 50%; background: #f0f2f5; border: 0; color: #222; font-size: 18px; font-weight: 700; flex: none; }
+.sft-x:active { background: #e2e6eb; }
+.sft-tabs { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 2px; scrollbar-width: none; flex: none; }
+.sft-tabs::-webkit-scrollbar { display: none; }
+.sft-tab { flex: none; min-height: 34px; padding: 0 16px; border-radius: 999px; background: #fff; color: #222; border: 1px solid #e0e5ec; font-size: 13px; font-weight: 800; box-shadow: none; }
+.sft-tab.on { background: #dce7fb; color: var(--link); border-color: #7f9fe0; }
+.sft-tab:active { background: #eef2f7; }
+.sft-offlist { overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding: 2px 0 6px; }
+.sft-off { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; padding: 10px 14px; border: 1px solid #e6ebf2; border-radius: 12px; background: #fafbfd; }
+.sft-off b { display: block; font-size: 14px; }
+.sft-off small { display: block; font-size: 11px; color: #6e7782; }
+.sft-offk { font-size: 11px; font-weight: 800; color: var(--link); white-space: nowrap; }
+.sft-ake { display: inline-flex; align-items: center; gap: 4px; margin-top: 4px; font-size: 11px; color: #555; }
+.sft-ake i { font-style: normal; width: 16px; height: 16px; border-radius: 50%; background: #f0a040; color: #fff; font-size: 9px; font-weight: 800; display: grid; place-items: center; }
+.sft-empty { font-size: 12px; color: #6e7782; text-align: center; padding: 18px 0; }
+body.sft-noscroll { overflow: hidden; }
+
+/* ---------- シフト確認 ---------- */
+.chk-nav { display: flex; align-items: center; justify-content: space-between; padding: 0 8px; }
+.chk-nav b { font-size: 18px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.chk-nav button { min-height: 36px; padding: 0 12px; background: none; border: 0; color: var(--link); font-size: 12px; font-weight: 800; box-shadow: none; }
+.chk-nav button:active { background: rgba(35, 70, 200, .08); }
+.chk-list { display: flex; flex-direction: column; gap: 10px; }
+.chk-note { font-size: 12px; color: var(--warn); background: var(--warn-soft); border-radius: 12px; padding: 8px 12px; }
+.chk-day { background: #fff; border-radius: 16px; padding: 10px 10px 12px; box-shadow: var(--glass-shadow); }
+.chk-dh { display: flex; justify-content: space-between; align-items: baseline; padding: 2px 6px 8px; border-bottom: 1px solid #edf0f4; margin-bottom: 10px; }
+.chk-dh b { font-size: 16px; font-weight: 800; }
+.chk-dh span { font-size: 11px; color: #6e7782; font-variant-numeric: tabular-nums; }
+.chk-box { margin: 0; display: grid; grid-template-columns: 5em 1fr; align-items: center; gap: 4px 0; padding: 12px 14px; border: 1px solid #e6ebf2; border-radius: 12px; background: #fff; }
+.chk-box dt { font-size: 10px; font-weight: 700; color: #6e7782; }
+.chk-box dd { margin: 0; font-size: 14px; font-weight: 800; }
+.chk-box dd.unset { color: var(--sft-sun); }
+.chk-box.work { background: var(--sft-work); border-color: var(--sft-work); }
+.chk-box.work dt { color: rgba(255, 255, 255, .75); }
+.chk-box.work dd { color: #fff; }
+/* 公休・明けは勤務ではないので、確定でも濃い赤にしない */
+.chk-box.work.rest { background: #f2f4f7; border-color: #e6ebf2; }
+.chk-box.work.rest dt { color: #6e7782; }
+.chk-box.work.rest dd { color: #333; }
+
+/* ---------- シフト作成（表） ---------- */
+.mk-lead { font-size: 11px; color: #5b6572; }
+.mk-status { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 11px; color: #5b6572; padding: 0 4px; }
+.mk-status:empty { display: none; }
+.mk-dirty { margin-left: auto; font-weight: 800; color: #c2560f; }
+.mk-keys { font-size: 10px; color: #6e7782; }
+.mk-board { background: #fff; border-radius: 16px; box-shadow: var(--glass-shadow); padding: 8px; min-width: 0; }
+.mk-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.mk-table { border-collapse: separate; border-spacing: 2px; font-size: 11px; }
+.mk-table th { font-weight: 700; color: #5b6572; text-align: center; white-space: nowrap; }
+.mk-table thead th { font-size: 11px; line-height: 1.2; padding: 2px 0; }
+.mk-table thead th small { display: block; font-size: 9px; font-weight: 500; }
+.mk-table .d0 { color: var(--sft-sun); }
+.mk-table .d6 { color: var(--sft-sat); }
+.mk-name { position: sticky; left: 0; z-index: 1; background: #fff; text-align: left !important; padding: 0 6px 0 2px; min-width: 5.5em; }
+.mk-name b { display: block; font-size: 12px; color: #222; }
+.mk-name small { display: block; font-size: 9px; color: #8a93a0; font-weight: 400; }
+.mk-cell {
+  position: relative; width: 30px; height: 30px; min-height: 0; padding: 0; border-radius: 7px; border: 1.5px solid transparent;
+  background: var(--sft-none-bg); color: #fff; font-size: 12px; font-weight: 800; box-shadow: none;
+}
+.mk-cell.ok { background: var(--sft-ok-bg); }
+.mk-cell.ng { background: var(--sft-ng-bg); }
+.mk-cell.off { background: var(--sft-off-bg); }
+/* 勤務が入ったマスは濃い赤の字（公休・明けは灰色）。地の色は希望 */
+.mk-cell { color: var(--sft-work); }
+.mk-cell.rest { color: #6e7782; }
+.mk-cell.dirty { border-color: #e2702a; }
+.mk-memo { position: absolute; right: 2px; bottom: 2px; width: 5px; height: 5px; border-radius: 50%; background: #5a78b0; }
+.mk-sum th, .mk-sum td { font-size: 11px; font-weight: 800; color: #12317d; text-align: center; padding-top: 4px; }
+.mk-actions { margin-top: 2px; }
+.mk-wish { font-size: 12px; display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
+.mk-wish p { color: #5b6572; }
+.mk-kinds { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.mk-kind { min-height: 44px; background: #fff; color: var(--sft-work); border: 1.5px solid #ecc6bb; font-size: 14px; box-shadow: none; }
+.mk-kind.rest { color: #444; border-color: #dfe4ea; }
+.mk-kind.on { background: var(--sft-work); color: #fff; border-color: var(--sft-work); }
+.mk-kind.rest.on { background: #5b6572; border-color: #5b6572; }
+.mk-kind.clear { color: var(--danger); border-color: #f1b7be; }
+.mk-kind:active { filter: brightness(.95); }
