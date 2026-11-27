@@ -55,15 +55,16 @@
     var d = r.明細 || [];
     if (r.申請種類 === '経費') {
       var total = d.reduce(function (s, x) { return s + Number(x.金額 || 0); }, 0);
-      var head = d[0] || {};
+      var head = d[0] || {}, kind = r.小口先出 || head.小口先出, memo = r.備考 || head.備考;
       return '<dl class="apv-dl">' +
         '<dt>対象日</dt><dd>' + esc(head.対象日 || '—') + '</dd>' +
-        '<dt>経費区分</dt><dd>' + esc(head.経費区分 || '—') + (head.小口先出 ? '（' + esc(head.小口先出) + '）' : '') + '</dd>' +
+        '<dt>経費区分</dt><dd>' + esc(head.経費区分 || '—') + '</dd>' +
+        (kind ? '<dt>小口先出</dt><dd>' + esc(kind) + '</dd>' : '') +
         d.map(function (x) {
           return '<dt>' + esc(x.物品 === 'フリー入力' && x.自由入力 ? x.自由入力 : x.物品) + ' ×' + esc(x.個数) + '</dt><dd class="apv-num">' + yen(x.金額) + '</dd>';
         }).join('') +
         '<dt class="apv-total">合計</dt><dd class="apv-num apv-total">' + yen(total) + '</dd>' +
-        (head.備考 ? '<dt>備考</dt><dd>' + esc(head.備考) + '</dd>' : '') +
+        (memo ? '<dt>備考</dt><dd>' + esc(memo) + '</dd>' : '') +
       '</dl>';
     }
     return '<dl class="apv-dl">' + d.map(function (x) {
@@ -79,26 +80,30 @@
     var ops;
     if (!can) {
       ops = '<p class="apv-note">' + esc(approverOf(r)) + ' さんが承認する段階です。あなたは見るだけです。</p>';
-    } else if (view.confirm && view.confirm.id === r.申請ID) {
-      var back = view.confirm.act === '差戻し';
-      ops = '<div class="apv-confirm' + (back ? ' is-back' : '') + '" role="group" aria-label="確認">' +
-        '<p>' + (back ? 'この申請を差し戻します。申請者にコメントが届きます。' : 'この申請を承認します。よろしいですか？') + '</p>' +
-        (back ? '<blockquote class="apv-quote">' + esc(view.confirm.cmt) + '</blockquote>' : '') +
+    } else if (view.confirm && view.confirm.id === r.申請ID && view.confirm.act === '差戻し') {
+      // 差戻し: 押したときだけコメント欄を開く（理由は必須）
+      ops = '<div class="apv-confirm is-back" role="group" aria-label="差戻しの理由">' +
+        '<div class="apv-label"><label for="cmt-' + id + '">差戻しの理由</label><span class="apv-opt">(必須)</span></div>' +
+        '<textarea id="cmt-' + id + '" class="apv-cmt" rows="3" placeholder="申請者に届きます。直してほしい点を書いてください">' + esc(view.cmts[r.申請ID] || '') + '</textarea>' +
+        '<div class="apv-err" role="alert"></div>' +
         '<div class="apv-btns"><button type="button" class="apv-btn apv-btn-ghost" data-act="やめる">やめる</button>' +
-        '<button type="button" class="apv-btn ' + (back ? 'apv-btn-back' : 'apv-btn-ok') + '" data-act="確定">' + (back ? '差し戻す' : '承認する') + '</button></div>' +
+        '<button type="button" class="apv-btn apv-btn-back" data-act="確定">差し戻す</button></div>' +
+      '</div>';
+    } else if (view.confirm && view.confirm.id === r.申請ID) {
+      ops = '<div class="apv-confirm" role="group" aria-label="確認">' +
+        '<p>この申請を承認します。よろしいですか？</p>' +
+        '<div class="apv-btns"><button type="button" class="apv-btn apv-btn-ghost" data-act="やめる">やめる</button>' +
+        '<button type="button" class="apv-btn apv-btn-ok" data-act="確定">承認する</button></div>' +
       '</div>';
     } else {
-      ops = '<div class="apv-field"><div class="apv-label"><span>コメント</span><span class="apv-opt">差戻しのときは(必須)</span></div>' +
-        '<textarea class="apv-cmt" rows="2" aria-label="コメント" placeholder="差戻しの理由など">' + esc(view.cmts[r.申請ID] || '') + '</textarea>' +
-        '<div class="apv-err" role="alert"></div></div>' +
-        '<div class="apv-btns"><button type="button" class="apv-btn apv-btn-backline" data-act="差戻し">差戻し</button>' +
+      ops = '<div class="apv-btns"><button type="button" class="apv-btn apv-btn-backline" data-act="差戻し">差戻し</button>' +
         '<button type="button" class="apv-btn apv-btn-ok" data-act="承認">承認</button></div>';
     }
     return '<article class="apv-item' + (can ? '' : ' is-view') + '" data-id="' + id + '">' +
       '<div class="apv-item-head"><h3>' + esc(r.申請種類) + '申請</h3>' +
         (can ? '<span class="apv-tag apv-tag-mine">あなたが承認</span>' : '<span class="apv-tag">閲覧のみ</span>') + '</div>' +
       '<p class="apv-meta">申請者：' + esc(r.申請者 || '—') + ' / 申請日時：' + esc(fmtDate(r.申請日時)) +
-        ' / <span class="apv-nw">申請ID：' + id + '</span> / 承認段階：' + esc(r.現在段階 || '—') + '</p>' +
+        ' / <span class="apv-nw">申請ID：' + id + '</span> / <span class="apv-nw">承認段階：' + esc(r.現在段階 || '—') + '</span></p>' +
       contentLines(r) + ops +
       (ops.indexOf('apv-err') < 0 ? '<div class="apv-err" role="alert"></div>' : '') +
     '</article>';
@@ -125,15 +130,25 @@
     });
   }
 
+  // 「メニューに戻る」は来たメニュー（#apply・#status・#task など）へ。覚えていなければ前の画面、それも無ければ #menu
+  function backHref() { return (I.apvLastMenu && I.apvLastMenu()) || '#menu'; }
+  function onBack(e) {
+    var a = e.target.closest('a[data-back]'); if (!a) return;
+    if (!(I.apvLastMenu && I.apvLastMenu()) && I.apvCameFromApp && I.apvCameFromApp()) {
+      e.preventDefault(); history.back();
+    }
+  }
+
   function viewApprovals() {
     view = { list: [], who: null, confirm: null, cmts: {} };
     app.innerHTML = '<h1 class="apv-title">承認待ち一覧</h1>' +
       '<div class="apv-shell" id="apv-body">' + loadingBar() + '</div>' +
-      '<a class="apv-menu" href="#menu">メニューに戻る</a>';
+      '<a class="apv-menu" href="' + backHref() + '" data-back>メニューに戻る</a>';
     load();
     app.addEventListener('click', onClick);
     app.addEventListener('input', onInput);
-    I.cleanup.push(function () { app.removeEventListener('click', onClick); app.removeEventListener('input', onInput); });
+    app.addEventListener('click', onBack);
+    I.cleanup.push(function () { app.removeEventListener('click', onClick); app.removeEventListener('input', onInput); app.removeEventListener('click', onBack); });
   }
   function onInput(e) {
     if (!e.target.classList.contains('apv-cmt') || !e.target.value.trim()) return;
@@ -160,27 +175,27 @@
     var card = t.closest('.apv-item'); if (!card) return;
     var id = card.dataset.id, err = card.querySelector('.apv-err');
     if (act === '承認' || act === '差戻し') {
-      var cmt = (card.querySelector('.apv-cmt').value || '').trim();
-      saveComments();
-      if (act === '差戻し' && !cmt) {
-        err.textContent = '差戻しの理由をコメントに書いてください。';
-        card.querySelector('.apv-cmt').classList.add('is-error');
-        card.querySelector('.apv-cmt').focus();
-        return;
-      }
-      view.confirm = { id: id, act: act, cmt: cmt }; render(); focusIn(id, '[data-act="確定"]'); return;
+      saveComments(); view.confirm = { id: id, act: act }; render();
+      focusIn(id, act === '差戻し' ? '.apv-cmt' : '[data-act="確定"]'); return;
     }
-    if (act === 'やめる') { view.confirm = null; render(); focusIn(id, '.apv-cmt'); return; }
+    if (act === 'やめる') { saveComments(); view.confirm = null; render(); focusIn(id, '[data-act="承認"]'); return; }
     if (act === '確定') {
       var c = view.confirm; if (!c) return;
-      card.querySelectorAll('button').forEach(function (b) { b.disabled = true; });
+      var box = card.querySelector('.apv-cmt'), cmt = box ? box.value.trim() : '';
+      if (c.act === '差戻し' && !cmt) {
+        err.textContent = '差戻しの理由を書いてください。';
+        box.classList.add('is-error'); box.focus(); return;
+      }
+      saveComments();
+      card.querySelectorAll('button, textarea').forEach(function (b) { b.disabled = true; });
       t.innerHTML = '<span class="apv-spin" aria-hidden="true"></span>送信中…';
-      api('decide', { 申請ID: c.id, 結果: c.act, コメント: c.cmt }).then(function () {
+      api('decide', { 申請ID: c.id, 結果: c.act, コメント: cmt }).then(function () {
         toast(c.act === '承認' ? '承認しました' : '差し戻しました');
         view.list = view.list.filter(function (r) { return r.申請ID !== c.id; });
         delete view.cmts[c.id]; view.confirm = null; render();
       }).catch(function (x) {
-        view.confirm = null; render();
+        if (c.act !== '差戻し') view.confirm = null;
+        render();
         var el = document.querySelector('.apv-item[data-id="' + cssEsc(c.id) + '"] .apv-err');
         if (el) el.textContent = x.message || '送信できませんでした。もう一度お試しください。';
       });

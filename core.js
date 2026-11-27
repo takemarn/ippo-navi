@@ -50,12 +50,12 @@
   // ---------- 見本モード（架空のデータ） ----------
   var Demo = {
     seq: 3,
-    me: { 職員ID: 'STF-0001', 氏名: '見本 太郎', 職種: '看護師', 役割: '承認者' },
+    me: { 職員ID: 'STF-0001', 氏名: '見本 太郎', 職種: '看護師', 役割: '承認者', 当月残業合計: '3:30' },
     options: {
       経費区分: ['看護', '介護', '施設', '利用者立替', 'その他', '救急搬送', '本部', '交通'],
       小口先出: ['小口', '先出'],
       物品: ['フリー入力', '滅菌ガーゼ', '絆創膏', 'アルコール綿', 'サージカルテープ', 'フィルムドレッシング', 'ワセリン', 'オリーブ油', '吸引チューブ'],
-      勤怠項目: ['欠勤', '残業・前残業', '遅刻', '早退', '有給', '休日出勤', '冬季休暇', '夏季休暇', '特別休暇', '打刻修正出勤', '打刻修正退勤']
+      勤怠項目: ['欠勤', '残業・前残業', '遅刻', '早退', '有給', '休日出勤', '冬期休暇', '夏季休暇', '特別休暇', '打刻修正出勤', '打刻修正退勤']
     },
     requests: [
       { 申請ID: 'EXP-20261127-DEMO01', 申請種類: '経費', 申請者職員ID: 'STF-0001', 申請日時: '2026-11-27 10:12:00', 状態: '承認済み', 現在段階: '', コメント: '', 承認者: '',
@@ -63,7 +63,7 @@
       { 申請ID: 'ATT-20261126-DEMO02', 申請種類: '勤怠', 申請者職員ID: 'STF-0001', 申請日時: '2026-11-26 18:40:00', 状態: '承認待ち', 現在段階: 1, コメント: '', 承認者: '見本 一郎',
         明細: [{ 項目: '残業・前残業', 対象日: '2026-11-26', 開始: '17:30', 終了: '18:30', 備考: '' }] },
       { 申請ID: 'EXP-20261120-DEMO05', 申請種類: '経費', 申請者職員ID: 'STF-0001', 申請日時: '2026-11-20 15:02:00', 状態: '差戻し', 現在段階: '', コメント: '領収書の金額と合っていません。確認して出し直してください。', 承認者: '',
-        明細: [{ 行番号: 1, 対象日: '2026-11-20', 経費区分: '交通', 物品: 'フリー入力', 個数: 1, 金額: 1200 }] },
+        明細: [{ 行番号: 1, 対象日: '2026-11-20', 経費区分: '交通', 物品: 'バス代（往診同行）', 個数: 1, 金額: 1200 }] },
       { 申請ID: 'ATT-20261115-DEMO06', 申請種類: '勤怠', 申請者職員ID: 'STF-0001', 申請日時: '2026-11-15 08:10:00', 状態: '取消', 現在段階: '', コメント: '', 承認者: '',
         明細: [{ 項目: '遅刻', 対象日: '2026-11-15', 開始: '09:00', 終了: '09:20', 備考: '電車遅延' }] }
     ],
@@ -75,7 +75,7 @@
       { 申請ID: 'ATT-20261126-DEMO07', 申請種類: '勤怠', 申請者: '見本 三郎', 申請日時: '2026-11-26 12:44:00', 状態: '承認待ち', 現在段階: 1, 承認者: '見本 一郎', 担当: false,
         明細: [{ 項目: '有給', 対象日: '2026-12-03', 開始: '09:00', 終了: '18:00', 備考: '' }] },
       { 申請ID: 'EXP-20261125-DEMO08', 申請種類: '経費', 申請者: '見本 四郎', 申請日時: '2026-11-25 17:20:00', 状態: '承認待ち', 現在段階: 2, 承認者: '見本 一郎', 担当: false,
-        明細: [{ 行番号: 1, 対象日: '2026-11-25', 経費区分: '施設', 物品: 'フリー入力', 個数: 1, 金額: 3300 }] }
+        明細: [{ 行番号: 1, 対象日: '2026-11-25', 経費区分: '施設', 物品: '電球（共用部）', 個数: 1, 金額: 3300 }] }
     ],
     call: function (action, data) {
       var self = this;
@@ -123,11 +123,11 @@
     if (errs.length) { err.innerHTML = errorsBox(errs); err.scrollIntoView({ block: 'center' }); return; }
     err.innerHTML = '';
     var btn = document.querySelector('#f button[type=submit]');
-    btn.disabled = true; btn.textContent = '送信中…';
+    btn.disabled = true; btn.textContent = '送信中…'; busy(true);
     api(action, data).then(function () {
       toast('送信しました'); location.hash = '#requests';
     }).catch(function (e) {
-      btn.disabled = false; btn.textContent = '送信';
+      busy(false); btn.disabled = false; btn.textContent = '送信';
       err.innerHTML = e.details && e.details.length ? errorsBox(e.details) : '<div class="errors" role="alert">' + esc(e.message) + '</div>';
     });
   }
@@ -153,7 +153,8 @@
       '<div class="mload-bar"></div>' +
       '<p class="mload-note">画面を読み込み中です。表示されない場合は再読み込みしてください。</p>';
   }
-  // 画面遷移や送信の途中: 画面全体をぼかして中央に「読み込み中・・・」。busy(true) で出し busy(false) で消す
+  // 画面遷移や送信の途中: 画面全体をぼかして中央に「読み込み中・・・」（参考 f_0411）。busy(true) で出し busy(false) で消す。
+  // submit() の送信中に使う。画面を切り替えると route() が自動で消す
   function busy(on) {
     var el = document.getElementById('busy');
     if (!on) { if (el) el.remove(); return; }
@@ -175,7 +176,8 @@
       ? '<a class="mbtn" href="#approvals">承認待ち一覧<span id="pcount"></span></a>'
       : '<button type="button" class="mbtn locked" data-locked="1">承認待ち一覧<span class="mtag">承認者のみ</span></button>';
     app.innerHTML = '<h1>メニュー</h1><nav class="mgroup" aria-label="メニュー">' + items.map(btn).join('') + '</nav>' +
-      '<div class="msolo">' + appr + '</div>';
+      '<div class="msolo">' + appr + '</div>' +
+      '<a class="mhome" href="#menu"><span aria-hidden="true">‹</span> メニュー一覧に戻る</a>';
     function onTap(e) {
       var b = e.target.closest('button.mbtn');
       if (!b) return;
@@ -186,7 +188,9 @@
     IPPO.cleanup.push(function () { app.removeEventListener('click', onTap); });
     if (canApprove()) api('pendingApprovals').then(function (list) {
       var el = document.getElementById('pcount');
-      if (el && list.length) el.innerHTML = '<span class="badge">' + list.length + '</span>';
+      // 自分が承認する件数だけ数える（担当が無い古い形のデータは自分の分とみなす。approvals.js の mine() と同じ決まり）
+      var n = list.filter(function (r) { return r.担当 === undefined ? true : r.担当; }).length;
+      if (el && n) { el.innerHTML = '<span class="badge">' + n + '</span>'; el.setAttribute('aria-label', '自分の承認待ち ' + n + '件'); }
     }).catch(function () {});
   }
 

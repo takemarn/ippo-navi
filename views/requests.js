@@ -5,6 +5,15 @@
   'use strict';
   var I = window.IPPO, app = I.app, api = I.api, esc = I.esc, yen = I.yen, toast = I.toast;
 
+  // 来たメニューを覚える（「メニューに戻る」用。approvals.js も使う）。hashchange は core の route より先にここで受ける
+  var lastMenu = '', moved = false, MENUS = I.MENUS || ['menu', 'apply', 'status', 'task', 'users', 'shift', 'portal'];
+  function menuOf(url) { var h = String(url || '').split('#')[1] || ''; return MENUS.indexOf(h) >= 0 ? '#' + h : ''; }
+  lastMenu = menuOf(location.href);
+  window.addEventListener('hashchange', function (e) { moved = true; var m = menuOf(e.oldURL); if (m) lastMenu = m; });
+  I.apvLastMenu = function () { return lastMenu; };
+  I.apvCameFromApp = function () { return moved; };
+  function backHref() { return lastMenu || '#status'; }
+
   var STATUS = ['承認待ち', '承認済み', '差戻し', '取消'];
   var CLS = { '承認待ち': 'wait', '承認済み': 'ok', '差戻し': 'back', '取消': 'cancel' };
   var view = { list: [], filter: 'すべて', confirm: null };
@@ -37,17 +46,20 @@
       var total = d.reduce(function (s, x) { return s + Number(x.金額 || 0); }, 0);
       return '<dl class="apv-dl"><dt>対象日</dt><dd>' + esc(d[0].対象日 || '—') + '</dd>' +
         '<dt>経費区分</dt><dd>' + esc(d[0].経費区分 || '—') + '</dd>' +
-        '<dt class="apv-total">合計</dt><dd class="apv-num apv-total">' + yen(total) + '（' + d.length + '品）</dd></dl>';
+        ((r.小口先出 || d[0].小口先出) ? '<dt>小口先出</dt><dd>' + esc(r.小口先出 || d[0].小口先出) + '</dd>' : '') +
+        '<dt class="apv-total">合計</dt><dd class="apv-num apv-total">' + yen(total) + '（' + d.length + '品）</dd>' +
+        ((r.備考 || d[0].備考) ? '<dt>備考</dt><dd>' + esc(r.備考 || d[0].備考) + '</dd>' : '') + '</dl>';
     }
     return '<dl class="apv-dl">' + d.map(function (x) {
       var time = x.打刻時刻 ? '打刻 ' + x.打刻時刻 : (x.開始 || x.終了 ? (x.開始 || '') + '〜' + (x.終了 || '') : '');
       return '<dt>項目</dt><dd>' + esc(x.項目) + '</dd><dt>対象日</dt><dd>' + esc(x.対象日) + '</dd>' +
-        (time ? '<dt>時間</dt><dd class="apv-num">' + esc(time) + '</dd>' : '');
+        (time ? '<dt>時間</dt><dd class="apv-num">' + esc(time) + '</dd>' : '') +
+        (x.備考 ? '<dt>備考</dt><dd>' + esc(x.備考) + '</dd>' : '');
     }).join('') + '</dl>';
   }
 
   function stageText(r) {
-    if (r.状態 === '承認待ち') return '承認段階：' + esc(r.現在段階 || '—') + (r.承認者 ? '（' + esc(r.承認者) + ' さん）' : '');
+    if (r.状態 === '承認待ち') return '<span class="apv-nw">承認段階：' + esc(r.現在段階 || '—') + (r.承認者 ? '（' + esc(r.承認者) + ' さん）' : '') + '</span>';
     return '';
   }
 
@@ -100,7 +112,7 @@
     view = { list: [], filter: 'すべて', confirm: null };
     app.innerHTML = '<h1 class="apv-title">自分の申請</h1>' +
       '<div class="apv-shell" id="req-body">' + loadingBar() + '</div>' +
-      '<div class="req-foot"><a class="apv-menu" href="#apply">申請する</a><a class="apv-menu" href="#menu">メニューに戻る</a></div>';
+      '<div class="req-foot"><a class="apv-menu" href="#apply">申請する</a><a class="apv-menu" href="' + backHref() + '">メニューに戻る</a></div>';
     load();
     app.addEventListener('click', onClick);
     I.cleanup.push(function () { app.removeEventListener('click', onClick); });

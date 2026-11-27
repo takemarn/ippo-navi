@@ -86,7 +86,7 @@
 .att-lab .att-lab-name { display: inline; font-size: 12px; font-weight: 700; color: #333; line-height: 1.3; }
 .att-off .att-lab .att-lab-name { color: #9AA5B1; font-weight: 400; }
 .att-range { display: flex; align-items: center; gap: 8px; }
-.att-form .att-range input { width: 32%; flex: 0 0 32%; padding: 0 10px; }
+.att-form .att-range input { width: 34%; flex: 0 0 34%; min-width: 104px; padding: 0 8px; }
 .att-tilde { font-size: 18px; color: #333; line-height: 1; }
 .att-off .att-tilde { color: #9AA5B1; }
 .att-form input[type=time]::-webkit-calendar-picker-indicator { opacity: .45; }
@@ -110,3 +110,6 @@
   border: 0; background: #EEF2F8; color: #5B6572; font-size: 14px; line-height: 28px; cursor: pointer; box-shadow: none;
 }
 .att-note { display: block; font-size: 11px; color: #8A6A1E; margin-top: 2px; white-space: normal; }
+
+/* 送信ボタンの下の小さな戻るリンク（他画面の「メニューに戻る」と揃える） */
+.att-menu { align-self: center; display: inline-flex; align-items: center; min-height: 36px; padding: 0 12px; font-size: 12px; color: #2F7BD6; text-decoration: none; }

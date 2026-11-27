@@ -3,7 +3,7 @@
    時間・打刻時間は最初は使えない。項目を選ぶと、打刻修正なら打刻時間、それ以外なら時間が使えるようになる
    （GAS の validateAttendance と同じ決まり: 打刻修正は 打刻時刻、それ以外は 開始・終了 が必須）。
    送信の流れ: 送信 → 入力チェック（項目の下に赤字） → ページ内の確認カード → 送信中 → 完了カード。
-   GAS に送る data の形は docs/api.md のまま: {項目, 対象日, 開始?, 終了?, 打刻時刻?, 備考?} */
+   GAS に送る data の形は docs/api.md のまま: {項目, 対象日, 開始?, 終了?, 打刻時刻?, 備考?}。欠勤・有給・各種休暇は時間が任意 */
 (function () {
   'use strict';
   var I = window.IPPO, app = I.app, state = I.state, api = I.api, esc = I.esc, today = I.today, toast = I.toast;
@@ -25,10 +25,15 @@
       '<p class="att-err" id="att-err-' + key + '" hidden></p></div>';
   }
 
-  // 当月の残業合計。GAS にまだ集計の操作がないので、見本モードだけ架空の値を出す（本番では出さない）
+  // 終日の項目は時間が任意（GAS の FULL_DAY_KINDS と同じ）
+  var FULL_DAY = ['欠勤', '有給', '冬期休暇', '夏季休暇', '特別休暇'];
+  var isFullDay = function (k) { return FULL_DAY.indexOf(k) >= 0; };
+
+  // 当月の残業合計。me の返事の 当月残業合計（'H:mm'）を出す。無いときは 0:00
   function overtimeLabel() {
     var m = new Date().getMonth() + 1;
-    return I.DEMO ? '（' + m + '月の残業合計：3:30）' : '';
+    var v = (state.me && state.me.当月残業合計) || '0:00';
+    return '（' + m + '月の残業合計：' + esc(v) + '）';
   }
   function fmtSize(n) { return n >= 1048576 ? (n / 1048576).toFixed(1) + 'MB' : Math.max(1, Math.round(n / 1024)) + 'KB'; }
 
@@ -46,7 +51,7 @@
           field('項目', head('att-項目', '項目', true) + sel('att-項目', kinds, '', true).replace('<select', '<select class="att-empty"')) +
           field('対象日', head('att-対象日', '対象日', true) + '<input type="date" id="att-対象日" value="' + today() + '">') +
           '<div class="att-field att-off" data-f="時間" role="group" aria-labelledby="att-時間-lab">' +
-            '<div class="att-lab"><span class="att-lab-name" id="att-時間-lab">時間</span><span class="att-req">(必須)</span></div>' +
+            '<div class="att-lab"><span class="att-lab-name" id="att-時間-lab">時間</span><span class="att-req" id="att-時間-mark">(必須)</span></div>' +
             '<div class="att-range">' +
               '<input type="time" id="att-開始" aria-label="開始時刻" disabled>' +
               '<span class="att-tilde" aria-hidden="true">～</span>' +
@@ -70,6 +75,7 @@
         '</div>' +
         '<p class="att-formerr" id="att-formerr" role="alert" hidden></p>' +
         '<button type="submit" class="att-send">送信</button>' +
+        '<a class="att-menu" href="#apply">← メニューに戻る</a>' +
       '</form>' +
       '<div id="att-after"></div>' +
       '</div>';
@@ -81,11 +87,14 @@
     // ---------- 項目に応じて 時間／打刻時間 を切り替える ----------
     function syncKind() {
       var k = $('項目').value;
-      var useRange = !!k && !isStamp(k), useStamp = isStamp(k);
+      var useRange = !!k && !isStamp(k), useStamp = isStamp(k), optional = isFullDay(k);
       $('開始').disabled = !useRange; $('終了').disabled = !useRange; $('打刻時刻').disabled = !useStamp;
       form.querySelector('[data-f="時間"]').classList.toggle('att-off', !useRange);
       form.querySelector('[data-f="打刻時間"]').classList.toggle('att-off', !useStamp);
       $('項目').classList.toggle('att-empty', !k);
+      // 欠勤・有給・各種休暇は時間を任意にする（使えるが (任意) 表示）
+      $('時間-mark').className = optional ? 'att-opt' : 'att-req';
+      $('時間-mark').textContent = optional ? '(任意)' : '(必須)';
       if (!useRange) clearErr($('開始'));
       if (!useStamp) clearErr($('打刻時刻'));
     }
@@ -109,7 +118,9 @@
       if (!f || !f.classList.contains('att-bad')) return;
       f.classList.remove('att-bad');
       var p = f.querySelector(':scope > .att-err'); if (p) { p.hidden = true; p.textContent = ''; }
-      if (!form.querySelector('.att-bad')) $('formerr').hidden = true;
+      var left = form.querySelectorAll('.att-bad').length;
+      $('formerr').hidden = !left;
+      if (left) $('formerr').textContent = '入力を確認してください（' + left + '件）';
     }
     function showErr(key, msg) {
       var p = $('err-' + key); if (!p) return;
@@ -122,6 +133,7 @@
       var k = $('項目').value;
       var d = { 項目: k, 対象日: $('対象日').value };
       if (isStamp(k)) d.打刻時刻 = $('打刻時刻').value;
+      else if (isFullDay(k)) { if ($('開始').value) d.開始 = $('開始').value; if ($('終了').value) d.終了 = $('終了').value; }
       else if (k) { d.開始 = $('開始').value; d.終了 = $('終了').value; }
       var memo = $('備考').value.trim(); if (memo) d.備考 = memo;
       return d;
@@ -132,6 +144,9 @@
       if (!d.対象日) { showErr('対象日', '対象日を入れてください'); n++; }
       if (d.項目 && isStamp(d.項目)) {
         if (!d.打刻時刻) { showErr('打刻時間', '打刻時間を入れてください'); n++; }
+      } else if (isFullDay(d.項目)) {
+        if (!!d.開始 !== !!d.終了) { showErr('時間', '時間は開始と終了の両方を入れるか、両方空にしてください'); n++; }
+        else if (d.開始 && d.開始 >= d.終了) { showErr('時間', '終了は開始より後にしてください'); n++; }
       } else if (d.項目) {
         if (!d.開始 || !d.終了) { showErr('時間', '時間（開始～終了）を入れてください'); n++; }
         else if (d.開始 >= d.終了 && d.項目 !== '残業・前残業') { showErr('時間', '終了は開始より後にしてください'); n++; }
@@ -159,7 +174,7 @@
 
     function showConfirm(d) {
       var f = file.files && file.files[0];
-      var time = d.打刻時刻 ? '<dt>打刻時間</dt><dd>' + esc(d.打刻時刻) + '</dd>' :
+      var time = isFullDay(d.項目) && !d.開始 ? '' : d.打刻時刻 ? '<dt>打刻時間</dt><dd>' + esc(d.打刻時刻) + '</dd>' :
         '<dt>時間</dt><dd>' + esc(d.開始) + ' ～ ' + esc(d.終了) + (d.開始 >= d.終了 ? '<span class="att-note">（翌日にまたがる）</span>' : '') + '</dd>';
       form.hidden = true;
       after.innerHTML =

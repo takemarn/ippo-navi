@@ -53,6 +53,7 @@
         '</div>' +
         '<p class="exp-formerr" id="exp-formerr" role="alert" hidden></p>' +
         '<button type="submit" class="exp-send">送信</button>' +
+        '<a class="exp-menu" href="#apply">← メニューに戻る</a>' +
       '</form>' +
       '<div id="exp-after"></div>' +
       '</div>';
@@ -62,8 +63,8 @@
     function $(id) { return document.getElementById('exp-' + id); }
 
     // ---------- 物品の行 ----------
-    function drawItems() {
-      $('items').innerHTML = rows.map(function (r, i) {
+    // 1行ぶんの HTML。行の追加・削除・フリー入力の出し入れは、その行だけを変える（他の行のエラー表示を消さないため）
+    function rowHtml(r, i) {
         var free = r.物品 === 'フリー入力';
         return '<div class="exp-item" data-i="' + i + '">' +
           '<div class="exp-item-row">' +
@@ -74,8 +75,9 @@
           (free ? '<input class="exp-free" id="exp-自由入力_' + i + '" placeholder="物品名を入力" aria-label="物品名 ' + (i + 1) + '行目" value="' + esc(r.自由入力 || '') + '">' : '') +
           '<p class="exp-err" id="exp-err-物品_' + i + '" hidden></p>' +
         '</div>';
-      }).join('');
-      $('del').disabled = rows.length <= 1;
+    }
+    function drawItems() {
+      $('items').innerHTML = rows.map(rowHtml).join('');
       updateTotal();
     }
     function collect() {
@@ -107,21 +109,30 @@
     form.addEventListener('change', function (e) {
       var id = e.target.id;
       if (id === 'exp-小口先出') syncDate();
-      if (/^exp-物品_/.test(id)) {
-        collect(); drawItems();
-        var free = $('自由入力_' + id.split('_')[1]); if (free) free.focus();
-      }
+      if (/^exp-物品_/.test(id)) setFree(Number(id.split('_')[1]), e.target.value === 'フリー入力');
       if (e.target.tagName === 'SELECT') e.target.classList.toggle('exp-empty', !e.target.value);
       clearErr(e.target);
     });
+    // フリー入力を選んだ行にだけ物品名の欄を出す
+    function setFree(i, on) {
+      var cur = $('自由入力_' + i);
+      if (on && !cur) {
+        $('物品_' + i).closest('.exp-item-row').insertAdjacentHTML('afterend',
+          '<input class="exp-free" id="exp-自由入力_' + i + '" placeholder="物品名を入力" aria-label="物品名 ' + (i + 1) + '行目">');
+        $('自由入力_' + i).focus();
+      } else if (!on && cur) cur.remove();
+    }
     $('add').addEventListener('click', function () {
-      collect(); rows.push({}); drawItems();
-      var last = $('物品_' + (rows.length - 1)); if (last) last.focus();
+      collect(); rows.push({});
+      $('items').insertAdjacentHTML('beforeend', rowHtml({}, rows.length - 1));
+      $('物品_' + (rows.length - 1)).focus();
     });
-    // 参考アプリと同じく「削除」は最後の行を消す（1行は残す）
+    // 参考アプリと同じく「削除」は最後の行を消す。1行は残す
     $('del').addEventListener('click', function () {
-      if (rows.length <= 1) return;
-      collect(); rows.pop(); drawItems();
+      if (rows.length <= 1) { toast('物品は1行以上必要です'); return; }
+      collect(); rows.pop();
+      var items = $('items'); items.removeChild(items.lastElementChild);
+      updateTotal(); refreshFormErr();
     });
 
     // ---------- エラー表示（項目の下に赤字） ----------
@@ -130,7 +141,13 @@
       if (!f || !f.classList.contains('exp-bad')) return;
       f.classList.remove('exp-bad');
       var p = f.querySelector(':scope > .exp-err'); if (p) { p.hidden = true; p.textContent = ''; }
-      if (!form.querySelector('.exp-bad')) $('formerr').hidden = true;
+      refreshFormErr();
+    }
+    // 送信ボタン上の「入力を確認してください（N件）」を、残っているエラーの数に合わせる
+    function refreshFormErr() {
+      var n = form.querySelectorAll('.exp-bad').length;
+      $('formerr').hidden = !n;
+      if (n) $('formerr').textContent = '入力を確認してください（' + n + '件）';
     }
     function showErr(key, msg) {
       var p = $('err-' + key); if (!p) return;
@@ -162,11 +179,14 @@
       if (!d.経費区分) { showErr('経費区分', '経費区分を選んでください'); n++; }
       d.物品.forEach(function (it, i) {
         var m = [];
-        if (!it.物品) m.push('物品を選んでください');
-        else if (it.物品 === 'フリー入力' && !it.自由入力) m.push('物品名を入れてください');
-        if (!(it.個数 > 0) || Math.floor(it.個数) !== it.個数) m.push('個数は1以上の整数で');
-        if (it.金額 === '' || !(it.金額 >= 0)) m.push('金額を入れてください');
-        if (m.length) { showErr('物品_' + i, (d.物品.length > 1 ? (i + 1) + '行目：' : '') + m.join('／')); n++; }
+        if (!it.物品) m.push('物品');
+        else if (it.物品 === 'フリー入力' && !it.自由入力) m.push('物品名');
+        var badCount = it.個数 !== '' && !(it.個数 > 0 && Math.floor(it.個数) === it.個数);
+        if (it.個数 === '') m.push('個数');
+        if (it.金額 === '' || !(it.金額 >= 0)) m.push('金額');
+        var msg = (m.length ? m.join('・') + 'を入れてください' : '') +
+          (badCount ? (m.length ? '。' : '') + '個数は1以上の整数で入れてください' : '');
+        if (msg) { showErr('物品_' + i, (d.物品.length > 1 ? (i + 1) + '行目：' : '') + msg); n++; }
       });
       return n;
     }

@@ -9,6 +9,8 @@
 /* ラベル行: 左にラベル（太字 12px）、右端に (必須)/(任意) 11px */
 .exp-field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .exp-lab { display: flex; align-items: center; gap: 6px; min-height: 22px; }
+.exp-field[data-f="物品"] > .exp-lab { gap: 12px; }
+.exp-field[data-f="物品"] > .exp-lab .exp-lab-name { margin-right: -2px; }
 .exp-lab label, .exp-lab .exp-lab-name { display: inline; font-size: 12px; font-weight: 700; color: #333; line-height: 1.3; }
 .exp-req, .exp-opt { margin-left: auto; font-size: 11px; font-weight: 700; white-space: nowrap; }
 .exp-req { color: #C0283A; }
@@ -37,14 +39,14 @@
 .exp-form [hidden] { display: none !important; }
 .exp-off .exp-req { color: #E3A0A9; font-weight: 400; }
 
-/* 物品: 追加（緑）・削除（赤）の小ピル */
+/* 物品: 追加（緑）・削除（赤）のピル。見た目は小ピル寄りだが、指で押し分けられるよう高さ 36px・間隔 12px */
 .exp-pill {
-  font: inherit; font-size: 11px; font-weight: 700; line-height: 1; padding: 6px 9px; border-radius: 8px; cursor: pointer;
-  min-height: 26px; box-shadow: none; width: auto;
+  font: inherit; font-size: 12px; font-weight: 700; line-height: 1; padding: 0 14px; border-radius: 10px; cursor: pointer;
+  min-height: 36px; min-width: 52px; box-shadow: none; width: auto;
 }
+.exp-pill + .exp-pill { margin-left: 6px; }
 .exp-add { background: #DFF3E3; color: #1E8A3A; border: 1px solid #9CD6AA; }
 .exp-del { background: #FCE1E4; color: #C0283A; border: 1px solid #EFA9B2; }
-.exp-del:disabled { opacity: .55; cursor: default; }
 .exp-items { display: flex; flex-direction: column; gap: 8px; }
 .exp-item { display: flex; flex-direction: column; gap: 6px; }
 .exp-item-row { display: grid; grid-template-columns: minmax(0, 15fr) minmax(0, 5fr) minmax(0, 10fr); gap: 8px; }
@@ -97,3 +99,6 @@
 .exp-done-id { font-size: 12px; color: #5B6572; font-variant-numeric: tabular-nums; }
 .exp-done-note { font-size: 12px; color: #5B6572; }
 .exp-form input:disabled::-webkit-calendar-picker-indicator { display: none; }
+
+/* 送信ボタンの下の小さな戻るリンク（他画面の「メニューに戻る」と揃える） */
+.exp-menu { align-self: center; display: inline-flex; align-items: center; min-height: 36px; padding: 0 12px; font-size: 12px; color: #2F7BD6; text-decoration: none; }
