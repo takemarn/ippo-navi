@@ -35,22 +35,49 @@
   function backLink(href, label) { return backHtml(href, label); }
 
   // ---------- GAS とのやりとり ----------
-  function api(action, data) {
+  function api(action, data, retried) {
     if (DEMO) return Demo.call(action, data || {});
+    var ctl = window.AbortController ? new AbortController() : null;
+    var timer = ctl && setTimeout(function () { ctl.abort(); }, 30000);
     return fetch(CFG.API_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify({ action: action, idToken: state.idToken, data: data || {} })
-    }).then(function (r) { return r.json(); }, function () {
-      throw new Error('通信できませんでした。電波の良い所でもう一度お試しください');
-    }).catch(function (e) {
-      if (e instanceof SyntaxError) throw new Error('サーバーの返事を読めませんでした。少し待ってからやり直してください');
-      throw e;
-    }).then(function (res) {
+      body: JSON.stringify({ action: action, idToken: freshToken(), data: data || {} }),
+      signal: ctl ? ctl.signal : undefined
+    }).then(function (r) { return r.text(); }, function (err) {
+      var e = new Error(err && err.name === 'AbortError' ? '時間がかかりすぎたため止めました。電波のよい所でもう一度試してください' : '通信できませんでした。電波のよい所でもう一度試してください');
+      e.code = 0; throw e;
+    }).then(function (text) {
+      if (timer) clearTimeout(timer);
+      var res;
+      try { res = JSON.parse(text); } catch (_) {
+        var e0 = new Error('サーバーから正しい返事がありませんでした。少し待ってからやり直してください'); e0.code = 500; throw e0;
+      }
       if (res.ok) return res.data;
       var e = new Error(res.message || 'エラーが起きました'); e.code = res.code; e.details = res.details || []; e.reason = res.reason || '';
+      // LINE の本人確認の期限切れは、1回だけ取り直してやり直す
+      if (e.reason === 'token' && !retried && renewToken()) return api(action, data, true);
       throw e;
     });
+  }
+  // LINE の IDトークン。期限が近ければ（1分以内）取り直す
+  function freshToken() {
+    if (DEMO || !window.liff) return state.idToken;
+    try {
+      var d = liff.getDecodedIDToken();
+      if (d && d.exp * 1000 < Date.now() + 60000) renewToken();
+      return liff.getIDToken() || state.idToken;
+    } catch (_) { return state.idToken; }
+  }
+  // 取り直し: LINE の中なら開き直し、ブラウザならログインし直す。すぐ使えるトークンが無ければ false
+  function renewToken() {
+    try {
+      var t = liff.getIDToken();
+      var d = liff.getDecodedIDToken();
+      if (t && d && d.exp * 1000 > Date.now() + 60000) { state.idToken = t; return true; }
+      if (liff.isInClient()) location.reload(); else { liff.logout(); liff.login({ redirectUri: location.href }); }
+    } catch (_) {}
+    return false;
   }
 
   // ---------- 見本モード（架空のデータ） ----------
