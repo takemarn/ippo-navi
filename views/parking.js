@@ -4,6 +4,7 @@
               番号の無い駐車場（区画が空で 台数 だけある）は、停まっている車と「空きスペースあり あと約N台」の行を出す
    「停める」を押した時刻から、選んだ時間（ふつう8時間）後を空き予定にする。予定を過ぎた車は「予定超過」
    開いている間は1分ごとに表示をし直す（「まもなく」「予定超過」が時間で変わるため）
+   views/portal.js（I.portalTools）を先に読み込むこと
    GAS とのやりとり: parking / parkIn / parkOut（kiroku-app の docs/api.md「相談AI」） */
 (function () {
   'use strict';
@@ -25,13 +26,13 @@
     var d = toDate(s), n = now();
     var t = d.getHours() + ':' + ('0' + d.getMinutes()).slice(-2);
     var same = d.getFullYear() === n.getFullYear() && d.getMonth() === n.getMonth() && d.getDate() === n.getDate();
-    return '<span class="nw">' + (same ? t : (d.getMonth() + 1) + '/' + d.getDate() + ' ' + t) + '</span>';
+    return '<span class="ptl-nw">' + (same ? t : (d.getMonth() + 1) + '/' + d.getDate() + ' ' + t) + '</span>';
   }
   function mins(a, b) { return Math.round((b - a) / 60000); }
   function dur(m) {
     m = Math.abs(m);
     var h = Math.floor(m / 60), r = m % 60;
-    return '<span class="nw">' + (h ? h + '時間' : '') + (r || !h ? r + '分' : '') + '</span>';
+    return '<span class="ptl-nw">' + (h ? h + '時間' : '') + (r || !h ? r + '分' : '') + '</span>';
   }
   function now() { return new Date(Date.now() + skew); }
 
@@ -54,7 +55,7 @@
   function skeleton() {
     return '<section class="pk-head"><h1>駐車場ナビ</h1><p>— 読み込み中 —</p><div class="pk-counts">' +
       ['空き', '使用中', 'まもなく', '予定超過'].map(function (l) { return '<div><b>–</b><small>' + l + '</small></div>'; }).join('') + '</div></section>' +
-      '<div class="pk-loading" role="status"><span class="spin" aria-hidden="true"></span>読み込み中...</div>';
+      T().loading();
   }
   function take(res) {
     st = res;

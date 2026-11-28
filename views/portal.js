@@ -13,8 +13,11 @@
   function loading(text) { return '<div class="loading" role="status">' + esc(text || '読み込み中...') + '</div>'; }
   // retry: true なら「再読み込み」ボタンを付ける（いまの画面を開き直す）
   function failBox(e, retry) {
-    return '<div class="errors" role="alert">' + esc(e && e.message || 'エラーが起きました') +
-      (retry ? '<div><button type="button" class="small sub ptl-retry" onclick="IPPO.route()">再読み込み</button></div>' : '') + '</div>';
+    // core.js の showError と同じ形（白いカード＋理由＋再読み込み）
+    if (!retry) return '<div class="errors" role="alert">' + esc(e && e.message || 'エラーが起きました') + '</div>'; // フォームの中のエラー
+    return '<div class="card fail" role="alert"><h2>画面を開けませんでした</h2>' +
+      '<p class="fail-msg">' + esc(e && e.message || 'エラーが起きました') + '</p>' +
+      '<button type="button" onclick="IPPO.route()">再読み込み</button></div>';
   }
   // 返事が来たときに、まだ同じ画面を見ているか（途中でほかの画面へ移ったら描かない）
   function alive() { var h = location.hash; return function () { return location.hash === h; }; }
@@ -88,8 +91,7 @@
       '<path d="M3 3.5A2.5 2.5 0 015.5 1H21v22H5.5A2.5 2.5 0 003 25.5z" fill="currentColor"/><path d="M3 25.5A2.5 2.5 0 015.5 23H21v4H5.5A2.5 2.5 0 013 24.5" fill="#fff" stroke="currentColor" stroke-width="1.2"/></svg>';
   }
   function viewRulesList() {
-    app.innerHTML = topBack('#rules', '就業規則・組織図・福利厚生に戻る') +
-      '<h1 class="ptl-h1l">就業規則・各規程</h1>' +
+    app.innerHTML = '<h1 class="ptl-h1l">就業規則・各規程</h1>' +
       '<p class="muted" id="rl-ed"></p>' +
       '<p class="ptl-note">閲覧には<b>お名前の確認</b>が必要です（会社の機密情報のため）。</p>' +
       '<div id="rl" class="list">' + loading() + '</div>' + I.backHtml('#rules', '就業規則・組織図・福利厚生に戻る');
@@ -209,7 +211,7 @@
 
   // ---------- 組織図 ----------
   function viewOrg() {
-    app.innerHTML = topBack('#rules', '就業規則・組織図・福利厚生に戻る') + '<div id="og" class="ptl-stack">' + loading() + '</div>' + I.backHtml('#rules', '就業規則・組織図・福利厚生に戻る');
+    app.innerHTML = '<div id="og" class="ptl-stack">' + loading() + '</div>' + I.backHtml('#rules', '就業規則・組織図・福利厚生に戻る');
     var ok = alive();
     api('orgChart').then(function (d) {
       var box = document.getElementById('og');

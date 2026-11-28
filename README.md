@@ -24,6 +24,7 @@
 - `core.js` … 共通の部品（GAS とのやりとり、見本データ、画面の切り替え）
 - `views/*.js` … 画面ごとの動き（menu, apply, expense, attendance, requests, approvals, shift, portal, manual, parking, ai）
 - `views/shift-demo.js` … シフトの見本データ（見本モードのときだけ使う。第2段階からは見本データを画面ごとのファイルに分けて `IPPO.demo` に登録する）
+- 相談AI（第4段階）: 読み込む順は portal-demo → portal → manual → parking → ai。`views/portal.js` が `views/menu.js` の `#portal`（準備中だけのメニュー）を上書きする。画面と GAS のやりとりは portal / openRule / orgChart / manual / parking / parkIn / parkOut / askAi（形は非公開リポジトリ kiroku-app の docs/api.md「相談AI」。中身は portal-demo.js の見本と同じ形）
 - `views/portal-demo.js` … 相談AI（規程・組織図・看護マニュアル・駐車場・AI相談）の見本データ。規程やマニュアルの文はすべて見本として書いたもの
 - `style.css` … 共通の見た目
 - `css/*.css` … 画面ごとの見た目

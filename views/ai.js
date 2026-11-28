@@ -2,6 +2,7 @@
    #ai … 質問を入れると、規程とマニュアルから近いところを探して「根拠」として見せる（いまは無料の検索だけ）
          規程の本文は閲覧前の確認が要るので、ここでは題と見出しだけ出し、「この規程を開く」で確認画面へ進む
          将来、文章で答える AI（有料の API）をつなぐときも、画面はこのままで GAS の askAi の中だけを変える
+   views/portal.js（I.pickRule・setPortalFrom）と views/manual.js（I.openGuide）を先に読み込むこと
    GAS とのやりとり: askAi（kiroku-app の docs/api.md「相談AI」） */
 (function () {
   'use strict';
@@ -39,7 +40,7 @@
         '<p class="muted">利用者さんの名前など、個人の情報は入れないでください。</p></section>' +
       '<div id="ai-log" class="ai-log" aria-live="polite"></div>' +
       '<div class="ai-ex" id="ai-ex"' + (log.length ? ' hidden' : '') + '>' + (nurse() ? NURSE_EXAMPLES.concat(EXAMPLES) : EXAMPLES).map(function (q) { return '<button type="button" data-ex="' + esc(q) + '">' + esc(q) + '</button>'; }).join('') + '</div>' +
-      '<form id="ai-f" class="ai-form"><label><span class="sr">質問</span><textarea id="ai-in" rows="2" maxlength="200" placeholder="例）有給休暇は何日もらえる？"></textarea></label>' +
+      '<form id="ai-f" class="ai-form"><label><span class="ptl-sr">質問</span><textarea id="ai-in" rows="2" maxlength="200" placeholder="例）有給休暇は何日もらえる？"></textarea></label>' +
         '<button type="submit">聞く</button></form>' +
       '<div id="err"></div>' + I.backHtml();
     var box = document.getElementById('ai-log');

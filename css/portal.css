@@ -1,5 +1,5 @@
 /* 相談AI（社内ポータル）の見た目: 規程・組織図・福利厚生(ptl-)、看護マニュアル(mnl-)、駐車場ナビ(pk-)、AI相談(ai-) */
-.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.ptl-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 
 /* ---------- 共通 ---------- */
 .ptl-stack { display: flex; flex-direction: column; gap: 12px; }
@@ -168,7 +168,7 @@ body.mnl-big .mnl-scene b, body.mnl-big .mnl-row b { font-size: 16px; }
 .pk-who b { font-size: 13px; }
 .pk-who small { font-size: 11px; color: var(--label); }
 .pk-st { align-self: flex-start; font-size: 10px; font-weight: 800; color: #fff !important; border-radius: 999px; padding: 1px 8px; background: #888; }
-.nw { white-space: nowrap; }
+.ptl-nw { white-space: nowrap; }
 .pk-slot.free .pk-no { background: #2e9a4a; }
 .pk-slot.free b { color: #157a33; }
 .pk-slot.soon .pk-no { background: #d99a1e; }
@@ -183,7 +183,6 @@ body.mnl-big .mnl-scene b, body.mnl-big .mnl-row b { font-size: 16px; }
 .pk-slot button.pk-in { background: #2e9a4a; border-color: #2e9a4a; border-radius: 999px; }
 .pk-slot button.pk-out.armed { background: var(--danger); border-color: var(--danger); color: #fff; font-size: 11px; }
 .pk-reload { min-height: 40px; padding: 4px 14px; font-size: 12px; }
-.pk-loading { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 24px 0; color: var(--muted); font-size: 12px; }
 .pk-form { background: #f6f9fe; border-radius: 12px; padding: 10px; }
 .pk-legend { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 11px; color: var(--label); }
 .pk-legend li::before { content: ""; display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 4px; vertical-align: 0; }
@@ -219,7 +218,7 @@ body.mnl-big .mnl-scene b, body.mnl-big .mnl-row b { font-size: 16px; }
 .mnl-119 { display: flex; flex-direction: column; background: #fff; border: 2px solid #c22035; color: #c22035; border-radius: 12px; padding: 10px 14px; text-decoration: none; min-height: 52px; }
 .mnl-119 b { font-size: 16px; }
 .mnl-119 small { font-size: 11px; color: var(--label); }
-.fail .btn { margin-top: 4px; }
-.fail .btn.sub-link { background: #fff; color: var(--navy); border-color: var(--glass-line); }
+.ptl-stack .fail .btn { margin-top: 4px; }
+.ptl-stack .fail .btn.sub-link { background: #fff; color: var(--navy); border-color: var(--glass-line); }
 .ai-hits button { min-height: 40px; border: 1px solid var(--glass-line); padding: 4px 12px; font-size: 12px; }
 .mnl-guide details summary { min-height: 40px; display: flex; align-items: center; }

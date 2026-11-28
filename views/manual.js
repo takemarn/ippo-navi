@@ -4,6 +4,7 @@
    #manual-guide  … 1つのガイド: 「パッと見（要点）」と「くわしく読む（本文）」。開いているガイドは sessionStorage に置く
    画面ごとにハッシュを分けているので、LINE やスマホの「戻る」でマニュアルのトップに戻れる。上に「文字 大」の切り替え
    参考アプリは暗証番号で入るが、こちらは LINE で本人が分かるので、職種（看護職）と役割（承認者・管理者）で見られる人を決める
+   views/portal.js（I.portalTools・portalFrom）を先に読み込むこと
    GAS とのやりとり: manual（kiroku-app の docs/api.md「相談AI」） */
 (function () {
   'use strict';
