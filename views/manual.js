@@ -123,7 +123,7 @@
     box.innerHTML =
       '<section class="mnl-hero"><b>何に困ってる？</b><small>ここを見れば、マニュアルが見つかります。</small></section>' +
       '<a class="mnl-urgent" href="#manual-urgent"><span class="mnl-urgent-ic" aria-hidden="true">!</span>' +
-        '<span><b>' + esc((data.急変 || {}).題 || '様子がおかしい・急変') + '</b><small>夜の連絡・オンコール・救急搬送 → すぐ見る</small></span></a>' +
+        '<span><b>' + esc((data.急変 || {}).題 || '様子がおかしい・急変') + '</b><small>夜の連絡先・当番の看護師（オンコール）・救急車 → すぐ見る</small></span></a>' +
       '<form class="mnl-search" id="mnl-f" role="search"><input id="mnl-q" type="search" enterkeyhint="search" placeholder="例：転倒" value="' + esc(query) + '" aria-label="マニュアルを探す">' +
         '<button type="submit">探す</button></form>' +
       '<div class="mnl-keys">' + (data.キーワード || []).map(function (k) { return '<button type="button" data-key="' + esc(k) + '">' + esc(k) + '</button>'; }).join('') + '</div>' +
@@ -180,7 +180,7 @@
     var list = (u.見る順 || []).map(guide).filter(Boolean);
     box.innerHTML = top() +
       '<h2 class="mnl-uh">' + esc(u.題 || '様子がおかしい・急変') + '</h2>' +
-      '<a class="mnl-119" href="tel:119"><b>命に関わるときは 119番</b><small>押すと電話をかけます。オンコール当番への連絡は、そのあとで大丈夫です</small></a>' +
+      '<a class="mnl-119" href="tel:119"><b>命に関わるときは 119番</b><small>押すと電話をかけます。当番の看護師（オンコール）への連絡は、そのあとで大丈夫です</small></a>' +
       '<div id="mnl-calls">' + calls() + '</div>' +
       '<p class="ptl-note">この場面で見るところ（上から順に）</p>' +
       '<ol class="mnl-steps">' + list.map(function (g) {

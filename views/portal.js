@@ -83,7 +83,7 @@
     // 夜勤中の介護職でも迷わないよう、急変のページへの近道をいちばん上に置く（看護マニュアルの中と同じ行き先）
     var h1 = app.querySelector('.mh') || app.querySelector('h1'); // 見出し（絵＋名前）の下
     if (h1) h1.insertAdjacentHTML('afterend', '<a class="mnl-urgent ptl-urgent-top" href="#manual-urgent"><span class="mnl-urgent-ic" aria-hidden="true">!</span>' +
-      '<span><b>様子がおかしい・急変</b><small>119番・オンコール当番への電話 → すぐ見る</small></span></a>');
+      '<span><b>様子がおかしい・急変</b><small>119番・当番の看護師（オンコール）への電話 → すぐ見る</small></span></a>');
     app.querySelector('.ptl-urgent-top').addEventListener('click', function () { setPortalFrom('#portal'); });
   };
 

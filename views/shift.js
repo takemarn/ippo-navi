@@ -175,14 +175,16 @@
       '<section class="sft-plan" id="sft-plan" aria-label="選んだ日の予定">' +
         '<div class="sft-plan-row">' +
           '<button type="button" class="sft-step" data-step="-1" aria-label="前の日">‹</button>' +
-          '<div class="sft-plan-day"><b>予定</b><p id="sft-seldate" class="sft-seldate">カレンダーの日付を押してください</p></div>' +
+          '<div class="sft-plan-day"><b>この日の希望</b><p id="sft-seldate" class="sft-seldate">カレンダーの日付を押してください</p></div>' +
           '<span id="sft-cur" class="sft-cur"></span>' +
           '<button type="button" class="sft-step" data-step="1" aria-label="次の日">›</button></div>' +
         '<div class="sft-seg" id="sft-seg" role="radiogroup" aria-label="この日の予定">' +
           WISHES.map(function (w) { return '<button type="button" role="radio" class="sft-segbtn ' + WISH_CLS[w] + '" data-w="' + w + '">' + w + '</button>'; }).join('') +
           '<button type="button" role="radio" class="sft-segbtn none" data-w="">未設定</button></div>' +
-        '<button type="button" id="sft-offs" class="sft-offs">この日の自分以外の休み申請を見る</button>' +
-        '<label class="sft-memo"><span>メモ</span><small>時間指定などある場合24時間表記で、その他ご要望はここに記入してください（例：9:00〜15:00 なら可）</small>' +
+        // 「出勤不可」と「休み希望」のちがいが分かりにくいので、ボタンのすぐ下にひとことで書く
+        '<p class="sft-seg-help"><b>出勤不可</b>＝その日はどうしても出られない　<b>休み希望</b>＝できれば休みたい</p>' +
+        '<button type="button" id="sft-offs" class="sft-offs">この日に休みを出している人を見る</button>' +
+        '<label class="sft-memo"><span>メモ</span><small>出られる時間が決まっているときや、ほかに伝えたいことがあれば書いてください（例：9時〜15時なら出られる）</small>' +
           '<textarea id="sft-note" maxlength="200" placeholder="なし"></textarea><em class="sft-memo-n" id="sft-memo-n">0/200</em></label>' +
       '</section>' +
       I.backHtml('#shift') +
@@ -296,10 +298,10 @@
     var can = on && !sub.locked; // 確定した月は日を選んで見られるが、変えられない
     document.getElementById('sft-plan').classList.toggle('idle', !on);
     document.getElementById('sft-seldate').innerHTML = on
-      ? '<strong>' + esc(dayLabel(sub.sel)) + '</strong><span>' + esc(sub.sel) + '</span>'
+      ? '<strong>' + esc(dayLabel(sub.sel)) + '</strong>'
       : (sub.loading ? '読み込み中...' : 'カレンダーの日付を押してください');
     document.getElementById('sft-cur').innerHTML = on
-      ? (w.希望 ? '<span class="sft-chip ' + WISH_CLS[w.希望] + '">' + esc(w.希望) + '</span>' : '<span class="sft-chip none">--</span>') +
+      ? (w.希望 ? '<span class="sft-chip ' + WISH_CLS[w.希望] + '">' + esc(w.希望) + '</span>' : '<span class="sft-chip none">未設定</span>') +
         (sub.edits[sub.sel] ? '<em class="sft-cur-dirty">未送信</em>' : '')
       : '';
     app.querySelectorAll('.sft-segbtn').forEach(function (b) {
@@ -360,7 +362,7 @@
     if (sub.sending) return; // 送信中の二度押し・Enter の連打
     var err = document.getElementById('sft-err');
     var dates = dirtyDates();
-    if (!dates.length) { err.innerHTML = '<div class="errors" role="alert">まだ変更がありません。日付を押して予定を選んでから送信してください</div>'; return; }
+    if (!dates.length) { toast('まだ変更がありません。日付を押して希望を選んでから送信してください'); return; } // 送信は画面の下にあり、上のエラー欄は見えないので知らせで出す
     err.innerHTML = '';
     // 月ごとにまとめて送る（GAS は1回に1か月分を受け取る）
     var byYm = {};
@@ -749,6 +751,15 @@
     var lack = days.map(function (d) { return { d: d, c: countOf(d) }; }).filter(function (x) { return x.c.lackDay || x.c.lackNight; });
     var el = document.getElementById('mk-short');
     if (!staffList().length) { el.innerHTML = ''; return; }
+    var any = staffList().some(function (p) { return days.some(function (d) { return !elsewhere(p, d) && shiftAt(p, d); }); });
+    if (!any) {
+      el.className = 'mk-short start';
+      el.innerHTML = '<b class="mk-short-h">はじめに（まだ勤務が入っていません）</b><ol class="mk-start">' +
+        '<li>下の<b>「休み希望を公休で埋める」</b>と<b>「希望から仮入れ」</b>を押すと、職員の希望どおりに入ります</li>' +
+        '<li>赤い日（人が足りない日）のマスを押して、勤務を足します</li>' +
+        '<li>下の<b>「確定する」</b>で職員に公開します（途中でやめるときは「下書き保存」）</li></ol>';
+      return;
+    }
     if (!lack.length) {
       el.className = 'mk-short good';
       el.innerHTML = '<b class="mk-short-h"><i aria-hidden="true">✓</i>どの日も必要な人数がそろっています</b>';
@@ -768,8 +779,8 @@
   function drawTools() {
     var from = needFromGas(), fill = autoPlan(false).length, off = autoPlan(true).length;
     function step(k) {
-      return '<span class="mk-need-k">' + k + '</span>' + (from ? '<b>' + needOf(mk.board.年月 + '-01')[k] + '</b>'
-        : '<button type="button" class="mk-stepper" data-need="' + k + ':-1" aria-label="' + k + 'の必要人数を減らす">−</button><b aria-live="polite">' + mk.need[k] + '</b><button type="button" class="mk-stepper" data-need="' + k + ':1" aria-label="' + k + 'の必要人数を増やす">＋</button>') + '<span class="mk-need-u">人</span>';
+      return '<span class="mk-need-g"><span class="mk-need-k">' + k + '</span>' + (from ? '<b>' + needOf(mk.board.年月 + '-01')[k] + '</b>'
+        : '<button type="button" class="mk-stepper" data-need="' + k + ':-1" aria-label="' + k + 'の必要人数を減らす">−</button><b aria-live="polite">' + mk.need[k] + '</b><button type="button" class="mk-stepper" data-need="' + k + ':1" aria-label="' + k + 'の必要人数を増やす">＋</button>') + '<span class="mk-need-u">人</span></span>';
     }
     document.getElementById('mk-tools').innerHTML =
       '<div class="mk-need"><span class="mk-need-h">1日に必要な人数</span><div class="mk-need-row">' + step('日中') + step('夜勤') + '</div>' +
@@ -797,10 +808,11 @@
       var cells = days.map(function (d) {
         var w = p.希望[d] && p.希望[d].希望, s = shiftAt(p, d), k = cellKey(p.職員ID, d);
         var memo = p.希望[d] && p.希望[d].メモ;
-        if (WORKING.indexOf(s) >= 0 && !away) tot++;
-        if (s === '夜勤' && !away) night++;
         // 希望が「出勤不可・休み希望」なのに勤務を入れたマスは斜線と「!」、可能勤務にない勤務は薄く点線で示す
         var iss = issueOf(p, d), clash = iss.clash, away = elsewhere(p, d);
+        // 右端の「計」は、この施設での勤務だけ数える（ほかの施設の勤務は、その施設のタブで数える）
+        if (WORKING.indexOf(s) >= 0 && !away) tot++;
+        if (s === '夜勤' && !away) night++;
         if (away) { iss.cannot = false; clash = false; } // ほかの施設の勤務は、その施設のタブで確かめる
         return '<td><button type="button" class="mk-cell' + (WISH_CLS[w] ? ' ' + WISH_CLS[w] : '') + (k in mk.edits ? ' dirty' : '') + (s && WORKING.indexOf(s) < 0 ? ' rest' : '') + (s === '夜勤' ? ' night' : '') + (clash ? ' clash' : '') + (iss.cannot ? ' cannot' : '') + (away ? ' away' : '') + '" data-id="' + esc(p.職員ID) + '" data-d="' + d + '"' +
           ' aria-label="' + esc(p.氏名) + ' ' + dayLabel(d) + ' 希望 ' + (w || 'なし') + ' 勤務 ' + (s || '未設定') + (away ? ' ' + esc(facAt(p, d)) + 'の勤務' : '') + (clash ? ' 希望と食い違い' : '') + (iss.cannot ? ' 可能勤務外' : '') + (memo ? ' メモ ' + esc(memo) : '') + '">' +
