@@ -6,7 +6,8 @@
    送信の流れは経費・勤怠と同じ: 送信 → 入力チェック（項目の下に赤字・件数） → ページ内の確認カード → 送信中 → 完了カード。
    送ると「タスク」の申請になり、承認待ち一覧・自分の申請に出る（中身の表示は views/clients.js の I.bodyLines）。
    GAS: submitTask（決まりは kiroku-app の docs/api.md）。送る data の形は変えていない:
-     {施設名, 利用者ID, 保険種類, 生活保護, タスク, 日程開始, 日程終了, 日程, 時間開始, 時間終了, 訪問看護指示書変更, 期間開始, 期間終了, 状態, 備考}
+     {施設名, 利用者ID, 保険種類, 生活保護, タスク, 日程開始, 日程終了, 日程, 時間開始, 時間終了, 訪問看護指示書変更, 期間開始, 期間終了, 状態, 備考, 送信ID}
+     送信ID = 確認カードを出すときに作る文字。「もう一度送信する」では同じIDを送るので、GAS は2件目を作らず前の返事を返す
    利用者の候補は searchClients で取る。見た目は css/expense.css（exp-* の共通部品と、末尾の「タスク管理」の区切り） */
 (function () {
   'use strict';
@@ -25,6 +26,14 @@
     if (!m) return s || '';
     var d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
     return m[1] + '年' + Number(m[2]) + '月' + Number(m[3]) + '日（' + '日月火水木金土'.charAt(d.getDay()) + '）';
+  }
+
+  // 送信ID（経費・勤怠の画面と同じ作り方）。暗号の乱数が使えない古い端末では時刻＋乱数
+  function newSendId() {
+    try {
+      var a = new Uint8Array(16); crypto.getRandomValues(a);
+      return Array.prototype.map.call(a, function (x) { return ('0' + x.toString(16)).slice(-2); }).join('');
+    } catch (_) { return Date.now().toString(36) + Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2); }
   }
 
   // ラベル行。forId が無いもの（ボタンの組・2つ並びの欄）は span にして、組の aria-labelledby から指す
@@ -286,6 +295,7 @@
     }
 
     function showConfirm(d) {
+      d.送信ID = newSendId(); // 確認のたびに作る（直して確認し直したら新しいID。送り直しは同じ d なので同じID）
       form.hidden = true;
       try { history.pushState({ ippoStep: 'confirm' }, ''); } catch (_) {} // ブラウザの「戻る」で入力に戻れるように
       after.innerHTML =

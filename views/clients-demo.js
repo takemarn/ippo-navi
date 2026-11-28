@@ -103,7 +103,7 @@
     return !s || (r.種別 + ' ' + r.記録担当者 + ' ' + r.メモ).indexOf(s) >= 0;
   }
   function desc(a, b) { return (b.記録日 + b.更新日時).localeCompare(a.記録日 + a.更新日時); }
-  function bad(msg, details) { var e = new Error(msg); e.details = details || []; return e; }
+  function bad(msg, details) { var e = new Error(msg); e.code = 400; e.details = details || []; return e; } // GAS の入力エラーと同じく 400
 
   // 申請（利用者登録・利用者修正・タスク）は core の見本の申請一覧に足す（自分の申請・承認待ちに出る）
   var core = { push: function (type, prefix, body) {
@@ -181,7 +181,17 @@
     if (q.種類 === '置換' && !Object.keys(f).length) throw bad('直す項目を1つ以上入れてください');
     if (f['利用者データ/ステータス'] && ['居住中', '入院中', '退居', '登録なし'].indexOf(f['利用者データ/ステータス']) < 0) throw bad('ステータスを選んでください');
     return core.push(q.種類 === '新規' ? '利用者登録' : '利用者修正', 'CLI',
-      { 種類: q.種類, 利用者ID: c ? c.利用者ID : '', 利用者氏名: c ? c.氏名 : f[NAME], 施設名: c ? c.施設名 : f[FACK], 項目: f, 変更前: q.種類 === '置換' ? (q.変更前 || {}) : {}, 理由: q.理由 || '' });
+      { 種類: q.種類, 利用者ID: c ? c.利用者ID : '', 利用者氏名: c ? c.氏名 : f[NAME], 施設名: c ? c.施設名 : f[FACK], 項目: f, 変更前: q.種類 === '置換' ? beforeOf(c, f) : {}, 理由: q.理由 || '' });
+  };
+  // 変更前は GAS と同じく、画面から送られた値ではなく「いまの値」から作る（画面は 変更前 を送らない）
+  function beforeOf(c, f) {
+    var out = {}, v = info[c.利用者ID] || {};
+    Object.keys(f).forEach(function (key) {
+      var cat = key.split('/')[0], k = key.split('/').slice(1).join('/');
+      var val = cat === '利用者データ' && MAIN.indexOf(k) >= 0 ? c[k] : (v[cat] || {})[k];
+      out[key] = val === undefined || val === null ? '' : String(val);
+    });
+    return out;
   };
   I.demo.submitTask = function (q, me) {
     var e = [], d = /^\d{4}-\d{2}-\d{2}$/;
@@ -199,8 +209,20 @@
     if (e.length) throw bad('入力を確認してください', e);
     var c = find(q.利用者ID);
     if (c.施設名 !== q.施設名) throw bad('入力を確認してください', ['利用者がこの施設にいません。施設名と利用者名を選び直してください']);
-    return core.push('タスク', 'TSK', Object.assign({ 担当者: me.氏名, 利用者氏名: c.氏名 }, q));
+    var body = Object.assign({ 担当者: me.氏名, 利用者氏名: c.氏名 }, q); delete body.送信ID;
+    return core.push('タスク', 'TSK', body);
   };
+  // 送信ID: 同じIDの2回目は1回目の返事を返すだけ（GAS と同じ。「もう一度送信する」で2件にしない）
+  var sentIds = {};
+  ['addRecord', 'requestClientChange', 'submitTask'].forEach(function (name) {
+    var fn = I.demo[name];
+    I.demo[name] = function (q, me) {
+      if (q && q.送信ID && sentIds[q.送信ID]) return sentIds[q.送信ID];
+      var r = fn(q, me);
+      if (q && q.送信ID) sentIds[q.送信ID] = r;
+      return r;
+    };
+  });
   // ---------- 承認待ち一覧の見本（ほかの職員が出した 利用者登録・利用者修正・タスク）と、承認したときの反映 ----------
   var dc = I.demoCore;
   if (dc) {

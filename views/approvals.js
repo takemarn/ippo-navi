@@ -8,7 +8,12 @@
      - 読み込み中は形だけの仮の行（スケルトン）、空のとき・エラーのとき（権限なし／通信）を分けて案内
    管理者だけ: 各カードに「削除」。理由を必須で書いてから deleteRequest {申請ID, 理由} を送る（承認待ちの申請だけ）。
      見本モードは core.js の Demo に deleteRequest が無いので、ここで IPPO.demo に「見本の承認待ちから取り除く」ものを登録する。
-   データの形（GAS の pendingApprovals / decide / deleteRequest）は変えていない。
+   データの形（GAS の pendingApprovals / decide / deleteRequest / viewAttachment）は変えていない。
+   経費・勤怠の明細に「施設名」があれば出す。勤怠の明細に「添付ファイルID」があれば「遅延証明書を見る」ボタンを出し、
+     押すと viewAttachment {申請ID} → {添付: dataURL|null, 種類} を読んで画面の上に重ねて見せる（自分の申請 views/requests.js も同じ部品）。
+     見本モードは IPPO.demo.viewAttachment に「見本です」と書いた小さな絵を返すものをここで登録する。
+   decide / deleteRequest が「もう承認待ちではありません」（400）を返したら、ほかの人が先に片づけたので一覧を読み直す。
+   差戻しのコメントは1000文字、削除の理由は500文字まで（GAS の決まり）。
    pendingApprovals の各行に「承認者」（いまの段階の承認者の氏名）と「担当」（自分が承認できるか）があれば使う。
    無いとき（今の GAS）は「自分が承認する段階の申請」とみなし、承認者は自分として数える。 */
 (function () {
@@ -46,11 +51,27 @@
 
   function isAdmin() { return !!(state.me && state.me.役割 === '管理者'); }
   // 見本モード: 削除は見本の承認待ちから取り除くだけ
+  function demoBad(msg) { var e = new Error(msg); e.code = 400; return e; }
   if (I.DEMO && I.demo && !I.demo.deleteRequest) {
     I.demo.deleteRequest = function (d) {
-      if (!d || !d.申請ID || !String(d.理由 || '').trim()) throw new Error('削除の理由を書いてください');
-      var D = I.demoCore; if (D) D.pending = D.pending.filter(function (r) { return r.申請ID !== d.申請ID; });
-      return { 申請ID: d.申請ID, 状態: '削除' };
+      if (!d || !d.申請ID || !String(d.理由 || '').trim()) throw demoBad('削除の理由を書いてください');
+      var D = I.demoCore;
+      if (D && !D.pending.some(function (r) { return r.申請ID === d.申請ID; })) throw demoBad('この申請はもう承認待ちではありません');
+      if (D) D.pending = D.pending.filter(function (r) { return r.申請ID !== d.申請ID; });
+      return { 申請ID: d.申請ID, 状態: '取消' }; // GAS と同じく状態は「取消」
+    };
+  }
+  // 見本モード: 添付（遅延証明書）は「見本です」と書いた小さな絵を返す。添付ファイルIDの無い申請は null
+  if (I.DEMO && I.demo && !I.demo.viewAttachment) {
+    I.demo.viewAttachment = function (d) {
+      var D = I.demoCore || {}, r = (D.pending || []).concat(D.requests || []).filter(function (x) { return x.申請ID === d.申請ID; })[0];
+      if (!r) throw demoBad('申請が見つかりません');
+      var has = (r.明細 || []).some(function (x) { return x.添付ファイルID; });
+      var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="320" height="200" viewBox="0 0 320 200"><rect width="320" height="200" fill="#f4f6fb"/>' +
+        '<rect x="12" y="12" width="296" height="176" rx="10" fill="#fff" stroke="#9aa8c4" stroke-dasharray="6 4"/>' +
+        '<text x="160" y="92" font-size="22" text-anchor="middle" fill="#12317D" font-family="sans-serif">遅延証明書</text>' +
+        '<text x="160" y="128" font-size="16" text-anchor="middle" fill="#6B7480" font-family="sans-serif">見本です（架空の画像）</text></svg>';
+      return { 申請ID: d.申請ID, 添付: has ? 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg) : null, 種類: has ? 'image/svg+xml' : '' };
     };
   }
   var SENDING_LABEL = { 承認: '承認中…', 差戻し: '差し戻し中…', 削除: '削除中…' };
@@ -155,6 +176,7 @@
       return '<dl class="apv-dl">' +
         '<dt>対象日</dt><dd class="apv-num">' + esc(head.対象日 || '—') + '</dd>' +
         '<dt>経費区分</dt><dd>' + esc(head.経費区分 || '—') + '</dd>' +
+        (head.施設名 ? '<dt>施設</dt><dd>' + esc(head.施設名) + '</dd>' : '') +
         (kind ? '<dt>小口先出</dt><dd>' + esc(kind) + '</dd>' : '') +
         d.map(function (x) {
           return '<dt class="apv-line">' + esc(x.物品 === 'フリー入力' && x.自由入力 ? x.自由入力 : x.物品) + ' <span class="apv-qty">×' + esc(x.個数) + '</span></dt><dd class="apv-num">' + yen(x.金額) + '</dd>';
@@ -168,7 +190,10 @@
       return '<dt>項目</dt><dd>' + esc(x.項目) + '</dd>' +
         '<dt>対象日</dt><dd class="apv-num">' + esc(x.対象日) + '</dd>' +
         (time ? '<dt>時間</dt><dd class="apv-num">' + esc(time) + '</dd>' : '') +
-        (x.備考 ? '<dt class="apv-wide">備考</dt><dd class="apv-wide">' + esc(x.備考) + '</dd>' : '');
+        (x.施設名 ? '<dt>施設</dt><dd>' + esc(x.施設名) + '</dd>' : '') +
+        (x.備考 ? '<dt class="apv-wide">備考</dt><dd class="apv-wide">' + esc(x.備考) + '</dd>' : '') +
+        // 添付（遅延証明書など）は押したときだけ読む（画像は重いので一覧では読まない）
+        (x.添付ファイルID ? '<dd class="apv-wide"><button type="button" class="apv-btn apv-btn-ghost" data-attach="' + esc(r.申請ID) + '">遅延証明書を見る</button></dd>' : '');
     }).join('') + '</dl>';
   }
   // 申請カードの見出しの下に出す札（何日前の申請か・予定日まであと何日か）
@@ -200,7 +225,7 @@
       ops = '<div class="apv-confirm is-back" role="group" aria-label="削除の確認">' +
         '<p>' + esc(r.申請者 || '申請者') + ' さんの' + esc(what(r)) + 'を削除します。削除すると元に戻せません。</p>' +
         '<div class="apv-label"><label for="del-' + id + '">削除の理由</label><span class="apv-opt">(必須)</span></div>' +
-        '<textarea id="del-' + id + '" class="apv-cmt" data-k="del:" rows="2" maxlength="300" placeholder="例: 二重に出された申請のため">' + esc(view.cmts['del:' + r.申請ID] || '') + '</textarea>' +
+        '<textarea id="del-' + id + '" class="apv-cmt" data-k="del:" rows="2" maxlength="500" placeholder="例: 二重に出された申請のため">' + esc(view.cmts['del:' + r.申請ID] || '') + '</textarea>' +
         '<div class="apv-err" role="alert"></div>' +
         '<div class="apv-btns"><button type="button" class="apv-btn apv-btn-ghost" data-act="やめる">やめる</button>' +
         '<button type="button" class="apv-btn apv-btn-back" data-act="確定">削除する</button></div>' +
@@ -215,7 +240,7 @@
         '<div class="apv-phrases" aria-label="よく使う理由">' + PHRASES.map(function (p) {
           return '<button type="button" class="apv-phrase" data-phrase="' + esc(p) + '">' + esc(p) + '</button>';
         }).join('') + '</div>' +
-        '<textarea id="cmt-' + id + '" class="apv-cmt" rows="3" maxlength="300" placeholder="申請者に届きます。直してほしい点を書いてください">' + esc(view.cmts[r.申請ID] || '') + '</textarea>' +
+        '<textarea id="cmt-' + id + '" class="apv-cmt" rows="3" maxlength="1000" placeholder="申請者に届きます。直してほしい点を書いてください">' + esc(view.cmts[r.申請ID] || '') + '</textarea>' +
         '<div class="apv-err" role="alert"></div>' +
         '<div class="apv-btns"><button type="button" class="apv-btn apv-btn-ghost" data-act="やめる">やめる</button>' +
         '<button type="button" class="apv-btn apv-btn-back" data-act="確定">差し戻す</button></div>' +
@@ -373,6 +398,12 @@
       }).catch(function (x) {
         if (gen !== I.gen) return;
         delete view.sending[c.id];
+        // ほかの承認者・管理者が先に片づけた申請（GAS は 400「もう承認待ちではありません」）は、一覧を読み直して消す
+        if (x.code === 400 && /承認待ちではありません/.test(x.message || '')) {
+          delete view.cmts[c.id]; delete view.cmts['del:' + c.id];
+          toast('この申請はもう承認待ちではありません。一覧を最新にしました');
+          load(); return;
+        }
         // 差戻し・削除は書いた理由を残したまま確認を開き直す（ほかのカードの確認を開いていなければ）
         if (c.act !== '承認' && !view.confirm) view.confirm = c;
         saveComments(); render();
@@ -386,6 +417,40 @@
     var el = document.querySelector('.apv-item[data-id="' + cssEsc(id) + '"] ' + sel);
     if (el) el.focus();
   }
+
+  // ---------- 添付（遅延証明書）を見る ----------
+  // 承認待ち一覧・自分の申請のどちらでも「遅延証明書を見る」（data-attach=申請ID）を押すと開く。
+  // 画面をまたいで1つだけ登録する（ボタンは両方の画面の明細の中にある）
+  function showAttachment(id, btn) {
+    if (btn) { if (btn.disabled) return; btn.disabled = true; btn.setAttribute('aria-busy', 'true'); }
+    var label = btn ? btn.textContent : '';
+    if (btn) btn.textContent = '読み込み中…';
+    function done() { if (btn && btn.isConnected) { btn.disabled = false; btn.removeAttribute('aria-busy'); btn.textContent = label; } }
+    api('viewAttachment', { 申請ID: id }).then(function (r) {
+      done();
+      if (!r || !r.添付) { toast('添付ファイルが見つかりませんでした'); return; }
+      var url = String(r.添付), pdf = /pdf/i.test(r.種類 || '') || /^data:application\/pdf/i.test(url);
+      // data: URL の画像だけ表示する（それ以外の文字はリンクにも入れない）
+      if (!/^data:(image\/(jpeg|png|webp|gif|svg\+xml)|application\/pdf)[;,]/i.test(url)) { toast('添付ファイルを表示できませんでした'); return; }
+      var wrap = document.createElement('div');
+      wrap.className = 'cl-modal-wrap'; wrap.setAttribute('role', 'dialog'); wrap.setAttribute('aria-modal', 'true'); wrap.setAttribute('aria-label', '遅延証明書');
+      wrap.innerHTML = '<div class="cl-modal"><h2>遅延証明書</h2>' +
+        (pdf ? '<p>PDF のため、この画面では表示できません。下のボタンで開いてください。</p><a class="apv-btn apv-btn-ghost" href="' + esc(url) + '" download="遅延証明書.pdf" target="_blank" rel="noopener">PDF を開く</a>'
+          : '<img src="' + esc(url) + '" alt="遅延証明書の画像" style="display:block;max-width:100%;max-height:60vh;margin:0 auto;object-fit:contain">') +
+        '<div class="cl-modal-btns"><button type="button" data-close>閉じる</button></div></div>';
+      function close() { wrap.remove(); document.removeEventListener('keydown', onKey); window.removeEventListener('hashchange', close); if (btn && btn.isConnected) btn.focus(); }
+      function onKey(e) { if (e.key === 'Escape') close(); }
+      wrap.addEventListener('click', function (e) { if (e.target === wrap || e.target.closest('[data-close]')) close(); });
+      document.addEventListener('keydown', onKey);
+      window.addEventListener('hashchange', close); // 画面を移ったら閉じる
+      document.body.appendChild(wrap);
+      wrap.querySelector('[data-close]').focus();
+    }).catch(function (e) { done(); toast(e.message || '添付ファイルを読めませんでした'); });
+  }
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest && e.target.closest('button[data-attach]');
+    if (b && app.contains(b)) showAttachment(b.dataset.attach, b);
+  });
 
   // 申請の中身（経費の品名・個数・金額の内訳／勤怠の項目・時間）。自分の申請（views/requests.js）も同じ部品で出す
   I.applyLines = contentLines;
