@@ -56,10 +56,20 @@
   }
   // 画面が切り替わったあとに遅れて届いた返事を捨てるための番号（core.js の route() が進める）
   function stale(gen) { return gen !== I.gen; }
+  // app（#app）は画面を移っても同じ要素なので、そこに付けたクリックは画面を離れるときに外す。
+  // 外さないと、行き来するたびに「もう一度読み込む」などが二重・三重に動く
+  function onApp(fn) {
+    app.addEventListener('click', fn);
+    I.cleanup.push(function () { app.removeEventListener('click', fn); });
+  }
 
   // ---------- 下から出るシート（他の人の休み・作成のマス・確かめ） ----------
+  // 閉じたら、開く前にいた所（押したボタン）へフォーカスを戻す（キーボード・読み上げで迷わないように）。
+  // sheetBack に関数を入れると、それが返す要素へ戻す（作成の表は描き直すとボタンが入れ替わるため）
+  var sheetFrom = null, sheetBack = null;
   function openSheet(html, onClose) {
-    closeSheet();
+    if (!document.getElementById('sft-sheet')) { sheetFrom = document.activeElement; sheetBack = null; }
+    closeSheet(true);
     var wrap = document.createElement('div');
     wrap.className = 'sft-sheet-wrap'; wrap.id = 'sft-sheet';
     wrap.innerHTML = '<div class="sft-sheet" role="dialog" aria-modal="true" aria-labelledby="sft-sheet-h"><span class="sft-grip" aria-hidden="true"></span>' + html + '</div>';
@@ -68,14 +78,28 @@
     wrap.addEventListener('click', function (e) {
       if (e.target === wrap || e.target.closest('[data-close]')) { closeSheet(); if (onClose) onClose(); }
     });
+    // Tab でシートの外（後ろの画面）へ出ないようにする
+    wrap.addEventListener('keydown', function (e) {
+      if (e.key !== 'Tab') return;
+      var f = [].filter.call(wrap.querySelectorAll('button, a[href], textarea, input'), function (x) { return !x.disabled && x.offsetParent; });
+      if (!f.length) return;
+      if (e.shiftKey && document.activeElement === f[0]) { e.preventDefault(); f[f.length - 1].focus(); }
+      else if (!e.shiftKey && document.activeElement === f[f.length - 1]) { e.preventDefault(); f[0].focus(); }
+    });
     var first = wrap.querySelector('[data-close]');
     if (first) first.focus();
     return wrap.querySelector('.sft-sheet');
   }
-  function closeSheet() {
+  // keep: 続けて別のシートを開くとき（フォーカスは戻さない）
+  function closeSheet(keep) {
     var el = document.getElementById('sft-sheet');
-    if (el) el.remove();
+    if (!el) return;
+    el.remove();
     document.body.classList.remove('sft-noscroll');
+    if (keep === true) return;
+    var to = sheetBack ? sheetBack() : sheetFrom;
+    sheetFrom = sheetBack = null;
+    if (to && to.isConnected && to.focus) to.focus({ preventScroll: true });
   }
   function onEsc(e) { if (e.key === 'Escape') closeSheet(); }
   // 「はい／やめる」を聞くシート。ok を押すと onOk。extra は本文に足す HTML
@@ -127,16 +151,16 @@
   function dirtyDates() { return Object.keys(sub.edits).sort(); }
 
   function viewSubmit() {
-    if (!sub.ym) sub.ym = nextYm();
+    sub.ym = nextYm(); // 開くたびに翌月から（前に見た月のままだと、出す月をまちがえやすい）。未送信の変更は月をまたいで残る
     sub.sel = null;
     document.addEventListener('keydown', onEsc);
-    I.cleanup.push(function () { document.removeEventListener('keydown', onEsc); closeSheet(); document.body.classList.remove('sft-has-bar'); });
+    I.cleanup.push(function () { document.removeEventListener('keydown', onEsc); closeSheet(true); document.body.classList.remove('sft-has-bar', 'sft-typing'); });
     document.body.classList.add('sft-has-bar');
     app.innerHTML =
       '<div class="sft-head"><h1 class="sft-title">シフト提出<small>（' + esc(state.me && state.me.氏名) + '）</small></h1>' +
       '<div id="sft-info" class="sft-info"></div>' +
       '<div class="sft-legend" aria-label="色の見かた">' + WISHES.map(function (w) { return '<span class="sft-chip ' + WISH_CLS[w] + '">' + w + '</span>'; }).join('') +
-        '<span class="sft-legend-dot"><i aria-hidden="true"></i>未送信</span></div></div>' +
+        '<span class="sft-chip none">未設定</span><span class="sft-legend-dot"><i aria-hidden="true"></i>未送信</span></div></div>' +
       '<section class="sft-cal" aria-label="カレンダー">' +
         '<div class="sft-calnav"><button type="button" class="sft-navbtn" data-mv="-1">前月</button><b id="sft-ym" aria-live="polite"></b><button type="button" class="sft-navbtn" data-mv="1">翌月</button></div>' +
         '<div class="sft-grid sft-dow" aria-hidden="true">' + DOW.map(function (d, i) { return '<span class="d' + i + '">' + d + '</span>'; }).join('') + '</div>' +
@@ -174,11 +198,15 @@
     app.querySelectorAll('[data-step]').forEach(function (b) {
       b.addEventListener('click', function () { stepDay(+b.dataset.step); });
     });
-    document.getElementById('sft-note').addEventListener('input', function () { edit({ メモ: this.value }); });
+    var note = document.getElementById('sft-note');
+    note.addEventListener('input', function () { edit({ メモ: this.value }); });
+    // メモを打っている間は下の送信バーを隠す（スマホのキーボードの上に乗って、入力欄や文字数を隠すため）
+    note.addEventListener('focus', function () { document.body.classList.add('sft-typing'); });
+    note.addEventListener('blur', function () { document.body.classList.remove('sft-typing'); });
     document.getElementById('sft-offs').addEventListener('click', function () { if (sub.sel) showOffs(sub.sel); });
     document.getElementById('sft-send').addEventListener('click', send);
     document.getElementById('sft-tally').addEventListener('click', function (e) { if (e.target.closest('#sft-fill')) fillUnset(); });
-    app.addEventListener('click', function (e) { if (e.target.closest('[data-retry="sub"]')) loadMonth(); });
+    onApp(function (e) { if (e.target.closest('[data-retry="sub"]')) loadMonth(); });
     loadMonth();
   }
 
@@ -299,7 +327,8 @@
     var cur = wishOf(date), next = { 希望: cur.希望 || '', メモ: cur.メモ || '' };
     Object.keys(change).forEach(function (k) { next[k] = change[k]; });
     var saved = sub.saved[date] || { 希望: '', メモ: '' };
-    if (next.希望 === (saved.希望 || '') && next.メモ === (saved.メモ || '')) delete sub.edits[date];
+    // メモは前後の空白・改行を除いて比べる（空白だけ打った・消し残した日を「未送信」にしない）
+    if (next.希望 === (saved.希望 || '') && String(next.メモ || '').trim() === String(saved.メモ || '').trim()) delete sub.edits[date];
     else sub.edits[date] = next;
   }
   function edit(change) {
@@ -315,15 +344,16 @@
   }
 
   function send() {
+    if (sub.sending) return; // 送信中の二度押し・Enter の連打
     var err = document.getElementById('sft-err');
     var dates = dirtyDates();
     if (!dates.length) { err.innerHTML = '<div class="errors" role="alert">まだ変更がありません。日付を押して予定を選んでから送信してください</div>'; return; }
     err.innerHTML = '';
     // 月ごとにまとめて送る（GAS は1回に1か月分を受け取る）
     var byYm = {};
-    dates.forEach(function (d) { (byYm[d.slice(0, 7)] = byYm[d.slice(0, 7)] || []).push({ 対象日: d, 希望: sub.edits[d].希望, メモ: sub.edits[d].メモ }); });
-    var btn = document.getElementById('sft-send');
-    btn.disabled = true; btn.textContent = '送信中…'; I.busy(true);
+    dates.forEach(function (d) { (byYm[d.slice(0, 7)] = byYm[d.slice(0, 7)] || []).push({ 対象日: d, 希望: sub.edits[d].希望, メモ: String(sub.edits[d].メモ || '').trim() }); });
+    var btn = document.getElementById('sft-send'), gen = I.gen;
+    btn.disabled = true; btn.textContent = '送信中…'; I.busy(true); sub.sending = true;
     var chain = Promise.resolve();
     Object.keys(byYm).sort().forEach(function (ym) {
       chain = chain.then(function () {
@@ -333,11 +363,16 @@
       });
     });
     chain.then(function () {
-      I.busy(false); btn.disabled = false;
+      sub.sending = false;
       toast(dates.length + '日分の希望を送信しました');
+      // 送信中にほかの画面へ移ったときは、届いたことだけ知らせる（提出の画面へ戻っていれば読み直す）
+      if (stale(gen)) { if (document.getElementById('sft-days')) loadMonth(); return; }
+      I.busy(false); btn.disabled = false;
       loadMonth();
     }).catch(function (e) {
-      I.busy(false); btn.disabled = false; drawPlan(); drawDays();
+      sub.sending = false;
+      if (stale(gen)) { toast(e.message || '送信できませんでした'); return; } // 送れなかった分は edits に残っている
+      I.busy(false); btn.disabled = false; drawPlan(); drawDays(); drawTally();
       err.innerHTML = e.details && e.details.length ? I.errorsBox(e.details) : failBox(e);
       err.scrollIntoView({ block: 'center', behavior: 'smooth' });
     });
@@ -354,7 +389,7 @@
     function load() {
       sheet.querySelector('#sft-offlist').innerHTML = loadingBar();
       api('dayOffs', { 対象日: date }).then(function (r) {
-        if (!document.getElementById('sft-offlist')) return;
+        if (!sheet.isConnected) return; // 閉じた・別の日を開き直したシートには描かない
         var tabs = ['全施設'].concat(r.施設 || []), cur = '全施設', list = r.一覧 || [];
         function draw() {
           var rows = list.filter(function (x) { return cur === '全施設' || x.施設名 === cur; });
@@ -375,7 +410,7 @@
           if (t) { cur = t.dataset.tab; draw(); }
         });
         draw();
-      }).catch(function (e) { var el = document.getElementById('sft-offlist'); if (el) el.innerHTML = failBox(e, 'offs'); });
+      }).catch(function (e) { if (sheet.isConnected) sheet.querySelector('#sft-offlist').innerHTML = failBox(e, 'offs'); });
     }
     sheet.addEventListener('click', function (e) { if (e.target.closest('[data-retry="offs"]')) load(); });
     load();
@@ -395,7 +430,7 @@
     app.querySelectorAll('[data-mv]').forEach(function (b) {
       b.addEventListener('click', function () { chk.ym = addMonth(chk.ym, +b.dataset.mv); loadCheck(); });
     });
-    app.addEventListener('click', function (e) {
+    onApp(function (e) {
       if (e.target.closest('[data-retry="chk"]')) loadCheck();
       if (e.target.closest('#chk-today')) {
         var t = document.querySelector('.chk-day.today');
@@ -471,6 +506,26 @@
     if (k in mk.edits) return mk.edits[k];
     return savedAt(p, date);
   }
+  function canOf(p) { return String(p.可能勤務 || '').split(/[、,\s]+/).filter(Boolean); }
+  // マスの食い違い: cannot … 可能勤務にない勤務を入れた、clash … 出勤不可・休み希望の日に勤務を入れた
+  function issueOf(p, date) {
+    var s = shiftAt(p, date), w = p.希望[date] && p.希望[date].希望, can = canOf(p), work = WORKING.indexOf(s) >= 0;
+    return { cannot: work && can.length > 0 && can.indexOf(s) < 0, clash: work && (w === '出勤不可' || w === '休み希望') };
+  }
+  // 月全体の数（確定前の確認に出す）
+  function monthIssues() {
+    var r = { empty: 0, filled: 0, cannot: 0, clash: 0 };
+    mk.board.職員.forEach(function (p) {
+      monthDays(mk.board.年月).forEach(function (d) {
+        if (shiftAt(p, d)) r.filled++; else r.empty++;
+        var x = issueOf(p, d);
+        if (x.cannot) r.cannot++;
+        if (x.clash) r.clash++;
+      });
+    });
+    return r;
+  }
+  function hasKind(k) { return (mk.board.勤務区分 || []).indexOf(k) >= 0; }
   function loadNeed() {
     var n = { 日中: NEED_DEFAULT.日中, 夜勤: NEED_DEFAULT.夜勤 };
     try { var s = JSON.parse(localStorage.getItem(NEED_KEY) || 'null'); if (s && s.日中 >= 0 && s.夜勤 >= 0) n = { 日中: +s.日中, 夜勤: +s.夜勤 }; } catch (_) {}
@@ -507,7 +562,12 @@
     if (!mk.ym) mk.ym = nextYm();
     if (!mk.need) mk.need = loadNeed();
     document.addEventListener('keydown', onEsc);
-    I.cleanup.push(function () { document.removeEventListener('keydown', onEsc); closeSheet(); document.body.classList.remove('sft-has-bar'); });
+    window.addEventListener('beforeunload', onUnload);
+    I.cleanup.push(function () {
+      document.removeEventListener('keydown', onEsc); window.removeEventListener('beforeunload', onUnload);
+      closeSheet(true); document.body.classList.remove('sft-has-bar');
+      keepEdits();
+    });
     document.body.classList.add('sft-has-bar');
     app.innerHTML =
       '<div class="sft-head"><h1 class="sft-title">シフト作成</h1>' +
@@ -518,6 +578,7 @@
       '<div class="mk-tools" id="mk-tools"></div>' +
       '<div id="mk-board" class="mk-board">' + loadingBar() + '</div>' +
       '<div class="sft-legend mk-legend">' + WISHES.map(function (w) { return '<span class="sft-chip ' + WISH_CLS[w] + '">希望：' + w + '</span>'; }).join('') +
+        '<span class="sft-chip none">希望なし</span><span class="mk-keys"><i class="mk-warn-mk mk-key-ic" aria-hidden="true">!</i>希望と食い違い　<s>薄い点線</s>可能勤務外</span>' +
         '<span class="mk-keys">' + Object.keys(SHORT).map(function (k) { return '<b>' + SHORT[k] + '</b>' + k; }).join(' ') + '</span></div>' +
       '<div id="mk-err"></div>' +
       I.backHtml('#shift') +
@@ -541,12 +602,38 @@
         mk.need[a[0]] = Math.max(0, Math.min(20, mk.need[a[0]] + +a[1]));
         saveNeed(); drawBoard();
       }
-      if (e.target.closest('#mk-auto')) autoFill();
+      if (e.target.closest('#mk-auto')) autoFill(false);
+      if (e.target.closest('#mk-off')) autoFill(true);
     });
-    app.addEventListener('click', function (e) { if (e.target.closest('[data-retry="mk"]')) loadMake(); });
+    onApp(function (e) { if (e.target.closest('[data-retry="mk"]')) loadMake(); });
     document.getElementById('mk-save').addEventListener('click', function () { saveMake(false); });
     document.getElementById('mk-fix').addEventListener('click', askFix);
     loadMake();
+  }
+
+  // 戻る・リッチメニューなどで画面を離れたとき、保存していない変更を黙って消さない。
+  // ハッシュの移動は止められない（core.js の route が先に動く）ので、預かっておき、作成の画面へ戻ったら戻す。
+  // 読み直しても残るよう sessionStorage にも置く。ページを閉じる・読み直すときはブラウザの確認を出す
+  var KEEP_KEY = 'ippo.shiftMakeKeep';
+  function onUnload(e) {
+    if (!Object.keys(mk.edits).length) return;
+    keepEdits(true);
+    e.preventDefault(); e.returnValue = '';
+  }
+  function keepEdits(quiet) {
+    var n = Object.keys(mk.edits).length;
+    if (!mk.board || !n || mk.saving) return;
+    mk.keep = { ym: mk.ym, edits: Object.assign({}, mk.edits) };
+    try { sessionStorage.setItem(KEEP_KEY, JSON.stringify(mk.keep)); } catch (_) {}
+    if (!quiet) toast('シフト作成の保存していない ' + n + 'マスは預かっています。作成の画面に戻ると続きから直せます');
+  }
+  function takeKept(ym) {
+    var k = mk.keep;
+    if (!k) { try { k = JSON.parse(sessionStorage.getItem(KEEP_KEY) || 'null'); } catch (_) { k = null; } }
+    if (!k || k.ym !== ym || !k.edits) return null;
+    mk.keep = null;
+    try { sessionStorage.removeItem(KEEP_KEY); } catch (_) {}
+    return k.edits;
   }
 
   // 保存していない変更があるときに月を移ろうとしたら聞く
@@ -570,7 +657,15 @@
     api('shiftBoard', { 年月: ym }).then(function (b) {
       if (stale(gen) || mk.ym !== ym) return;
       b.職員 = (b.職員 || []).map(function (p) { p.希望 = p.希望 || {}; p.シフト = p.シフト || {}; return p; });
-      mk.board = b; drawBoard();
+      mk.board = b;
+      // 前に離れたときに預かった変更を戻す（いない職員・この月でない日のマスは捨てる）
+      var kept = takeKept(ym), ids = b.職員.map(function (p) { return p.職員ID; }), back = 0;
+      if (kept) Object.keys(kept).forEach(function (k) {
+        var a = k.split('|');
+        if (ids.indexOf(a[0]) >= 0 && a[1].slice(0, 7) === ym) { mk.edits[k] = kept[k]; back++; }
+      });
+      drawBoard();
+      if (back) toast('保存していない ' + back + 'マスを戻しました。「下書き保存」で保存されます');
     }).catch(function (e) {
       if (stale(gen) || mk.ym !== ym) return;
       document.getElementById('mk-board').innerHTML = failBox(e, 'mk');
@@ -618,8 +713,7 @@
   }
 
   function drawTools() {
-    var from = needFromGas(), empty = 0;
-    mk.board.職員.forEach(function (p) { monthDays(mk.board.年月).forEach(function (d) { if (!shiftAt(p, d) && p.希望[d] && p.希望[d].希望) empty++; }); });
+    var from = needFromGas(), fill = autoPlan(false).length, off = autoPlan(true).length;
     function step(k) {
       return '<span class="mk-need-k">' + k + '</span>' + (from ? '<b>' + needOf(mk.board.年月 + '-01')[k] + '</b>'
         : '<button type="button" class="mk-stepper" data-need="' + k + ':-1" aria-label="' + k + 'の必要人数を減らす">−</button><b aria-live="polite">' + mk.need[k] + '</b><button type="button" class="mk-stepper" data-need="' + k + ':1" aria-label="' + k + 'の必要人数を増やす">＋</button>') + '<span class="mk-need-u">人</span>';
@@ -627,7 +721,9 @@
     document.getElementById('mk-tools').innerHTML =
       '<div class="mk-need"><span class="mk-need-h">1日に必要な人数</span><div class="mk-need-row">' + step('日中') + step('夜勤') + '</div>' +
         (from ? '' : '<small>この端末に覚えます</small>') + '</div>' +
-      (empty ? '<button type="button" id="mk-auto" class="mk-auto">希望から仮入れ（' + empty + 'マス）<small>空いているマスだけ：出勤可→日勤、出勤不可・休み希望→公休</small></button>' : '');
+      // 2つのボタンは入れるマスが重ならない（休み → 公休 ／ 出勤可・夜勤の翌日 → 日勤・明け）
+      (off ? '<button type="button" id="mk-off" class="mk-auto">休み希望を公休で埋める（' + off + 'マス）<small>空いているマスだけ：出勤不可・休み希望 → 公休</small></button>' : '') +
+      (fill ? '<button type="button" id="mk-auto" class="mk-auto">希望から仮入れ（' + fill + 'マス）<small>空いているマスだけ：出勤可 → 日勤' + (hasKind('明け') ? '、夜勤の翌日 → 明け' : '') + '</small></button>' : '');
   }
 
   function drawBoard() {
@@ -650,10 +746,11 @@
         var memo = p.希望[d] && p.希望[d].メモ;
         if (WORKING.indexOf(s) >= 0) tot++;
         if (s === '夜勤') night++;
-        // 希望が「出勤不可・休み希望」なのに勤務を入れたマスは、気づけるよう斜線で示す
-        var clash = s && WORKING.indexOf(s) >= 0 && (w === '出勤不可' || w === '休み希望');
-        return '<td><button type="button" class="mk-cell' + (w ? ' ' + WISH_CLS[w] : '') + (k in mk.edits ? ' dirty' : '') + (s && WORKING.indexOf(s) < 0 ? ' rest' : '') + (s === '夜勤' ? ' night' : '') + (clash ? ' clash' : '') + '" data-id="' + esc(p.職員ID) + '" data-d="' + d + '"' +
-          ' aria-label="' + esc(p.氏名) + ' ' + dayLabel(d) + ' 希望 ' + (w || 'なし') + ' 勤務 ' + (s || '未設定') + (memo ? ' メモ ' + esc(memo) : '') + '">' + (SHORT[s] || '') + (memo ? '<i class="mk-memo" aria-hidden="true"></i>' : '') + '</button></td>';
+        // 希望が「出勤不可・休み希望」なのに勤務を入れたマスは斜線と「!」、可能勤務にない勤務は薄く点線で示す
+        var iss = issueOf(p, d), clash = iss.clash;
+        return '<td><button type="button" class="mk-cell' + (WISH_CLS[w] ? ' ' + WISH_CLS[w] : '') + (k in mk.edits ? ' dirty' : '') + (s && WORKING.indexOf(s) < 0 ? ' rest' : '') + (s === '夜勤' ? ' night' : '') + (clash ? ' clash' : '') + (iss.cannot ? ' cannot' : '') + '" data-id="' + esc(p.職員ID) + '" data-d="' + d + '"' +
+          ' aria-label="' + esc(p.氏名) + ' ' + dayLabel(d) + ' 希望 ' + (w || 'なし') + ' 勤務 ' + (s || '未設定') + (clash ? ' 希望と食い違い' : '') + (iss.cannot ? ' 可能勤務外' : '') + (memo ? ' メモ ' + esc(memo) : '') + '">' +
+          (SHORT[s] || esc(String(s || '').slice(0, 1))) + (memo ? '<i class="mk-memo" aria-hidden="true"></i>' : '') + (clash ? '<i class="mk-warn-mk" aria-hidden="true">!</i>' : '') + '</button></td>';
       }).join('');
       return '<tr><th scope="row" class="mk-name"><b>' + esc(p.氏名) + '</b><small>' + esc(p.職種) + (p.雇用形態 ? '・' + esc(p.雇用形態) : '') + '</small></th>' + cells +
         '<td class="mk-tot"><b>' + tot + '</b>' + (night ? '<small>夜' + night + '</small>' : '') + '</td></tr>';
@@ -690,21 +787,32 @@
     });
   }
 
-  // 空いているマスに希望どおりの仮の勤務を入れる（保存するまで職員には見えない）
-  function autoFill() {
-    var n = 0;
+  // 空いているマスに希望どおりの仮の勤務を入れる（保存するまで職員には見えない）。
+  // off=true … 出勤不可・休み希望 → 公休 だけ。off=false … 夜勤の翌日 → 明け、出勤可 → 日勤（できなければ できる勤務）
+  // 返すのは [マスのキー, 勤務] の並び（数えるときにも使う）
+  function autoPlan(off) {
+    var out = [];
     mk.board.職員.forEach(function (p) {
-      var can = String(p.可能勤務 || '').split(/[、,\s]+/).filter(Boolean);
-      monthDays(mk.board.年月).forEach(function (d) {
-        if (shiftAt(p, d)) return;
-        var w = p.希望[d] && p.希望[d].希望, k = '';
-        if (w === '出勤可') k = can.indexOf('日勤') >= 0 || !can.length ? '日勤' : (can.filter(function (x) { return WORKING.indexOf(x) >= 0; })[0] || '日勤');
-        else if (w === '出勤不可' || w === '休み希望') k = '公休';
-        if (k) { mk.edits[cellKey(p.職員ID, d)] = k; n++; }
+      var can = canOf(p), days = monthDays(mk.board.年月), prev = '';
+      days.forEach(function (d) {
+        var cur = shiftAt(p, d), w = p.希望[d] && p.希望[d].希望, k = '';
+        if (!cur) {
+          if (off) { if (w === '出勤不可' || w === '休み希望') k = '公休'; }
+          else if (prev === '夜勤' && hasKind('明け')) k = '明け';
+          else if (w === '出勤可') k = can.indexOf('日勤') >= 0 || !can.length ? '日勤' : (can.filter(function (x) { return WORKING.indexOf(x) >= 0; })[0] || '日勤');
+        }
+        if (k) out.push([cellKey(p.職員ID, d), k]);
+        prev = k || cur;
       });
     });
+    return out;
+  }
+  function autoFill(off) {
+    var plan = autoPlan(off);
+    plan.forEach(function (x) { mk.edits[x[0]] = x[1]; });
     drawBoard();
-    toast(n + 'マスに仮の勤務を入れました。足りない日を直してから保存してください');
+    toast(off ? plan.length + 'マスを公休にしました。保存するまで職員には見えません'
+      : plan.length + 'マスに仮の勤務を入れました。足りない日を直してから保存してください');
   }
 
   function editCell(id, date) {
@@ -712,7 +820,7 @@
     if (!p) return;
     var days = monthDays(mk.board.年月);
     var w = p.希望[date] || {}, cur = shiftAt(p, date), c = countOf(date), idx = days.indexOf(date);
-    var can = String(p.可能勤務 || '').split(/[、,\s]+/).filter(Boolean);
+    var can = canOf(p), afterNight = idx > 0 && shiftAt(p, days[idx - 1]) === '夜勤' && cur !== '明け';
     function stat(label, n, need) { return '<span class="' + (n < need ? 'lack' : 'ok') + '">' + label + ' ' + n + '/' + need + '人</span>'; }
     var sheet = openSheet(
       '<div class="sft-sheet-head"><div><h2 id="sft-sheet-h">' + esc(p.氏名) + '<span class="mk-sheet-d">' + dayLabel(date) + '</span></h2>' +
@@ -722,10 +830,14 @@
         '<div class="mk-daystat">この日 ' + stat('日中', c.日中, c.need.日中) + stat('夜勤', c.夜勤, c.need.夜勤) + '</div></div>' +
       '<div class="mk-kinds">' + (mk.board.勤務区分 || []).map(function (k) {
         var cannot = WORKING.indexOf(k) >= 0 && can.length && can.indexOf(k) < 0;
-        return '<button type="button" class="mk-kind' + (k === cur ? ' on' : '') + (WORKING.indexOf(k) < 0 ? ' rest' : '') + (k === '夜勤' ? ' night' : '') + (cannot ? ' cannot' : '') + '" data-k="' + esc(k) + '" aria-pressed="' + (k === cur) + '">' + esc(k) + (cannot ? '<small>可能勤務外</small>' : '') + '</button>';
+        return '<button type="button" class="mk-kind' + (k === cur ? ' on' : '') + (WORKING.indexOf(k) < 0 ? ' rest' : '') + (k === '夜勤' ? ' night' : '') + (cannot ? ' cannot' : '') + (afterNight && k === '明け' ? ' suggest' : '') + '" data-k="' + esc(k) + '" aria-pressed="' + (k === cur) + '">' + esc(k) +
+          (cannot ? '<small>可能勤務外</small>' : afterNight && k === '明け' ? '<small>夜勤の翌日</small>' : '') + '</button>';
       }).join('') + '<button type="button" class="mk-kind clear" data-k="">消す</button></div>' +
       '<div class="mk-sheet-nav"><button type="button" class="sub" data-nav="-1"' + (idx <= 0 ? ' disabled' : '') + '>‹ 前の日</button>' +
         '<small>選ぶと次の日へ進みます</small><button type="button" class="sub" data-nav="1"' + (idx >= days.length - 1 ? ' disabled' : '') + '>次の日 ›</button></div>');
+    sheetBack = function () { return document.querySelector('.mk-cell[data-id="' + esc(id) + '"][data-d="' + date + '"]'); };
+    var focusK = sheet.querySelector('.mk-kind.on') || sheet.querySelector('.mk-kind.suggest') || sheet.querySelector('.mk-kind');
+    if (focusK) focusK.focus();
     sheet.querySelector('.mk-kinds').addEventListener('click', function (e) {
       var b = e.target.closest('[data-k]');
       if (!b) return;
@@ -745,9 +857,21 @@
     if (!mk.board) return;
     var days = monthDays(mk.board.年月);
     var lack = days.filter(function (d) { var c = countOf(d); return c.lackDay || c.lackNight; });
-    var n = Object.keys(mk.edits).length;
+    var n = Object.keys(mk.edits).length, is = monthIssues();
+    if (!is.filled) {
+      // 1マスも入っていない月は確定させない（空のシフトが職員に公開されてしまうため）
+      openSheet('<div class="sft-sheet-head"><h2 id="sft-sheet-h">' + esc(ymLabel(mk.ym)) + 'はまだ勤務が入っていません</h2><button type="button" class="sft-x" data-close aria-label="閉じる">×</button></div>' +
+        '<div class="sft-confirm"><p>マスを押して勤務を入れるか、「希望から仮入れ」を使ってから確定してください。</p></div>' +
+        '<div class="sft-confirm-btns"><button type="button" data-close>わかりました</button></div>');
+      return;
+    }
     confirmSheet(ymLabel(mk.ym) + 'のシフトを確定しますか',
-      '<p>確定すると、職員の「シフト確認」に勤務が出ます。</p>' +
+      '<p>確定すると、<b>' + esc(ymLabel(mk.ym)) + 'の勤務が職員全員の「シフト確認」に公開</b>されます。</p>' +
+      '<ul class="mk-check">' +
+        '<li class="' + (is.empty ? 'warn' : 'ok') + '">未入力のマス <b>' + is.empty + '</b></li>' +
+        '<li class="' + (is.clash ? 'warn' : 'ok') + '">休み希望・出勤不可の日の勤務 <b>' + is.clash + '</b></li>' +
+        '<li class="' + (is.cannot ? 'warn' : 'ok') + '">可能勤務外の勤務 <b>' + is.cannot + '</b></li>' +
+      '</ul>' +
       (n ? '<p>保存していない ' + n + 'マスも一緒に保存します。</p>' : '') +
       (lack.length ? '<p class="mk-warn">人が足りない日が <b>' + lack.length + '日</b> あります（' + esc(lack.slice(0, 5).map(shortDay).join('、')) + (lack.length > 5 ? ' ほか' : '') + '）。このまま確定してもよいですか。</p>' : ''),
       '確定する', function () { saveMake(true); });
@@ -758,16 +882,22 @@
     var err = document.getElementById('mk-err'); err.innerHTML = '';
     var list = Object.keys(mk.edits).map(function (k) { var a = k.split('|'); return { 職員ID: a[0], 対象日: a[1], 勤務: mk.edits[k] }; });
     if (!fix && !list.length) { toast('変更はありません'); return; }
-    var ym = mk.ym;
-    I.busy(true);
+    if (mk.saving) return; // 保存・確定中の二度押し
+    var ym = mk.ym, gen = I.gen;
+    I.busy(true); mk.saving = true; setBar(false);
     var p = list.length ? api('saveShifts', { 年月: ym, 割当: list }) : Promise.resolve();
     p.then(function () { return fix ? api('fixShifts', { 年月: ym }) : null; })
       .then(function () {
-        I.busy(false); toast(fix ? ymLabel(ym) + 'のシフトを確定しました' : list.length + 'マスを保存しました');
+        mk.saving = false;
+        toast(fix ? ymLabel(ym) + 'のシフトを確定しました' : list.length + 'マスを保存しました');
+        if (stale(gen)) { if (document.getElementById('mk-board')) loadMake(); return; } // 保存中にほかの画面へ移ったとき
+        I.busy(false);
         if (then) then(); else loadMake();
       })
       .catch(function (e) {
-        I.busy(false);
+        mk.saving = false;
+        if (stale(gen)) { toast(e.message || '保存できませんでした'); return; }
+        I.busy(false); drawStatus();
         err.innerHTML = e.details && e.details.length ? I.errorsBox(e.details) : failBox(e);
         err.scrollIntoView({ block: 'center', behavior: 'smooth' });
       });

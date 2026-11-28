@@ -2,7 +2,7 @@
    色の役割（参考アプリ 4:16〜）: 出勤可=淡い水色、出勤不可=淡いピンク、休み希望=淡い緑、確定した勤務=濃い赤。
    自社で足した色: 未送信=橙の点、夜勤=濃い赤より紫寄り（夜だと分かるように）、人が足りない=赤、そろっている=緑 */
 :root {
-  --sft-ok-bg: #dbe8f8; --sft-ok-fg: #2a5fae; --sft-ok-line: #b5cdee;
+  --sft-ok-bg: #cfe0f8; --sft-ok-fg: #2a5fae; --sft-ok-line: #b5cdee;
   --sft-ng-bg: #f9dade; --sft-ng-fg: #b4283a; --sft-ng-line: #efb3bc;
   --sft-off-bg: #daf2df; --sft-off-fg: #1d7a3a; --sft-off-line: #a9dcb5;
   --sft-none-bg: #f3f6fb;
@@ -57,9 +57,9 @@
 /* 凡例（出勤可・出勤不可・休み希望） */
 .sft-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .sft-chip { display: inline-flex; align-items: center; min-height: 28px; padding: 0 12px; border-radius: 999px; font-size: 11px; font-weight: 700; color: #333; background: #e6edf6; white-space: nowrap; }
-.sft-chip.ok { background: var(--sft-ok-bg); color: #24508f; }
-.sft-chip.ng { background: var(--sft-ng-bg); color: #7a2430; }
-.sft-chip.off { background: var(--sft-off-bg); color: #1d6a35; }
+.sft-chip.ok { background: var(--sft-ok-bg); color: #24508f; box-shadow: inset 0 0 0 1px var(--sft-ok-line); }
+.sft-chip.ng { background: var(--sft-ng-bg); color: #7a2430; box-shadow: inset 0 0 0 1px var(--sft-ng-line); }
+.sft-chip.off { background: var(--sft-off-bg); color: #1d6a35; box-shadow: inset 0 0 0 1px var(--sft-off-line); }
 .sft-chip.none { background: #fff; border: 1px solid #e3e8ef; color: #8a93a0; }
 .sft-legend-dot { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; color: #6e7782; font-weight: 700; }
 .sft-legend-dot i { width: 7px; height: 7px; border-radius: 50%; background: var(--sft-dirty); }
@@ -91,9 +91,11 @@
 .sft-day:active:not(:disabled) { transform: scale(.94); filter: brightness(.95); }
 .sft-day.d0 { color: var(--sft-sun); }
 .sft-day.d6 { color: var(--sft-sat); }
-.sft-day.ok { background: var(--sft-ok-bg); }
-.sft-day.ng { background: var(--sft-ng-bg); }
-.sft-day.off { background: var(--sft-off-bg); }
+.sft-day.ok { background: var(--sft-ok-bg); box-shadow: inset 0 0 0 1px var(--sft-ok-line); }
+.sft-day.ng { background: var(--sft-ng-bg); box-shadow: inset 0 0 0 1px var(--sft-ng-line); }
+.sft-day.off { background: var(--sft-off-bg); box-shadow: inset 0 0 0 1px var(--sft-off-line); }
+/* 未設定の日は白地に点線（出勤可の淡い水色と見分けやすく） */
+.sft-day:where(:not(.ok, .ng, .off, .out)) { background: #fff; box-shadow: inset 0 0 0 1px #d5deec; }
 .sft-day.sel { border-color: #5a78b0; box-shadow: 0 0 0 3px rgba(90, 120, 176, .22); }
 .sft-day.out { opacity: .35; background: #f5f8fc; cursor: default; font-weight: 600; }
 .sft-day.past:not(.out) .n { opacity: .55; }
@@ -109,7 +111,7 @@
 .sft-tally:empty { display: none; }
 .sft-tally-n { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
 .sft-tally-n span { display: flex; flex-direction: column; align-items: center; gap: 1px; font-size: 10px; font-weight: 700; color: #6e7782; }
-.sft-tally-n i { width: 10px; height: 10px; border-radius: 3px; background: var(--sft-none-bg); border: 1px solid #dfe5ee; }
+.sft-tally-n i { width: 10px; height: 10px; border-radius: 3px; background: #fff; border: 1px solid #dfe5ee; }
 .sft-tally-n .ok i { background: var(--sft-ok-bg); border-color: var(--sft-ok-line); }
 .sft-tally-n .ng i { background: var(--sft-ng-bg); border-color: var(--sft-ng-line); }
 .sft-tally-n .off i { background: var(--sft-off-bg); border-color: var(--sft-off-line); }
@@ -168,6 +170,9 @@
 body.sft-has-bar main { padding-bottom: 110px; }
 body.sft-has-bar .demo { margin-bottom: 96px; }
 body.sft-has-bar .toast { bottom: calc(96px + env(safe-area-inset-bottom, 0px)); }
+/* メモを打っている間（キーボードが出ている間）は送信バーを隠す。views/shift.js が sft-typing を付け外しする */
+body.sft-typing .sft-bar { display: none; }
+body.sft-typing .toast { bottom: 24px; }
 
 /* ---------- 下から出るシート ---------- */
 .sft-sheet-wrap { position: fixed; inset: 0; z-index: 25; background: rgba(30, 40, 60, .45); display: flex; align-items: flex-end; justify-content: center; }
@@ -293,14 +298,17 @@ body.sft-noscroll { overflow: hidden; }
 /* 表 */
 .mk-board { background: #fff; border-radius: 16px; box-shadow: var(--glass-shadow); padding: 8px; min-width: 0; }
 .mk-board > .loading, .mk-board > .errors, .mk-board > .sft-emptybox { box-shadow: none; }
-.mk-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; overscroll-behavior-x: contain; }
+.mk-scroll { overflow: auto; -webkit-overflow-scrolling: touch; overscroll-behavior-x: contain; max-height: calc(100vh - 200px); max-height: calc(100dvh - 200px); }
 .mk-table { border-collapse: separate; border-spacing: 2px; font-size: 11px; }
 .mk-table th { font-weight: 700; color: #5b6572; text-align: center; white-space: nowrap; }
 .mk-table thead th { font-size: 12px; line-height: 1.2; padding: 3px 0; border-radius: 6px; min-width: 40px; }
+/* 縦に動かしても日付の見出しが残るよう、表は枠の中で縦横に動かし、見出しの行を上に貼り付ける */
+.mk-table thead th { position: sticky; top: 0; z-index: 3; background: #fff; }
+.mk-table thead th.mk-corner { left: 0; z-index: 4; }
 .mk-table thead th small { display: block; font-size: 9px; font-weight: 500; }
 .mk-table .d0 { color: var(--sft-sun); }
 .mk-table .d6 { color: var(--sft-sat); }
-.mk-table thead th.lack { background: var(--sft-lack-bg); }
+.mk-table thead th.lack { background: #fde4e7; background: var(--sft-lack-bg); }
 .mk-table thead th.today { box-shadow: inset 0 -3px 0 var(--navy); }
 .mk-name { position: sticky; left: 0; z-index: 2; background: #fff; text-align: left !important; padding: 0 6px 0 2px; min-width: 5.8em; max-width: 7em; box-shadow: 4px 0 6px -4px rgba(60, 90, 140, .25); }
 .mk-name b { display: block; font-size: 12px; color: #222; overflow: hidden; text-overflow: ellipsis; }
@@ -310,14 +318,18 @@ body.sft-noscroll { overflow: hidden; }
   background: var(--sft-none-bg); color: var(--sft-work); font-size: 13px; font-weight: 800; box-shadow: none;
 }
 .mk-cell:active { filter: brightness(.93); background-color: inherit; }
-.mk-cell.ok { background: var(--sft-ok-bg); }
-.mk-cell.ng { background: var(--sft-ng-bg); }
-.mk-cell.off { background: var(--sft-off-bg); }
+.mk-cell.ok { background: var(--sft-ok-bg); box-shadow: inset 0 0 0 1px var(--sft-ok-line); }
+.mk-cell.ng { background: var(--sft-ng-bg); box-shadow: inset 0 0 0 1px var(--sft-ng-line); }
+.mk-cell.off { background: var(--sft-off-bg); box-shadow: inset 0 0 0 1px var(--sft-off-line); }
+.mk-cell:where(:not(.ok, .ng, .off)) { background: #fff; box-shadow: inset 0 0 0 1px #dfe5ee; }
 /* 勤務が入ったマスは濃い赤の字（夜勤は紫、公休・明けは灰色）。地の色は希望 */
 .mk-cell.night { color: var(--sft-night); }
 .mk-cell.rest { color: #6e7782; }
 .mk-cell.dirty { border-color: var(--sft-dirty); }
 /* 休みたい日に勤務を入れたマスは斜線で気づけるように */
+.mk-cell.cannot { color: rgba(176, 48, 15, .45); border-style: dashed; border-color: #b9c3d2; }
+.mk-cell.cannot.dirty { border-color: var(--sft-dirty); }
+.mk-warn-mk { position: absolute; left: 2px; top: 1px; font-style: normal; font-size: 10px; font-weight: 900; color: var(--sft-lack); line-height: 1; }
 .mk-cell.clash { background-image: repeating-linear-gradient(135deg, rgba(192, 40, 58, .18) 0 3px, transparent 3px 7px); }
 .mk-memo { position: absolute; right: 3px; bottom: 3px; width: 6px; height: 6px; border-radius: 50%; background: #5a78b0; }
 .mk-tot { text-align: center; min-width: 34px; font-variant-numeric: tabular-nums; }
@@ -356,7 +368,13 @@ thead .mk-tot { font-size: 11px; }
 .mk-kind small { font-size: 9px; font-weight: 600; color: #8a93a0; }
 .mk-kind.night { color: var(--sft-night); border-color: #d3c1e6; }
 .mk-kind.rest { color: #444; border-color: #dfe4ea; }
-.mk-kind.cannot { border-style: dashed; }
+.mk-kind.cannot { border-style: dashed; opacity: .6; }
+.mk-kind.suggest:not(.on) { border-color: var(--sft-dirty); box-shadow: 0 0 0 2px rgba(226, 112, 42, .2); }
+.mk-kind.suggest small { color: #a0520a; }
+/* 確定前の確認の数 */
+.mk-check { list-style: none; padding: 0; margin: 8px 0; display: grid; gap: 4px; font-size: 13px; }
+.mk-check li { display: flex; justify-content: space-between; padding: 6px 10px; border-radius: 8px; background: var(--sft-good-bg); color: var(--sft-good); }
+.mk-check li.warn { background: var(--sft-lack-bg); color: var(--sft-lack); }
 .mk-kind.on { background: var(--sft-work); color: #fff; border-color: var(--sft-work); }
 .mk-kind.night.on { background: var(--sft-night); border-color: var(--sft-night); }
 .mk-kind.rest.on { background: #5b6572; border-color: #5b6572; }
@@ -367,3 +385,6 @@ thead .mk-tot { font-size: 11px; }
 .mk-sheet-nav button { flex: none; min-height: 44px; padding: 0 14px; font-size: 12px; border: 1px solid #dfe5ee; }
 .mk-sheet-nav small { flex: 1; text-align: center; font-size: 10px; color: #8a93a0; }
 .mk-warn { background: var(--sft-lack-bg); color: #7a1d2a; border-radius: 10px; padding: 8px 12px; }
+/* 作成の凡例の「!」と「薄い点線」の見本 */
+.mk-key-ic { position: static; margin-right: 2px; }
+.mk-keys s { text-decoration: none; display: inline-block; padding: 0 4px; margin-right: 2px; border: 1.5px dashed #b9c3d2; border-radius: 4px; color: rgba(176, 48, 15, .45); font-size: 10px; }
