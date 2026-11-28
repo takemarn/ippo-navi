@@ -7,7 +7,7 @@
   --glass: rgba(236, 243, 251, .78); --glass-line: #c9dbf5; --glass-shadow: 0 4px 16px rgba(80, 110, 170, .15);
   --surface: #ffffff; --line: #dfe7f2; --input-off: #e1eaf6;
   /* 文字 */
-  --fg: #111111; --label: #333333; --muted: #8a93a0; --label-off: #9aa5b1;
+  --fg: #111111; --label: #333333; --muted: #667080; --label-off: #9aa5b1;
   /* 役割色 */
   --navy: #12317d; --navy-press: #0d2560; --blue: #2f7bd6; --link: #2346c8;
   --accent: #12317d; --accent-fg: #ffffff; --accent-soft: #e3ecf8;
