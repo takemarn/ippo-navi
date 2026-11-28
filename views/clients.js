@@ -15,7 +15,21 @@
   // ---------- 画面をまたいで持つもの ----------
   var cur = load() || { q: { 施設: [], 氏名: '', ステータス: [] }, rq: { 施設: [], 種別: [], 開始日: '', 終了日: '', 単日: '' }, id: null, card: null, kind: '看護記録', edit: null };
   function save() { try { sessionStorage.setItem('ippo.clients', JSON.stringify(cur)); } catch (_) {} }
-  function load() { try { return JSON.parse(sessionStorage.getItem('ippo.clients') || 'null'); } catch (_) { return null; } }
+  // 前の版で保存した形が違っても壊れないよう、決まった形に重ねて読む
+  function load() {
+    try {
+      var x = JSON.parse(sessionStorage.getItem('ippo.clients') || 'null');
+      if (!x || typeof x !== 'object') return null;
+      var d = { q: { 施設: [], 氏名: '', ステータス: [] }, rq: { 施設: [], 種別: [], 開始日: '', 終了日: '', 単日: '' }, id: null, card: null, kind: '看護記録', edit: null };
+      var out = Object.assign(d, x);
+      out.q = Object.assign({ 施設: [], 氏名: '', ステータス: [] }, x.q || {});
+      out.rq = Object.assign({ 施設: [], 種別: [], 開始日: '', 終了日: '', 単日: '' }, x.rq || {});
+      if (!out.card) out.id = null;
+      return out;
+    } catch (_) { return null; }
+  }
+  // 画面を離れたあとに届いた返事は使わない（core.js の route が IPPO.gen を進める）
+  function keep(fn) { var g = I.gen; return function () { if (g === I.gen) return fn.apply(this, arguments); }; }
   var photoCache = {};
 
   // 自分が見られる施設だけ（GAS の me が返す 見られる施設。無ければ選択肢の施設）
@@ -191,14 +205,14 @@
       cur.id = b.dataset.client; cur.card = (cur.list || []).filter(function (c) { return c.利用者ID === cur.id; })[0]; save();
       location.hash = '#user';
     });
-    api('searchClients', cur.q).then(function (r) {
+    api('searchClients', cur.q).then(keep(function (r) {
       var el = document.getElementById('cl-list'); if (!el) return;
       cur.list = r.一覧; save();
       el.innerHTML = r.一覧.length ? r.一覧.map(function (c) { return clientCard(c, true); }).join('') :
         '<div class="cl-empty">条件に合う利用者はいません。条件を減らしてもう一度検索してください。</div>';
       el.insertAdjacentHTML('afterbegin', '<p class="cl-count">' + r.一覧.length + '名</p>');
       fillPhotos();
-    }).catch(function (e) { var el = document.getElementById('cl-list'); if (el) el.innerHTML = failHtml(e); });
+    })).catch(keep(function (e) { var el = document.getElementById('cl-list'); if (el) el.innerHTML = failHtml(e); }));
   }
 
   // ---------- 利用者操作 ----------
@@ -270,10 +284,10 @@
     app.innerHTML = shell('情報閲覧', 'カテゴリを切り替えて、利用者情報を見やすく確認できます。', '#user',
       clientCard(cur.card) + '<div id="cl-info">' + loading() + '</div>');
     fillPhotos();
-    api('clientInfo', { 利用者ID: cur.id }).then(function (r) {
+    api('clientInfo', { 利用者ID: cur.id }).then(keep(function (r) {
       cur.info = r.カテゴリ; save();
       drawInfo();
-    }).catch(function (e) { var el = document.getElementById('cl-info'); if (el) el.innerHTML = failHtml(e); });
+    })).catch(keep(function (e) { var el = document.getElementById('cl-info'); if (el) el.innerHTML = failHtml(e); }));
     trackClicks(function (e) {
       var b = e.target.closest('[data-tab]');
       if (b) { infoTab = b.dataset.tab; drawInfo(); }
@@ -327,8 +341,10 @@
       var err = document.getElementById('err'), btn = e.target.querySelector('button[type=submit]');
       if (errs.length) { err.innerHTML = I.errorsBox(errs); return; }
       err.innerHTML = ''; btn.disabled = true; btn.textContent = '登録中…'; overlay('読み込み中・・・');
+      var g = I.gen;
       api('addRecord', data).then(function () {
-        I.busy(false); toast(kind + 'を登録しました'); location.hash = '#user'; // 参考アプリと同じく利用者操作へ戻る
+        I.busy(false); toast(kind + 'を登録しました');
+        if (g === I.gen) location.hash = '#user'; // 参考アプリと同じく利用者操作へ戻る（もう別の画面にいたら動かさない）
       }).catch(function (x) {
         I.busy(false); btn.disabled = false; btn.textContent = '登録する';
         err.innerHTML = x.details && x.details.length ? I.errorsBox(x.details) : failHtml(x);
@@ -371,13 +387,13 @@
     var el = document.getElementById('cl-recs');
     el.innerHTML = loading('記録を読み込み中...');
     overlay('記録を読み込み中・・・'); // 参考アプリと同じく、読み込むあいだは画面全体をぼかす
-    api('clientRecords', Object.assign({ 利用者ID: cur.id }, recQ)).then(function (r) {
+    api('clientRecords', Object.assign({ 利用者ID: cur.id }, recQ)).then(keep(function (r) {
       I.busy(false);
       if (!document.getElementById('cl-recs')) return;
       var filtered = recQ.開始日 || recQ.終了日 || recQ.単日 || recQ.文字;
       el.innerHTML = r.一覧.length ? '<p class="cl-count">' + r.一覧.length + '件（削除できるのは自分が書いた記録だけ）</p>' + r.一覧.map(function (x) { return recCard(x, false); }).join('')
         : '<div class="cl-empty">' + (filtered ? '条件に合う記録はありません。条件を変えてもう一度検索してください。' : '記録はありません。') + '</div>';
-    }).catch(function (e) { I.busy(false); el.innerHTML = failHtml(e); });
+    })).catch(keep(function (e) { I.busy(false); el.innerHTML = failHtml(e); }));
   }
   function recCard(r, withName) {
     var mine = state.me && (r.記録者職員ID === state.me.職員ID || state.me.役割 === '管理者');
@@ -405,10 +421,10 @@
     app.innerHTML = shell('記録検索結果', '条件に合う記録を新しい順に表示しています。', '#users',
       '<div class="cl-card"><p class="cl-label">検索条件</p><div class="cl-cond">' + condText(cur.rq) + '</div></div>' +
       '<p class="cl-label cl-out">記録一覧</p><div id="cl-recs" class="cl-list">' + loading('記録を読み込み中...') + '</div>');
-    api('searchRecords', cur.rq).then(function (r) {
+    api('searchRecords', cur.rq).then(keep(function (r) {
       var el = document.getElementById('cl-recs'); if (!el) return;
       el.innerHTML = '<p class="cl-count">' + r.一覧.length + '件</p>' + (r.一覧.length ? r.一覧.map(function (x) { return recCard(x, true); }).join('') : '<div class="cl-empty">条件に合う記録はありません。</div>');
-    }).catch(function (e) { var el = document.getElementById('cl-recs'); if (el) el.innerHTML = failHtml(e); });
+    })).catch(keep(function (e) { var el = document.getElementById('cl-recs'); if (el) el.innerHTML = failHtml(e); }));
   }
 
   // ---------- データ修正・新規登録（どちらも申請） ----------
@@ -425,7 +441,7 @@
       (isNew ? '' : clientCard(cur.card)) + '<div id="cl-edit">' + (isNew ? '' : loading()) + '</div>');
     fillPhotos();
     if (isNew) return drawEdit(ed, categoriesTemplate());
-    api('clientInfo', { 利用者ID: cur.id }).then(function (r) { drawEdit(ed, r.カテゴリ); })
+    api('clientInfo', { 利用者ID: cur.id }).then(keep(function (r) { drawEdit(ed, r.カテゴリ); }))
       .catch(function (e) { var el = document.getElementById('cl-edit'); if (el) el.innerHTML = failHtml(e); });
   }
   function categoriesTemplate() {
@@ -455,6 +471,7 @@
   }
   function drawEdit(ed, cats) {
     var el = document.getElementById('cl-edit'); if (!el) return;
+    if (ed.種類 !== '削除' && !(cats || []).length) { el.innerHTML = failHtml({ message: '入力する項目を読み込めませんでした。画面を開き直してください' }); return; }
     var i = 0, del = ed.種類 === '削除';
     // 新規登録は必須の項目を先に出し、退居日・ご逝去・ステータス（居住中で始まる）は出さない
     if (ed.種類 === '新規') cats = cats.map(function (c) {
@@ -491,8 +508,9 @@
       var err = document.getElementById('err'), btn = e.target.querySelector('button[type=submit]');
       if (errs.length) { err.innerHTML = I.errorsBox(errs); err.scrollIntoView({ block: 'center' }); return; }
       btn.disabled = true; btn.textContent = '送信中…'; I.busy(true);
+      var g = I.gen;
       api('requestClientChange', { 種類: ed.種類, 利用者ID: ed.種類 === '新規' ? '' : cur.id, 項目: fields, 変更前: ed.種類 === '置換' ? before : {}, 理由: why }).then(function () {
-        I.busy(false); toast('申請しました。承認されると反映されます'); location.hash = '#requests';
+        I.busy(false); toast('申請しました。承認されると反映されます'); if (g === I.gen) location.hash = '#requests';
       }).catch(function (x) {
         I.busy(false); btn.disabled = false; btn.textContent = ed.種類 === '新規' ? '新規登録を申請する' : '申請する';
         err.innerHTML = x.details && x.details.length ? I.errorsBox(x.details) : failHtml(x);
@@ -523,8 +541,11 @@
     document.getElementById('ph-send').addEventListener('click', function () {
       if (!picked) return;
       var btn = this; btn.disabled = true; I.busy(true);
-      api('uploadClientPhoto', { 利用者ID: cur.id, 写真: picked }).then(function () {
-        I.busy(false); photoCache[cur.id] = picked; cur.card.写真 = true; save(); toast('写真を登録しました'); location.hash = '#user';
+      var id = cur.id, g = I.gen;
+      api('uploadClientPhoto', { 利用者ID: id, 写真: picked }).then(function () {
+        I.busy(false); photoCache[id] = picked; toast('写真を登録しました');
+        if (cur.id === id && cur.card) { cur.card.写真 = true; save(); }
+        if (g === I.gen) location.hash = '#user';
       }).catch(function (x) { I.busy(false); btn.disabled = false; document.getElementById('err').innerHTML = failHtml(x); });
     });
   }

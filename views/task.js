@@ -149,6 +149,7 @@
       err.innerHTML = ''; btn.disabled = true; btn.textContent = '送信中…'; I.busy(true);
       api('submitTask', d).then(function (res) {
         I.busy(false); toast('送信しました');
+        if (!$('after')) return; // もう別の画面にいる
         form.hidden = true;
         $('after').innerHTML = '<section class="card exp-card exp-done"><h2>依頼を送信しました</h2>' +
           '<p class="exp-done-id">申請番号 ' + esc(res.申請ID || '—') + '</p>' + (res.状態 ? '<p>' + I.pill(res.状態) + '</p>' : '') +

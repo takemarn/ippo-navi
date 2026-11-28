@@ -41,7 +41,12 @@
       method: 'POST',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
       body: JSON.stringify({ action: action, idToken: state.idToken, data: data || {} })
-    }).then(function (r) { return r.json(); }).then(function (res) {
+    }).then(function (r) { return r.json(); }, function () {
+      throw new Error('通信できませんでした。電波の良い所でもう一度お試しください');
+    }).catch(function (e) {
+      if (e instanceof SyntaxError) throw new Error('サーバーの返事を読めませんでした。少し待ってからやり直してください');
+      throw e;
+    }).then(function (res) {
       if (res.ok) return res.data;
       var e = new Error(res.message || 'エラーが起きました'); e.code = res.code; e.details = res.details || [];
       throw e;
@@ -232,6 +237,8 @@
   }
   function route() {
     busy(false);
+    // 画面が変わるたびに番号を進める。遅れて届いた返事は、番号が変わっていたら捨てる（views/clients.js など）
+    IPPO.gen = (IPPO.gen || 0) + 1;
     IPPO.cleanup.splice(0).forEach(function (fn) { try { fn(); } catch (_) {} });
     var name = (location.hash || '#menu').slice(1);
     if (!IPPO.views[name]) name = 'menu';
