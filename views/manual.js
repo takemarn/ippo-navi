@@ -67,21 +67,23 @@
     if (kind === 'urgent') return renderUrgent(box);
     if (kind === 'guide') return renderGuide(box);
     var all = data.ガイド || [];
-    var now = all.filter(function (g) { return g.分類 === 'いまこんな時'; });
-    var first = all.filter(function (g) { return g.分類 === 'はじめての人へ'; });
-    var rest = all.filter(function (g) { return g.分類 !== 'いまこんな時' && g.分類 !== 'はじめての人へ'; });
+    function cat(g) { return String(g.分類 || '').replace(/[\s　]/g, ''); }
+    var now = all.filter(function (g) { return cat(g) === 'いまこんな時'; });
+    var first = all.filter(function (g) { return cat(g) === 'はじめての人へ'; });
+    var rest = all.filter(function (g) { return cat(g) !== 'いまこんな時' && cat(g) !== 'はじめての人へ'; });
     box.innerHTML =
       '<section class="mnl-hero"><b>何に困ってる？</b><small>ここを見れば、マニュアルが見つかります。</small></section>' +
       '<a class="mnl-urgent" href="#manual-urgent"><span class="mnl-urgent-ic" aria-hidden="true">!</span>' +
         '<span><b>' + esc((data.急変 || {}).題 || '様子がおかしい・急変') + '</b><small>夜の連絡・オンコール・救急搬送 → すぐ見る</small></span></a>' +
-      '<form class="mnl-search" id="mnl-f" role="search"><input id="mnl-q" type="search" enterkeyhint="search" placeholder="例：転倒　夜間　発熱" value="' + esc(query) + '" aria-label="マニュアルを探す">' +
+      '<form class="mnl-search" id="mnl-f" role="search"><input id="mnl-q" type="search" enterkeyhint="search" placeholder="例：転倒" value="' + esc(query) + '" aria-label="マニュアルを探す">' +
         '<button type="submit">探す</button></form>' +
       '<div class="mnl-keys">' + (data.キーワード || []).map(function (k) { return '<button type="button" data-key="' + esc(k) + '">' + esc(k) + '</button>'; }).join('') + '</div>' +
       '<div id="mnl-res" hidden></div>' +
       (now.length ? '<h2 class="ptl-sec">いま こんな時 <small>押すと、その場面のページが開きます</small></h2>' + scenes(now) : '') +
       (first.length ? '<h2 class="ptl-sec">はじめての人へ</h2>' + scenes(first) : '') +
       (rest.length ? '<details class="mnl-more"><summary>＋ ほかのページ（' + rest.length + '）</summary>' + scenes(rest) + '</details>' : '') +
-      (!all.length ? '<div class="loading">まだマニュアルが登録されていません。</div>' : '');
+      (!all.length ? '<div class="loading">まだマニュアルが登録されていません。</div>' : '') +
+      (data.看護職 === false ? '<p class="ptl-note">看護職向けのページ（記録の書き方など）は、看護師・准看護師だけに出ます。</p>' : '');
     document.getElementById('mnl-f').addEventListener('submit', function (e) {
       e.preventDefault(); query = document.getElementById('mnl-q').value.trim(); search();
       document.getElementById('mnl-q').blur();
@@ -95,11 +97,13 @@
     if (!res) return;
     res.hidden = !query;
     if (!query) { res.innerHTML = ''; return; }
-    var words = query.split(/[\s　、,]+/).filter(String);
-    var hits = (data.ガイド || []).filter(function (g) {
-      var text = [g.題, g.場面, g.分類, g.キーワード, (g.要点 || []).join(' '), g.本文].join(' ');
-      return words.every(function (w) { return text.indexOf(w) >= 0; });
-    });
+    // 全角・半角、大文字・小文字をそろえて比べる。言葉が多く当たるページほど上に出す
+    function norm(s) { s = String(s || ''); return (s.normalize ? s.normalize('NFKC') : s).toLowerCase(); }
+    var words = norm(query).split(/[\s、,]+/).filter(String);
+    var hits = (data.ガイド || []).map(function (g) {
+      var text = norm([g.題, g.場面, g.分類, g.キーワード, (g.要点 || []).join(' '), g.本文].join(' '));
+      return { g: g, n: words.filter(function (w) { return text.indexOf(w) >= 0; }).length };
+    }).filter(function (x) { return x.n > 0; }).sort(function (a, b) { return b.n - a.n; }).map(function (x) { return x.g; });
     res.innerHTML = '<div class="mnl-res" role="status"><div class="row"><p class="ptl-note">「' + esc(query) + '」で ' + hits.length + ' 件</p>' +
       '<button type="button" class="small sub" data-clear="1">消す</button></div>' +
       (hits.length ? hits.map(function (g) {
@@ -112,7 +116,10 @@
     var list = (u.見る順 || []).map(guide).filter(Boolean);
     box.innerHTML = T().topBack('#manual', 'マニュアルのトップ') +
       '<h2 class="mnl-uh">' + esc(u.題 || '様子がおかしい・急変') + '</h2>' +
-      '<a class="mnl-119" href="tel:119"><b>命に関わるときは 119番</b><small>押すと電話をかけます。連絡はそのあとでよい</small></a>' +
+      '<a class="mnl-119" href="tel:119"><b>命に関わるときは 119番</b><small>押すと電話をかけます。施設への連絡は、そのあとで大丈夫です</small></a>' +
+      (data.連絡先 || []).map(function (c) {
+        return '<a class="mnl-call" href="tel:' + esc(c.電話) + '"><b>' + esc(c.名前) + 'に電話する</b><small>' + esc(c.電話) + '</small></a>';
+      }).join('') +
       '<p class="ptl-note">この場面で見るところ（上から順に）</p>' +
       '<ol class="mnl-steps">' + list.map(function (g) {
         return '<li><button type="button" data-jump="' + esc(g.ID) + '">' + esc(g.題) + '</button></li>';

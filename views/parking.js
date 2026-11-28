@@ -133,7 +133,7 @@
       '<div class="pk-who"><span class="pk-st">' + esc(s.label) + '</span><b>' + esc(p.氏名) + '</b>' +
         '<small>' + (p.車 ? esc(p.車) + ' ／ ' : '') + '停めた ' + hm(p.停めた) + '</small><small>' + when + '</small></div>' +
       // 出庫は本人のほか、運営（承認者・管理者）が代わりに押せる（関係事業者の車や押し忘れのため）。押しまちがい防止で2回押す
-      (mine || I.canApprove() ? '<button type="button" class="sub pk-out" data-out="' + esc(p.記録ID) + '">出庫</button>' : '') + '</div>';
+      (mine || I.canApprove() ? '<button type="button" class="sub pk-out" data-out="' + esc(p.記録ID) + '"' + (mine ? '' : ' data-who="' + esc(p.氏名) + '"') + '>出庫</button>' : '') + '</div>';
   }
 
   // 「停める」: 行の下に小さなフォームを開く（時間・車の目印・関係事業者の代わりに）
@@ -150,6 +150,9 @@
       '<div class="pk-err"></div><div class="actions"><button type="button" class="sub" data-cancel="1">やめる</button><button type="submit">ここに停める</button></div>';
     row.after(f);
     f.querySelector('select').focus();
+    var lotName = (row.closest('.pk-lot').querySelector('.pk-lot-h b') || {}).textContent || '';
+    var pxBox = f.querySelector('#pk-proxy');
+    if (pxBox) pxBox.addEventListener('change', function () { f.querySelector('#pk-car').placeholder = pxBox.checked ? '例）訪問入浴の車・○○社' : '例）白い軽'; });
     f.addEventListener('submit', function (e) {
       e.preventDefault();
       var go = f.querySelector('button[type=submit]');
@@ -158,7 +161,8 @@
       var px = f.querySelector('#pk-proxy'), ok = T().alive();
       api('parkIn', { 駐車場ID: btn.dataset.lot, 区画: btn.dataset.slot, 時間: Number(f.querySelector('#pk-h').value),
         車: f.querySelector('#pk-car').value.trim(), 代理: !!(px && px.checked) })
-        .then(function (res) { if (!ok()) return; take(res); render(); I.toast((btn.dataset.slot === FREE ? '' : btn.dataset.slot + ' に') + '停めました'); })
+        .then(function (res) { if (!ok()) return; take(res); render(); var where = lotName + (btn.dataset.slot === FREE ? '' : 'の' + btn.dataset.slot);
+          I.toast(px && px.checked ? where + 'に関係事業者の車を登録しました' : where + 'に停めました'); })
         .catch(function (e2) {
           if (!f.isConnected) { I.toast(e2.message); return; }
           go.disabled = false; go.textContent = 'ここに停める';
@@ -176,7 +180,7 @@
     if (b.dataset.out) {
       // 1回目は「もう一度押すと出庫」に変わるだけ。4秒以内にもう一度押すと出庫する
       if (!b.dataset.armed) {
-        b.dataset.armed = '1'; b.textContent = 'もう一度押すと出庫'; b.classList.add('armed');
+        b.dataset.armed = '1'; b.textContent = b.dataset.who ? b.dataset.who + 'の車を出庫' : 'もう一度押すと出庫'; b.classList.add('armed');
         setTimeout(function () { if (b.isConnected && b.dataset.armed) { delete b.dataset.armed; b.textContent = '出庫'; b.classList.remove('armed'); } }, 4000);
         return;
       }

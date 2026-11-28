@@ -229,7 +229,7 @@
         }).join('') + '</div>' +
         '<h2 class="ptl-sec" id="help">困ったときは、ここへ</h2>' +
         '<dl class="ptl-help">' + (d.困ったとき || []).map(function (h) {
-          return '<div><dt>' + esc(h.内容) + '</dt><dd>' + esc(h.窓口) + '</dd></div>';
+          return '<div><dt>' + esc(h.内容) + '</dt><dd>' + esc(h.窓口) + (h.連絡方法 ? '<small>' + esc(h.連絡方法) + '</small>' : '') + '</dd></div>';
         }).join('') + '</dl>';
       box.querySelector('.ptl-chips').addEventListener('click', function (e) {
         var a = e.target.closest('a[data-go]');

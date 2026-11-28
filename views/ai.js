@@ -18,10 +18,11 @@
   function bubbleWait(n) { return '<div class="ai-a ai-wait" id="ai-wait-' + n + '"><span class="spin" aria-hidden="true"></span>探しています…</div>'; }
   function bubbleA(a) {
     var rows = (a.根拠 || []).map(function (h, i) {
-      var open = h.種類 === '規程'
+      var open = h.種類 === '窓口' ? '<a class="ai-help" href="#org">組織図で見る</a>'
+        : h.種類 === '規程'
         ? '<button type="button" class="small sub" data-rule="' + esc(h.ID) + '">この規程を開く</button>'
         : '<button type="button" class="small sub" data-guide="' + esc(h.ID) + '">マニュアルを開く</button>';
-      return '<li><span class="ai-kind ' + (h.種類 === '規程' ? 'r' : 'm') + '">' + esc(h.種類) + '</span>' +
+      return '<li><span class="ai-kind ' + (h.種類 === '規程' ? 'r' : h.種類 === '窓口' ? 'h' : 'm') + '">' + esc(h.種類) + '</span>' +
         '<b>' + esc(h.題) + '</b>' + (h.見出し ? '<small>' + esc(h.見出し) + '</small>' : '') +
         (h.抜粋 ? '<q>' + esc(h.抜粋) + '</q>' : (h.種類 === '規程' ? '<small class="ai-lock">本文は「閲覧前のご確認」のあとで読めます</small>' : '')) +
         open + '</li>';
@@ -29,7 +30,9 @@
     var none = !(a.根拠 || []).length
       ? (!nurse() ? '<p class="ai-small">急変・看護のことは看護マニュアル（看護職向け）にあります。急ぐときは、まず看護師・オンコール当番へ。</p>' : '') +
         '<a class="ai-help" href="#org">困ったときの窓口を見る（組織図）</a>' : '';
-    return '<div class="ai-a"><p>' + esc(a.回答) + '</p>' + (rows ? '<ol class="ai-hits">' + rows + '</ol>' : '') + none +
+    var urgent = a.急ぎ ? '<div class="ai-urgent"><b>急ぐときは、まず看護師・オンコール当番へ。</b>命に関わるときは迷わず119番。' +
+      '<div class="ai-urgent-btns"><a class="btn" href="tel:119">119番に電話</a><a class="btn sub-link" href="#manual-urgent">急変のときの流れ</a></div></div>' : '';
+    return '<div class="ai-a">' + urgent + '<p>' + esc(a.回答) + '</p>' + (rows ? '<ol class="ai-hits">' + rows + '</ol>' : '') + none +
       '<p class="ai-small">答えは規程・マニュアルの文章が正しいものです。迷ったら上長に確認してください。</p></div>';
   }
 

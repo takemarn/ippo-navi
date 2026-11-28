@@ -222,3 +222,12 @@ body.mnl-big .mnl-scene b, body.mnl-big .mnl-row b { font-size: 16px; }
 .ptl-stack .fail .btn.sub-link { background: #fff; color: var(--navy); border-color: var(--glass-line); }
 .ai-hits button { min-height: 40px; border: 1px solid var(--glass-line); padding: 4px 12px; font-size: 12px; }
 .mnl-guide details summary { min-height: 40px; display: flex; align-items: center; }
+.mnl-call{display:flex;flex-direction:column;background:#c22035;color:#fff;border-radius:12px;padding:10px 14px;text-decoration:none;min-height:52px}
+.mnl-call b{font-size:16px}
+.mnl-call small{font-size:11px;opacity:.9}
+.ptl-help dd small{display:block;font-weight:400;font-size:11px;color:var(--label)}
+.ai-kind.h{background:#2c9a63}
+.ai-urgent{background:#fdecee;border:1px solid #f2b8c0;border-radius:12px;padding:10px 12px;margin-bottom:8px;color:#8a1426;font-size:13px}
+.ai-urgent b{display:block;font-size:14px;margin-bottom:2px}
+.ai-urgent-btns{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+.ai-urgent-btns .btn{min-height:40px;display:inline-flex;align-items:center;padding:0 14px;font-size:13px}
