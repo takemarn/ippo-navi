@@ -174,7 +174,7 @@
 .apv-btn-back:active { background: #9E1F2F; }
 .apv-btn-backline { background: #FCE1E4; border-color: #E9A3AC; color: #B0202F; }
 .apv-btn-backline:active { background: #F7C9CF; }
-.apv-btn-ghost { background: #fff; border-color: #C9DBF5; color: #2F7BD6; }
+.apv-btn-ghost { background: #fff; border-color: #C9DBF5; color: #12317D; } /* 「もう一度読み込む」などの白いボタンの文字は全画面で濃紺にそろえる */
 .apv-btn-ghost:active { background: #E4E8EE; }
 .apv-btn .apv-spin { border-color: rgba(255,255,255,.45); border-top-color: #fff; }
 .apv-btn-ghost .apv-spin { border-color: #C9DBF5; border-top-color: #12317D; }

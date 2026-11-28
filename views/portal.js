@@ -11,13 +11,14 @@
   var I = window.IPPO, app = I.app, api = I.api, esc = I.esc;
 
   function loading(text) { return '<div class="loading" role="status">' + esc(text || '読み込み中...') + '</div>'; }
-  // retry: true なら「再読み込み」ボタンを付ける（いまの画面を開き直す）
+  // retry: true なら「もう一度読み込む」ボタンを付ける（いまの画面を開き直す）
   function failBox(e, retry) {
-    // core.js の showError と同じ形（白いカード＋理由＋再読み込み）
+    // core.js の showError と同じ形・同じ言い方（白いカード＋理由＋電波の案内＋もう一度読み込む）
     if (!retry) return '<div class="errors" role="alert">' + esc(e && e.message || 'エラーが起きました') + '</div>'; // フォームの中のエラー
     return '<div class="card fail" role="alert"><h2>画面を開けませんでした</h2>' +
       '<p class="fail-msg">' + esc(e && e.message || 'エラーが起きました') + '</p>' +
-      '<button type="button" onclick="IPPO.route()">再読み込み</button></div>';
+      (/電波/.test(e && e.message || '') ? '' : '<p class="fail-note">電波の良い所で、もう一度読み込んでください。</p>') +
+      '<button type="button" onclick="IPPO.route()">もう一度読み込む</button></div>';
   }
   // 返事が来たときに、まだ同じ画面を見ているか（途中でほかの画面へ移ったら描かない）
   // ハッシュだけでなく core.js の画面の番号（I.gen）も見る。いったん離れて同じ画面に戻ったときに、前に開いたときの遅い返事で描き直さないため
@@ -129,7 +130,7 @@
       '<path d="M3 3.5A2.5 2.5 0 015.5 1H21v22H5.5A2.5 2.5 0 003 25.5z" fill="currentColor"/><path d="M3 25.5A2.5 2.5 0 015.5 23H21v4H5.5A2.5 2.5 0 013 24.5" fill="#fff" stroke="currentColor" stroke-width="1.2"/></svg>';
   }
   function viewRulesList() {
-    app.innerHTML = topBack('#rules', '就業規則・組織図・福利厚生にもどる') + '<h1 class="ptl-h1l">就業規則・各規程</h1>' +
+    app.innerHTML = topBack('#rules', '就業規則・組織図・福利厚生に戻る') + '<h1 class="ptl-h1l">就業規則・各規程</h1>' +
       '<p class="muted" id="rl-ed"></p>' +
       '<p class="ptl-note">閲覧には<b>お名前の確認</b>が必要です（会社の機密情報のため）。</p>' +
       '<div id="rl" class="list">' + loading() + '</div>' + I.backHtml('#rules', '就業規則・組織図・福利厚生に戻る');
@@ -183,7 +184,7 @@
       consent(r);
     }).catch(function (e) { if (ok()) app.innerHTML = failBox(e, true) + backBottom(); });
   }
-  function topRule() { return portalFrom() === '#ai' ? topBack('#ai', 'AIに聞く画面に戻る') : topBack('#rules-list', '規程の選び直し'); }
+  function topRule() { return portalFrom() === '#ai' ? topBack('#ai', 'AIに聞く画面に戻る') : topBack('#rules-list', '規程の一覧に戻る'); }
   // 規程の画面の下の戻る: AI相談から開いたときは AI相談へ、ほかは規程の一覧へ
   function backBottom() {
     return portalFrom() === '#ai' ? I.backHtml('#ai', 'AIに聞く画面に戻る') : I.backHtml('#rules-list', '規程の一覧に戻る');
@@ -271,7 +272,7 @@
   // ---------- 組織図 ----------
   function viewOrg() {
     // AI相談の「組織図で見る」から来たときは AI相談へ戻す
-    app.innerHTML = (portalFrom() === '#ai' ? topBack('#ai', 'AIに聞く画面に戻る') : topBack('#rules', 'トップに戻る')) +
+    app.innerHTML = (portalFrom() === '#ai' ? topBack('#ai', 'AIに聞く画面に戻る') : topBack('#rules', '就業規則・組織図・福利厚生に戻る')) +
       '<div id="og" class="ptl-stack">' + loading('組織図を読み込んでいます…') + '</div>' +
       (portalFrom() === '#ai' ? I.backHtml('#ai', 'AIに聞く画面に戻る') : I.backHtml('#rules', '就業規則・組織図・福利厚生に戻る'));
     var ok = alive();

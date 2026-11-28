@@ -51,8 +51,12 @@
   function shell(title, sub, back, inner) {
     return '<section class="cl-shell"><div class="cl-head"><div class="cl-h"><small aria-hidden="true">' + esc(EN[title] || '') + '</small><h1>' + esc(title) + '</h1></div>' +
       (back ? '<a class="cl-backpill" href="' + back + '"><span aria-hidden="true">‹</span>戻る</a>' : '') + '</div>' +
-      (sub ? '<p class="cl-sub">' + esc(sub) + '</p>' : '') + inner + '</section>';
+      (sub ? '<p class="cl-sub">' + esc(sub) + '</p>' : '') + inner + '</section>' +
+      // 右上の「戻る」に加えて、ほかの画面と同じく下にも「‹ 〇〇に戻る」を置く（長い画面を下まで見たあと上に戻らずに済む）
+      (back ? I.backHtml(back, BACK_LABEL[back]) : '');
   }
+  // 下の戻るリンクの言い方（#users は core が「利用者一覧に戻る」にする）
+  var BACK_LABEL = { '#user': '利用者操作に戻る', '#users-result': '検索結果に戻る' };
   // 小見出し（日本語＋右に小さな英字）。out=true はカードの外に置くとき
   function lab(jp, en, out, tag) {
     var t = tag || 'p';
@@ -176,7 +180,7 @@
     if (!el) return;
     el.innerHTML = '<div class="cl-fail" role="alert"><p class="cl-fail-h">読み込めませんでした</p><p>' + esc(e && e.message || 'エラーが起きました') + '</p>' +
       // 通信エラーの文にはすでに「電波の良い所で…」が入っているので、同じ文を2回出さない
-      (/電波/.test(e && e.message || '') ? '' : '<p class="cl-fail-n">電波の良い所で、もう一度お試しください。</p>') +
+      (/電波/.test(e && e.message || '') ? '' : '<p class="cl-fail-n">電波の良い所で、もう一度読み込んでください。</p>') +
       (fn ? '<button type="button" class="cl-clear cl-retry">もう一度読み込む</button>' : '') + '</div>';
     var b = el.querySelector('.cl-retry');
     if (b) b.addEventListener('click', fn);

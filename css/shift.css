@@ -17,10 +17,14 @@
 .sft-spin { width: 14px; height: 14px; flex: none; border-radius: 50%; border: 2px solid #cfdaf0; border-top-color: #4a6fd0; }
 @media (prefers-reduced-motion: no-preference) { .sft-spin { animation: sft-rot .8s linear infinite; } }
 @keyframes sft-rot { to { transform: rotate(360deg); } }
-.sft-fail { display: flex; flex-direction: column; gap: 8px; }
-.sft-fail p { line-height: 1.6; }
-.sft-retry { align-self: flex-start; min-height: 40px; padding: 0 16px; font-size: 12px; background: #fff; color: var(--danger); border: 1.5px solid #f1b7be; box-shadow: none; }
-.sft-retry:active { background: var(--danger-soft); }
+.sft-fail { display: flex; flex-direction: column; gap: 4px; padding: 14px 16px; }
+/* 見出し・案内・ボタンは利用者一覧の「読み込めませんでした」（css/clients.css .cl-fail）とそろえる */
+.sft-fail p { line-height: 1.6; color: #444; overflow-wrap: anywhere; }
+.sft-fail .sft-fail-h { font-size: 14px; font-weight: 800; color: var(--danger); display: flex; align-items: center; gap: 6px; }
+.sft-fail-h::before { content: "!"; display: inline-grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; background: var(--danger); color: #fff; font-size: 12px; flex: none; }
+.sft-fail .sft-fail-n { color: #5b6572; font-size: 11px; }
+.sft-retry { margin-top: 8px; min-height: 44px; padding: 0 16px; font-size: 13px; background: #fff; color: var(--navy); border: 1px solid #c9d6ea; box-shadow: none; }
+.sft-retry:active { background: #eef2f7; }
 .sft-emptybox { background: rgba(255, 255, 255, .85); border: 1px dashed #c9d6ea; border-radius: 14px; padding: 18px 16px; text-align: center; display: flex; flex-direction: column; gap: 6px; }
 .sft-emptybox b { font-size: 13px; color: #333; }
 .sft-emptybox p { font-size: 11px; color: #5b6572; line-height: 1.6; }
@@ -165,9 +169,10 @@
 }
 .sft-bar-note { max-width: 612px; width: 100%; margin: 0 auto; font-size: 11px; font-weight: 700; color: #a0520a; text-align: center; }
 .sft-bar-note[hidden] { display: none; }
-.sft-send { display: flex; width: 100%; max-width: 612px; margin: 0 auto; min-height: 48px; border-radius: 12px; font-size: 15px; font-weight: 800; background: #1636b4; border-color: #1636b4; box-shadow: 0 4px 12px rgba(22, 54, 180, .25); }
-.sft-send:active { background: #0f2a90; }
-.sft-send.empty { background: #5468b0; border-color: #5468b0; box-shadow: none; }
+.sft-send { display: flex; width: 100%; max-width: 612px; margin: 0 auto; min-height: 48px; border-radius: 12px; font-size: 15px; font-weight: 800; background: var(--navy); border-color: var(--navy); box-shadow: 0 4px 12px rgba(18, 49, 125, .25); }
+/* 主ボタンの色はアプリ全体で濃紺（--navy）にそろえる（経費・勤怠の「内容を確認する」、承認と同じ） */
+.sft-send:active { background: var(--navy-press); }
+.sft-send.empty { background: #5a6d9e; border-color: #5a6d9e; box-shadow: none; }
 body.sft-has-bar main { padding-bottom: 110px; }
 body.sft-has-bar .demo { margin-bottom: 96px; }
 body.sft-has-bar .toast { bottom: calc(96px + env(safe-area-inset-bottom, 0px)); }

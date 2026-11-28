@@ -5,7 +5,8 @@
 .ptl-stack { display: flex; flex-direction: column; gap: 12px; }
 .ptl-hint { font-weight: 400; color: var(--muted); font-size: 11px; }
 .ptl-topback { align-self: flex-start; color: var(--navy); font-size: 12px; font-weight: 700; text-decoration: none; padding: 6px 0; min-height: 40px; display: inline-flex; align-items: center; gap: 4px; }
-.ptl-h1l { text-align: left; font-size: 18px; }
+/* 左寄せの画面見出しは 20px（シフト・利用者一覧の見出しとそろえる。中央寄せのフォーム見出しは共通の 18px） */
+.ptl-h1l { text-align: left; font-size: 20px; }
 .ptl-note { font-size: 12px; color: var(--label); }
 .ptl-note b { color: var(--danger); }
 .ptl-sec { font-size: 13px; margin: 6px 0 0; display: flex; align-items: center; gap: 6px; }
@@ -93,7 +94,7 @@
 
 /* ---------- 看護マニュアル ---------- */
 .mnl-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.mnl-top h1 { margin: 0; text-align: left; }
+.mnl-top h1 { margin: 0; text-align: left; font-size: 20px; }
 button.mnl-size { background: #fff; color: var(--navy); border-color: var(--glass-line); min-height: 40px; padding: 4px 12px; font-size: 13px; }
 button.mnl-size[aria-pressed="true"] { background: var(--navy); color: #fff; }
 .mnl-hero { background: linear-gradient(120deg, #e8f4f1, #f4f9ff); border-radius: 14px; padding: 18px 16px; display: flex; flex-direction: column; gap: 2px; }
