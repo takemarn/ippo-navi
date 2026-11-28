@@ -36,6 +36,8 @@
 
   function contentLines(r) {
     var d = r.明細 || [];
+    // 経費・勤怠以外（利用者登録・利用者修正・タスク）の中身は views/clients.js が描く
+    if (r.申請種類 !== '経費' && r.申請種類 !== '勤怠' && I.bodyLines) return I.bodyLines(r);
     if (!d.length) return '';
     if (r.申請種類 === '経費') {
       var total = d.reduce(function (s, x) { return s + Number(x.金額 || 0); }, 0);

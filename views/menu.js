@@ -1,7 +1,7 @@
 /* menu の画面
    #menu   … 入口。LINE のリッチメニューを使わずブラウザで開いたとき用に、リッチメニューと同じ6タイルを並べる
    #status … 申請状況のメニュー
-   #task #users #portal … まだ作っていない機能のメニュー（項目は「準備中」）。#shift は views/shift.js */
+   #portal … まだ作っていない機能のメニュー（項目は「準備中」）。#shift は views/shift.js、#users は views/clients.js、#task は views/task.js */
 (function () {
   'use strict';
   var I = window.IPPO, app = I.app, esc = I.esc;
@@ -24,8 +24,6 @@
 
   I.views.menu = viewMenu;
   I.views.status = function () { I.subMenu([{ label: '自分の申請', href: '#requests' }]); };
-  I.views.task = function () { I.subMenu([{ label: '施設→本部事務' }, { label: '介護タスク' }]); };
-  I.views.users = function () { I.subMenu([{ label: '利用者を探す' }, { label: '利用者の新規登録' }, { label: '記録検索' }]); };
   I.views.portal = function () {
     I.subMenu([{ label: '就業規則・組織図・福利厚生' }, { label: '駐車場ナビ' }, { label: '看護AI' }, { label: '日報' }, { label: '経営資料' }]);
   };
