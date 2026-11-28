@@ -63,9 +63,8 @@ p.cl-desc.cl-out { margin-top: -10px; }
 .cl-input { border: 1px solid #e3e8ef; box-shadow: none; background: #fff; border-radius: 12px; min-height: 44px; font-size: 14px; }
 textarea.cl-input { min-height: 140px; line-height: 1.6; }
 .cl-lab { gap: 6px; }
-.cl-dates { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.cl-dates { display: grid; grid-template-columns: 1fr; gap: 8px; }
 .cl-dates label { font-size: 11px; color: #555; min-width: 0; }
-.cl-dates label:last-child:nth-child(odd) { grid-column: 1 / -1; }
 .cl-dates input { min-width: 0; width: 100%; }
 
 /* ---------- 検索条件・件数・空 ---------- */
@@ -139,7 +138,6 @@ button.cl-cc-link:active { background: #f6f8fd; border-color: #d9e0ee; }
   min-height: 30px; padding: 0 14px; border-radius: 999px; font-size: 11px; font-weight: 800;
   color: var(--danger); background: var(--danger-soft); border: 1px solid #edb3ba; box-shadow: none;
 }
-.cl-del[data-sure] { color: #fff; background: var(--danger); border-color: var(--danger); }
 
 /* ---------- 写真登録 ---------- */
 .cl-pick { display: flex; flex-direction: column; align-items: center; gap: 12px; }
@@ -159,7 +157,7 @@ button.cl-cc-link:active { background: #f6f8fd; border-color: #d9e0ee; }
 .tk-row { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 6px; }
 .tk-row span { color: #6e7782; font-size: 14px; }
 .tk-row input { min-width: 0; width: 100%; }
-.tk-name { display: grid; grid-template-columns: 88px 1fr; gap: 8px; }
+.tk-name { display: grid; grid-template-columns: 68px 1fr; gap: 8px; }
 .tk-name input, .tk-name select { min-width: 0; }
 .tk-tog { display: grid; grid-template-columns: repeat(auto-fit, minmax(80px, 1fr)); gap: 8px; }
 .tk-tog button {
@@ -168,16 +166,10 @@ button.cl-cc-link:active { background: #f6f8fd; border-color: #d9e0ee; }
 }
 /* 参考アプリでは選んだボタンが緑になる */
 .tk-tog button.on { background: #1eac40; border-color: #1eac40; color: #fff; }
-.tk-fixed { background: #f3f6fb; color: #333; }
 
 @media (max-width: 360px) {
   .cl-shell { padding: 12px 10px 14px; }
-  .cl-head h1 { font-size: 20px; }
-  .cl-photo { width: 56px; height: 56px; }
-  .cl-dates { grid-template-columns: 1fr; }
-  .tk-name { grid-template-columns: 72px 1fr; }
 }
-.tk-hint { margin-top: -4px; font-size: 11px; }
 .cl-form input, .cl-form select, .cl-form textarea { border: 1px solid #e3e8ef; border-radius: 12px; box-shadow: none; background-color: #fff; }
 .cl-form textarea { min-height: 72px; }
 .cl-fold .cl-lab + .cl-lab { margin-top: 4px; }
@@ -188,11 +180,9 @@ button.cl-cc-link:active { background: #f6f8fd; border-color: #d9e0ee; }
 }
 /* 見直し2周目: 情報閲覧の中にも間をあける、日付は参考アプリと同じく縦に並べる、長い名前でも ID は1行目にそろえる */
 #cl-info { display: flex; flex-direction: column; gap: 12px; }
-.cl-dates { grid-template-columns: 1fr; }
 .cl-cc-name { align-items: flex-start; }
 .cl-cc-name b { line-height: 1.5; }
 .cl-tags { border-top: 1px solid #eef1f6; padding-top: 8px; }
-.cl-photo .fail { font-size: 9px; }
 /* 承認待ち一覧・自分の申請での利用者申請・タスクの中身（項目名が長いので値は左寄せで折り返す） */
 .apv-dl.cl-body { grid-template-columns: minmax(5em, 40%) 1fr; }
 .apv-dl.cl-body dd { text-align: left; overflow-wrap: anywhere; }
@@ -228,7 +218,6 @@ button.cl-cc-link:active { background: #f6f8fd; border-color: #d9e0ee; }
 .cl-form input, .cl-form select { min-height: 44px; }
 .cl-lab, .cl-form label { font-size: 12px; font-weight: 700; }
 .tk-tog { grid-template-columns: repeat(3, 1fr); }
-.tk-name { grid-template-columns: 68px 1fr; }
 .cl-photo { width: 72px; height: 72px; border-radius: 14px; }
 .cl-photo:not(.none) { box-shadow: 0 4px 10px rgba(30, 40, 70, .18); }
 .cl-photo.big { width: 160px; height: 160px; }
@@ -236,4 +225,5 @@ button.cl-cc-link:active { background: #f6f8fd; border-color: #d9e0ee; }
   .cl-head h1 { font-size: 19px; }
   .cl-photo { width: 56px; height: 56px; }
   .cl-photo.big { width: 140px; height: 140px; }
+  .cl-photo.none { font-size: 8px; padding: 2px; letter-spacing: -.05em; }
 }

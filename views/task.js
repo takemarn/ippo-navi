@@ -147,9 +147,10 @@
       var err = $('err'), btn = form.querySelector('button[type=submit]');
       if (errs.length) { err.innerHTML = I.errorsBox(errs); err.scrollIntoView({ block: 'center' }); return; }
       err.innerHTML = ''; btn.disabled = true; btn.textContent = '送信中…'; I.busy(true);
+      var g = I.gen; // 送信中に別の画面へ移ったら、結果は画面に書かない
       api('submitTask', d).then(function (res) {
         I.busy(false); toast('送信しました');
-        if (!$('after')) return; // もう別の画面にいる
+        if (g !== I.gen) return;
         form.hidden = true;
         $('after').innerHTML = '<section class="card exp-card exp-done"><h2>依頼を送信しました</h2>' +
           '<p class="exp-done-id">申請番号 ' + esc(res.申請ID || '—') + '</p>' + (res.状態 ? '<p>' + I.pill(res.状態) + '</p>' : '') +
@@ -159,7 +160,9 @@
         window.scrollTo(0, 0);
         $('again').addEventListener('click', viewOffice);
       }).catch(function (x) {
-        I.busy(false); btn.disabled = false; btn.textContent = '送信';
+        I.busy(false);
+        if (g !== I.gen) { toast(x.message || '送信できませんでした'); return; }
+        btn.disabled = false; btn.textContent = '送信';
         err.innerHTML = I.errorsBox(x.details && x.details.length ? x.details : [x.message || '送信できませんでした']);
       });
     });

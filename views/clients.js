@@ -3,6 +3,7 @@
          → #user-info（情報閲覧） / #user-records（記録一覧） / #user-write（看護記録・介護記録・施設記録・往診）
          / #user-edit（データ修正・新規登録） / #user-photo（写真登録）。記録検索の結果は #records-result
    選んでいる利用者や検索条件は画面をまたぐので、この中の cur に持ち、sessionStorage にも置く（再読み込みしても続きから）
+   ほかの画面へ: 申請内容を行に直す I.bodyLines を置く（views/approvals.js と views/requests.js が使う）
    GAS: searchClients / clientInfo / clientPhoto / uploadClientPhoto / addRecord / clientRecords / searchRecords / deleteRecord / requestClientChange */
 (function () {
   'use strict';
@@ -235,6 +236,7 @@
     fillPhotos();
     trackClicks(function (e) {
       var k = e.target.closest('[data-kind]');
+      // 参考アプリと同じく、記録画面へ移る間だけ「準備中」を出す（route() が消す）
       if (k) { cur.kind = k.dataset.kind; save(); overlay('記録画面を準備中・・・'); }
       var s = e.target.closest('[data-sub]');
       if (!s) return;
@@ -391,7 +393,7 @@
       I.busy(false);
       if (!document.getElementById('cl-recs')) return;
       var filtered = recQ.開始日 || recQ.終了日 || recQ.単日 || recQ.文字;
-      el.innerHTML = r.一覧.length ? '<p class="cl-count">' + r.一覧.length + '件（削除できるのは自分が書いた記録だけ）</p>' + r.一覧.map(function (x) { return recCard(x, false); }).join('')
+      el.innerHTML = r.一覧.length ? '<p class="cl-count">' + r.一覧.length + '件' + (state.me && state.me.役割 === '管理者' ? '' : '（削除できるのは自分が書いた記録だけ）') + '</p>' + r.一覧.map(function (x) { return recCard(x, false); }).join('')
         : '<div class="cl-empty">' + (filtered ? '条件に合う記録はありません。条件を変えてもう一度検索してください。' : '記録はありません。') + '</div>';
     })).catch(keep(function (e) { I.busy(false); el.innerHTML = failHtml(e); }));
   }
@@ -411,9 +413,11 @@
       return;
     }
     btn.disabled = true;
+    var reload = keep(loadRecs); // 削除中に画面を離れたら一覧は読み直さない
     api('deleteRecord', { 記録ID: btn.dataset.del }).then(function () {
-      toast('記録を削除しました'); loadRecs();
-    }).catch(function (e) { btn.disabled = false; box.insertAdjacentHTML('beforeend', failHtml(e)); });
+      toast('記録を削除しました');
+      reload();
+    }).catch(keep(function (e) { btn.disabled = false; box.insertAdjacentHTML('beforeend', failHtml(e)); }));
   }
 
   // ---------- 記録検索の結果（利用者横断） ----------
@@ -442,7 +446,7 @@
     fillPhotos();
     if (isNew) return drawEdit(ed, categoriesTemplate());
     api('clientInfo', { 利用者ID: cur.id }).then(keep(function (r) { drawEdit(ed, r.カテゴリ); }))
-      .catch(function (e) { var el = document.getElementById('cl-edit'); if (el) el.innerHTML = failHtml(e); });
+      .catch(keep(function (e) { var el = document.getElementById('cl-edit'); if (el) el.innerHTML = failHtml(e); }));
   }
   function categoriesTemplate() {
     // 項目の一覧は GAS の options（利用者項目）から。見本モードは views/clients-demo.js が I.CLIENT_CATEGORIES を置く
@@ -501,7 +505,7 @@
       });
       var why = document.getElementById('e-why').value.trim(), errs = [];
       if (ed.種類 === '新規') {
-        if (!fields['利用者データ/氏名']) errs.push('氏名を入れてください');
+        if (!fields['利用者データ/氏名']) errs.push('名前を入れてください');
         if (!fields['利用者データ/ふりがな']) errs.push('ふりがなを入れてください');
       } else if (ed.種類 === '置換' && !Object.keys(fields).length) errs.push('直した項目がありません');
       if (del && !why) errs.push('削除の理由を入れてください');
