@@ -124,5 +124,16 @@
   };
 
   I.views.menu = viewMenu;
-  I.views.status = function () { I.subMenu([{ label: '自分の申請', href: '#requests' }]); };
+  // 申請状況: 「自分の申請」に差戻しの件数を赤い数字で出す（出し直しが要る申請があると分かるように）
+  I.views.status = function () {
+    I.subMenu([{ label: '自分の申請', href: '#requests' }]);
+    var gen = I.gen;
+    api('myRequests').then(function (list) {
+      var n = (list || []).filter(function (x) { return x.状態 === '差戻し'; }).length;
+      var a = app.querySelector('.mgroup a[href="#requests"]');
+      if (!n || !a || I.gen !== gen) return;
+      a.insertAdjacentHTML('beforeend', '<span class="badge" aria-hidden="true">差戻し ' + n + '</span>');
+      a.setAttribute('aria-label', '自分の申請（差戻し ' + n + '件）');
+    }).catch(function () {});
+  };
 })();
