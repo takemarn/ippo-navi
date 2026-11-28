@@ -72,6 +72,29 @@
     var after = document.getElementById('exp-after');
     function $(id) { return document.getElementById('exp-' + id); }
 
+    // ---------- ブラウザ（スマホ）の「戻る」 ----------
+    // 確認カードを出すときに履歴を1つ積んである。戻るを押すと、書いた内容のまま入力に戻る（「戻って直す」も同じ動き）。
+    // 完了カードで戻ると #apply へ（同じ申請をうっかり出し直さないように）。送信中の戻るは何もしない
+    var leaving = false;
+    function backToForm() { after.innerHTML = ''; form.hidden = false; window.scrollTo(0, 0); }
+    function fixTap() {
+      if (history.state && history.state.ippoStep === 'confirm') history.back(); // popstate → onPop → backToForm
+      else backToForm();
+    }
+    function onPop() {
+      if (leaving || !document.getElementById('exp-form')) return;
+      if ($('done-h')) { leaving = true; location.replace('#apply'); return; }
+      if (form.hidden && $('go') && !$('go').disabled) backToForm();
+    }
+    window.addEventListener('popstate', onPop);
+    I.cleanup.push(function () { window.removeEventListener('popstate', onPop); });
+    // 「続けて…する」: 画面の切り替え（core の route）と同じく、後片付けをして番号を進めてから描き直す
+    function restart() {
+      I.cleanup.splice(0).forEach(function (f) { try { f(); } catch (_) {} });
+      I.gen = (I.gen || 0) + 1;
+      viewExpense();
+    }
+
     // ---------- 物品の行 ----------
     // 1行ぶんの HTML。行の追加・削除・フリー入力の出し入れは、その行だけを変える（他の行のエラー表示を消さないため）
     function rowHtml(r, i) {
@@ -245,6 +268,7 @@
         return '<li><span>' + esc(it.物品 === 'フリー入力' ? it.自由入力 : it.物品) + ' <span class="exp-qty">× ' + esc(it.個数) + '</span></span><span>' + esc(yen(it.金額)) + '</span></li>';
       }).join('');
       form.hidden = true;
+      try { history.pushState({ ippoStep: 'confirm' }, ''); } catch (_) {} // ブラウザの「戻る」で入力に戻れるように
       after.innerHTML =
         '<section class="card exp-card exp-confirm" aria-labelledby="exp-cf-h">' +
           '<h2 id="exp-cf-h" class="exp-cf-h">この内容で送信しますか？</h2>' +
@@ -264,7 +288,7 @@
           '<button type="button" class="exp-back" id="exp-fix">戻って直す</button>' +
         '</div>';
       window.scrollTo(0, 0);
-      $('fix').addEventListener('click', function () { after.innerHTML = ''; form.hidden = false; window.scrollTo(0, 0); });
+      $('fix').addEventListener('click', fixTap);
       $('go').addEventListener('click', function () { send(d); });
       $('go').focus({ preventScroll: true });
     }
@@ -293,6 +317,7 @@
     }
 
     function showDone(res, d) {
+      try { if (history.state && history.state.ippoStep === 'confirm') history.replaceState({ ippoStep: 'done' }, ''); } catch (_) {}
       var sum = d.物品.reduce(function (a, it) { return a + Number(it.金額 || 0); }, 0);
       after.innerHTML =
         '<section class="card exp-card exp-done" aria-labelledby="exp-done-h">' +
@@ -310,7 +335,7 @@
         '</div>';
       window.scrollTo(0, 0);
       $('done-h').setAttribute('tabindex', '-1'); $('done-h').focus();
-      $('again').addEventListener('click', viewExpense);
+      $('again').addEventListener('click', restart);
     }
   }
 

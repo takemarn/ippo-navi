@@ -22,7 +22,8 @@
   var TYPE_CLS = { 経費: 'exp', 勤怠: 'att', 利用者登録: 'cli', 利用者修正: 'cli', タスク: 'tsk' };
   // 差し戻された申請を出し直す画面（種類ごと）
   var REDO = { 経費: '#expense', 勤怠: '#attendance', 利用者登録: '#users', 利用者修正: '#users', タスク: '#task' };
-  var view = { list: [], filter: 'すべて', confirm: null };
+  // sending = 取り消しを送っている申請ID（{ id: true }）。絞り込みなどで描き直しても押せないままにする（二重送信を防ぐ）
+  var view = { list: [], filter: 'すべて', confirm: null, sending: {} };
 
   // ---------- 日付の道具 ----------
   function dayOf(s) {
@@ -110,7 +111,9 @@
   function item(r) {
     var id = esc(r.申請ID), s = r.状態, ops = '';
     if (s === '承認待ち') {
-      if (view.confirm === r.申請ID) {
+      if (view.sending[r.申請ID]) {
+        ops = '<div class="req-ops"><button type="button" class="req-cancelbtn" disabled aria-busy="true"><span class="apv-spin" aria-hidden="true"></span>取り消し中…</button></div>';
+      } else if (view.confirm === r.申請ID) {
         ops = '<div class="apv-confirm is-back" role="group" aria-label="取り消しの確認">' +
           '<p>この' + esc(r.申請種類) + '申請を取り消します。取り消すと元に戻せません。もう一度出すときは新しく申請してください。</p>' +
           '<div class="apv-btns"><button type="button" class="apv-btn apv-btn-ghost" data-act="やめる">やめる</button>' +
@@ -167,7 +170,7 @@
   }
 
   function viewRequests() {
-    view = { list: [], filter: 'すべて', confirm: null };
+    view = { list: [], filter: 'すべて', confirm: null, sending: {} };
     app.innerHTML = '<h1 class="apv-title">自分の申請</h1>' +
       '<div class="apv-shell" id="req-body">' + skeleton() + '</div>' +
       '<a class="req-new" href="#apply"><span aria-hidden="true">＋</span> 経費・勤怠を申請する</a>' + backHtml('#status');
@@ -190,17 +193,18 @@
     if (act === '取消') { view.confirm = id; render(); focus(id, '[data-act="確定"]'); return; }
     if (act === 'やめる') { view.confirm = null; render(); focus(id, '[data-act="取消"]'); return; }
     if (act === '確定') {
-      card.querySelectorAll('button').forEach(function (b) { b.disabled = true; });
-      t.innerHTML = '<span class="apv-spin" aria-hidden="true"></span>取り消し中…';
+      if (view.sending[id]) return;
+      view.sending[id] = true; view.confirm = null; render();
       var gen = I.gen;
       api('cancelRequest', { 申請ID: id }).then(function (res) {
         if (gen !== I.gen) return;
+        delete view.sending[id];
         toast('取り消しました');
         view.list.forEach(function (r) { if (r.申請ID === id) { r.状態 = (res && res.状態) || '取消'; r.現在段階 = ''; } });
-        view.confirm = null; render();
+        render();
       }).catch(function (x) {
         if (gen !== I.gen) return;
-        view.confirm = null; render();
+        delete view.sending[id]; render();
         var el = document.querySelector('.apv-item[data-id="' + (window.CSS && CSS.escape ? CSS.escape(id) : id) + '"] .apv-err');
         if (el) el.textContent = x.message || '取り消せませんでした。もう一度お試しください。';
       });
