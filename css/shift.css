@@ -388,3 +388,14 @@ thead .mk-tot { font-size: 11px; }
 /* 作成の凡例の「!」と「薄い点線」の見本 */
 .mk-key-ic { position: static; margin-right: 2px; }
 .mk-keys s { text-decoration: none; display: inline-block; padding: 0 4px; margin-right: 2px; border: 1.5px dashed #b9c3d2; border-radius: 4px; color: rgba(176, 48, 15, .45); font-size: 10px; }
+/* 確定した月の提出画面の知らせ（入力は止める） */
+.sft-lock { background: #fff7e8; border: 1px solid #f1d29a; border-radius: 14px; padding: 12px 14px; display: flex; flex-direction: column; gap: 4px; }
+.sft-lock[hidden] { display: none; }
+.sft-lock b { font-size: 14px; color: #7a4a06; }
+.sft-lock p { font-size: 12px; color: #6e5a3a; line-height: 1.6; }
+.sft-lock a { align-self: flex-start; min-height: 40px; display: inline-flex; align-items: center; font-size: 13px; font-weight: 800; color: var(--link); }
+/* 作成: 確定の取消・施設のタブ・ほかの施設の勤務 */
+.mk-unfix { margin-left: auto; min-height: 40px; padding: 0 12px; font-size: 12px; color: var(--danger); border-color: #f1b7be; }
+.mk-factabs[hidden] { display: none; }
+.mk-factabs .sft-tab small { margin-left: 4px; font-size: 10px; font-weight: 600; opacity: .75; }
+.mk-cell.away { color: #9aa3ae; background-image: repeating-linear-gradient(45deg, rgba(120, 130, 150, .14) 0 2px, transparent 2px 6px); }

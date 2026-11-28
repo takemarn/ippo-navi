@@ -1,12 +1,13 @@
 /* シフトの見本データ（見本モードのときだけ使う。名前はすべて架空）。
    GAS の shifts.js と同じ返事の形を返す。決まりは kiroku-app の docs/api.md 「シフト」。
-   今月は確定済み、来月は希望が集まっている作成中、という状態を作る */
+   今月は確定済み、来月は希望が集まっている作成中、という状態を作る。
+   施設は2つ（架空）。見本 ひなた は両方に所属、見本 一郎 は2つ目だけ（作成画面の施設タブを見せるため） */
 (function () {
   'use strict';
   var I = window.IPPO;
   if (!I.DEMO) return;
 
-  var FAC = 'モア一津屋';
+  var FAC = 'モア一津屋', FAC2 = '見本ホーム';
   var KINDS = ['日勤', '早出', '遅出', '夜勤', '明け', '公休'];
   var STAFF = [
     { 職員ID: 'STF-0001', 氏名: '見本 太郎', 職種: '看護師', 雇用形態: '常勤', 可能勤務: '日勤、早出、遅出、夜勤', 資格: '正看護師' },
@@ -41,7 +42,7 @@
       var k = cycle[(di + si * 3) % cycle.length];
       if (k !== '公休' && k !== '明け' && can.indexOf(k) < 0) k = '日勤';
       if ((k === '明け') && can.indexOf('夜勤') < 0) k = '公休';
-      put(shifts, s.職員ID, d, { 施設名: FAC, 勤務: k });
+      put(shifts, s.職員ID, d, { 施設名: facsOf(s)[0], 勤務: k });
     });
   });
   months[THIS] = { 状態: '確定', 確定日時: THIS + '-20 18:00:00' };
@@ -58,12 +59,15 @@
   months[NEXT] = { 状態: '作成中', 確定日時: '' };
 
   function stateOf(ym) { return months[ym] || { 状態: '作成中', 確定日時: '' }; }
+  function facsOf(s) { return s.職員ID === 'STF-0007' ? [FAC, FAC2] : s.職員ID === 'STF-0008' ? [FAC2] : [FAC]; }
   function staffOf(id) { return STAFF.filter(function (s) { return s.職員ID === id; })[0]; }
   function needYm(ym) { if (!/^\d{4}-\d{2}$/.test(ym || '')) throw new Error('年月を選んでください'); return ym; }
 
   I.demo.shiftForm = function (data, me) {
     var ym = needYm(data.年月), mine = wishes[me.職員ID] || {}, s = staffOf(me.職員ID) || me;
+    var st = stateOf(ym).状態;
     return {
+      状態: st, 提出可: st !== '確定', // 確定した月は提出画面で入力を止める
       職員: { 氏名: me.氏名, 職種: s.職種, 雇用形態: s.雇用形態, 可能勤務: s.可能勤務, 資格: s.資格 },
       年月: ym,
       希望: Object.keys(mine).filter(function (d) { return d.slice(0, 7) === ym; }).sort()
@@ -71,6 +75,7 @@
     };
   };
   I.demo.submitShiftWishes = function (data, me) {
+    if (stateOf(data.年月).状態 === '確定') { var e = new Error(data.年月 + ' は確定済みのため、希望は出せません。変更は管理者へ連絡してください'); e.code = 400; throw e; }
     (data.日 || []).forEach(function (d) {
       if (d.希望 || d.メモ) put(wishes, me.職員ID, d.対象日, { 希望: d.希望 || '', メモ: d.メモ || '' });
       else if (wishes[me.職員ID]) delete wishes[me.職員ID][d.対象日];
@@ -108,22 +113,31 @@
       return o;
     }
     return {
-      年月: ym, 状態: stateOf(ym), 勤務区分: KINDS, 施設: [FAC],
+      年月: ym, 状態: stateOf(ym), 勤務区分: KINDS, 施設: [FAC, FAC2],
       職員: STAFF.map(function (s) {
-        return Object.assign({}, s, { 希望: only(wishes[s.職員ID]), シフト: only(shifts[s.職員ID]) });
+        return Object.assign({}, s, { 所属施設: facsOf(s), 希望: only(wishes[s.職員ID]), シフト: only(shifts[s.職員ID]) });
       })
     };
   };
   I.demo.saveShifts = function (data) {
     (data.割当 || []).forEach(function (a) {
-      if (a.勤務) put(shifts, a.職員ID, a.対象日, { 施設名: FAC, 勤務: a.勤務 });
+      // 施設名を省くと本人の所属施設（1つ目）
+      if (a.勤務) put(shifts, a.職員ID, a.対象日, { 施設名: a.施設名 || facsOf(staffOf(a.職員ID) || {})[0], 勤務: a.勤務 });
       else if (shifts[a.職員ID]) delete shifts[a.職員ID][a.対象日];
     });
     return { 年月: data.年月, 件数: (data.割当 || []).length, 状態: stateOf(data.年月) };
   };
   I.demo.fixShifts = function (data) {
+    var any = Object.keys(shifts).some(function (id) { return Object.keys(shifts[id]).some(function (d) { return d.slice(0, 7) === data.年月 && shifts[id][d].勤務; }); });
+    if (!any) { var e = new Error('勤務が1マスも入っていない月は確定できません'); e.code = 400; throw e; }
     var t = new Date();
     months[data.年月] = { 状態: '確定', 確定日時: I.today() + ' ' + pad(t.getHours()) + ':' + pad(t.getMinutes()) + ':00' };
+    return { 年月: data.年月, 状態: months[data.年月] };
+  };
+  // 確定の取消（作成中に戻す。入っている勤務はそのまま）
+  I.demo.unfixShifts = function (data) {
+    needYm(data.年月);
+    months[data.年月] = { 状態: '作成中', 確定日時: '' };
     return { 年月: data.年月, 状態: months[data.年月] };
   };
 })();

@@ -7,7 +7,10 @@
    #shift-make   … シフト作成（承認者・管理者）: 参考アプリに映っていないので自社用に作った表。
                     日ごとに「日中（日勤・早出・遅出）」「夜勤」の人数を必要人数と比べ、足りない日を赤で示す。
                     マスを押すと下からシートが出て、勤務を選ぶと次の日へ進む（続けて入れられる）
-   GAS とのやりとり: shiftForm / submitShiftWishes / dayOffs / myShifts / shiftBoard / saveShifts / fixShifts（kiroku-app の docs/api.md）
+   GAS とのやりとり: shiftForm / submitShiftWishes / dayOffs / myShifts / shiftBoard / saveShifts / fixShifts / unfixShifts（kiroku-app の docs/api.md）
+   ・shiftForm の「状態」「提出可」: 提出可=false の月は提出画面で入力を止める
+   ・shiftBoard の職員の「所属施設」（配列）: 施設が2つ以上なら作成画面に施設タブ。saveShifts はタブの施設名を付けて送る
+   ・fixShifts は1マスも無い月だと 400（画面でも先に止める）。unfixShifts で確定を取り消す
    ※ shiftBoard の返事に「必要人数」（{ 日中: 数, 夜勤: 数 }、または { 'YYYY-MM-DD': { 日中, 夜勤 } } の日ごと）を足すと、
      その数で足りない日を判定する。無いときは画面で決めた数（この端末に覚える。初めは 日中3・夜勤1）を使う。
      → GAS側にも「必要人数」を返す口が要る（任意。無くても画面は動く） */
@@ -168,6 +171,7 @@
         '<div class="sft-tally" id="sft-tally" aria-live="polite"></div>' +
       '</section>' +
       '<div id="sft-err"></div>' +
+      '<div id="sft-lock" class="sft-lock" role="status" hidden></div>' +
       '<section class="sft-plan" id="sft-plan" aria-label="選んだ日の予定">' +
         '<div class="sft-plan-row">' +
           '<button type="button" class="sft-step" data-step="-1" aria-label="前の日">‹</button>' +
@@ -218,13 +222,16 @@
 
   function loadMonth() {
     var ym = sub.ym, gen = I.gen;
-    sub.loading = true; sub.failed = false;
+    sub.loading = true; sub.failed = false; sub.locked = false;
     document.getElementById('sft-ym').textContent = ymLabel(ym);
     document.getElementById('sft-err').innerHTML = '';
     drawDays(); drawPlan(); drawTally();
     api('shiftForm', { 年月: ym }).then(function (r) {
       if (stale(gen) || sub.ym !== ym) return;
       sub.info = r.職員 || {};
+      // 確定した月（提出可=false）は見るだけにする。前に打った未送信の変更があっても送れないので捨てる
+      sub.locked = r.提出可 === false; sub.state = r.状態 || '';
+      if (sub.locked) Object.keys(sub.edits).forEach(function (d) { if (d.slice(0, 7) === ym) delete sub.edits[d]; });
       sub.saved = {};
       (r.希望 || []).forEach(function (w) { sub.saved[w.対象日] = { 希望: w.希望 || '', メモ: w.メモ || '' }; });
       sub.loading = false;
@@ -271,17 +278,22 @@
   // カレンダーの下: この月の数のまとめと、未設定をまとめて埋めるボタン
   function drawTally() {
     var el = document.getElementById('sft-tally');
+    var lock = document.getElementById('sft-lock');
+    lock.hidden = !(sub.locked && !sub.loading);
+    lock.innerHTML = lock.hidden ? '' : '<b>' + esc(ymLabel(sub.ym)) + 'のシフトは' + esc(sub.state || '確定') + '済みです</b>' +
+      '<p>この月の希望は変えられません。変更したいときは管理者（シフトを作る人）へ連絡してください。</p><a href="#shift-view">シフト確認で勤務を見る ›</a>';
     if (sub.loading || sub.failed) { el.innerHTML = ''; return; }
     var n = { 出勤可: 0, 出勤不可: 0, 休み希望: 0, '': 0 };
     monthDays(sub.ym).forEach(function (d) { n[wishOf(d).希望 || ''] += 1; });
     el.innerHTML = '<div class="sft-tally-n">' + WISHES.map(function (w) {
       return '<span class="' + WISH_CLS[w] + '"><i aria-hidden="true"></i>' + w + '<b>' + n[w] + '</b></span>';
     }).join('') + '<span class="none"><i aria-hidden="true"></i>未設定<b>' + n[''] + '</b></span></div>' +
-      (n[''] ? '<button type="button" id="sft-fill" class="sft-fill">未設定の' + n[''] + '日をまとめて「出勤可」にする</button>' : '');
+      (n[''] && !sub.locked ? '<button type="button" id="sft-fill" class="sft-fill">未設定の' + n[''] + '日をまとめて「出勤可」にする</button>' : '');
   }
 
   function drawPlan() {
     var on = !!sub.sel && !sub.loading && !sub.failed, w = on ? wishOf(sub.sel) : { 希望: '', メモ: '' };
+    var can = on && !sub.locked; // 確定した月は日を選んで見られるが、変えられない
     document.getElementById('sft-plan').classList.toggle('idle', !on);
     document.getElementById('sft-seldate').innerHTML = on
       ? '<strong>' + esc(dayLabel(sub.sel)) + '</strong><span>' + esc(sub.sel) + '</span>'
@@ -292,7 +304,7 @@
       : '';
     app.querySelectorAll('.sft-segbtn').forEach(function (b) {
       var p = on && b.dataset.w === (w.希望 || '');
-      b.disabled = !on; b.classList.toggle('on', p); b.setAttribute('aria-checked', String(p));
+      b.disabled = !can; b.classList.toggle('on', p); b.setAttribute('aria-checked', String(p));
     });
     app.querySelectorAll('[data-step]').forEach(function (b) {
       var to = on ? addDay(sub.sel, +b.dataset.step) : '';
@@ -300,7 +312,7 @@
     });
     document.getElementById('sft-offs').disabled = !on;
     var note = document.getElementById('sft-note');
-    note.disabled = !on;
+    note.disabled = !can;
     if (document.activeElement !== note) note.value = w.メモ || '';
     document.getElementById('sft-memo-n').textContent = (note.value || '').length + '/200';
     var n = dirtyDates().length, btn = document.getElementById('sft-send'), bn = document.getElementById('sft-bar-note');
@@ -332,11 +344,12 @@
     else sub.edits[date] = next;
   }
   function edit(change) {
-    if (!sub.sel) return;
+    if (!sub.sel || sub.locked) return;
     setWish(sub.sel, change);
     drawDays(); drawPlan(); drawTally();
   }
   function fillUnset() {
+    if (sub.locked) return;
     var list = monthDays(sub.ym).filter(function (d) { return !wishOf(d).希望; });
     list.forEach(function (d) { setWish(d, { 希望: '出勤可' }); });
     drawDays(); drawPlan(); drawTally();
@@ -498,7 +511,8 @@
   }
 
   // ---------- シフト作成（承認者・管理者） ----------
-  var mk = { ym: null, board: null, edits: {}, need: null };
+  // editFac … 施設タブで入れたマスの施設（マスのキー → 施設名）、fac … 見ている施設タブ
+  var mk = { ym: null, board: null, edits: {}, editFac: {}, fac: '', need: null };
   function cellKey(id, date) { return id + '|' + date; }
   function savedAt(p, date) { return (p.シフト[date] && p.シフト[date].勤務) || ''; }
   function shiftAt(p, date) {
@@ -506,6 +520,26 @@
     if (k in mk.edits) return mk.edits[k];
     return savedAt(p, date);
   }
+  // ---- 施設（施設が2つ以上のときだけタブを出して絞り込む） ----
+  function facList() {
+    var b = mk.board, out = (b.施設 || []).slice();
+    b.職員.forEach(function (p) { (p.所属施設 || []).forEach(function (f) { if (out.indexOf(f) < 0) out.push(f); }); });
+    return out;
+  }
+  function useFac() { return facList().length >= 2; }
+  // 表に出す職員: タブの施設に所属する人（所属施設が空の人はどのタブにも出す）
+  function staffList() {
+    if (!useFac()) return mk.board.職員;
+    return mk.board.職員.filter(function (p) { var f = p.所属施設 || []; return !f.length || f.indexOf(mk.fac) >= 0; });
+  }
+  // そのマスの勤務がどの施設のものか（入れ直したマスは入れたときのタブ、保存済みは施設名、どちらも無ければ所属の1つ目）
+  function facAt(p, date) {
+    var k = cellKey(p.職員ID, date);
+    if (k in mk.edits && mk.editFac[k]) return mk.editFac[k];
+    return (p.シフト[date] && p.シフト[date].施設名) || (p.所属施設 || [])[0] || '';
+  }
+  // ほかの施設での勤務（2施設に所属する人）。この施設の人数には数えない
+  function elsewhere(p, date) { return useFac() && !!shiftAt(p, date) && facAt(p, date) !== mk.fac; }
   function canOf(p) { return String(p.可能勤務 || '').split(/[、,\s]+/).filter(Boolean); }
   // マスの食い違い: cannot … 可能勤務にない勤務を入れた、clash … 出勤不可・休み希望の日に勤務を入れた
   function issueOf(p, date) {
@@ -515,7 +549,7 @@
   // 月全体の数（確定前の確認に出す）
   function monthIssues() {
     var r = { empty: 0, filled: 0, cannot: 0, clash: 0 };
-    mk.board.職員.forEach(function (p) {
+    mk.board.職員.forEach(function (p) { // 確定は月全体（全施設）なので全員を数える
       monthDays(mk.board.年月).forEach(function (d) {
         if (shiftAt(p, d)) r.filled++; else r.empty++;
         var x = issueOf(p, d);
@@ -543,8 +577,8 @@
   // その日の人数と、足りない数
   function countOf(date) {
     var day = 0, night = 0, can = 0;
-    mk.board.職員.forEach(function (p) {
-      var s = shiftAt(p, date);
+    staffList().forEach(function (p) {
+      var s = elsewhere(p, date) ? '' : shiftAt(p, date);
       if (DAYTIME.indexOf(s) >= 0) day++;
       if (s === '夜勤') night++;
       if (p.希望[date] && p.希望[date].希望 === '出勤可') can++;
@@ -574,6 +608,7 @@
       '<p class="mk-lead">マスを押して勤務を入れます。マスの色は職員の希望です。「確定する」と職員の「シフト確認」に出ます（LINE への通知はしません）。</p></div>' +
       '<div class="chk-nav"><button type="button" data-mv="-1">‹ 前月</button><b id="mk-ym" aria-live="polite"></b><button type="button" data-mv="1">次月 ›</button></div>' +
       '<div class="mk-status" id="mk-status"></div>' +
+      '<div class="sft-tabs mk-factabs" id="mk-facs" role="tablist" aria-label="施設" hidden></div>' +
       '<section class="mk-short" id="mk-short" aria-live="polite"></section>' +
       '<div class="mk-tools" id="mk-tools"></div>' +
       '<div id="mk-board" class="mk-board">' + loadingBar() + '</div>' +
@@ -608,6 +643,11 @@
     onApp(function (e) { if (e.target.closest('[data-retry="mk"]')) loadMake(); });
     document.getElementById('mk-save').addEventListener('click', function () { saveMake(false); });
     document.getElementById('mk-fix').addEventListener('click', askFix);
+    document.getElementById('mk-status').addEventListener('click', function (e) { if (e.target.closest('#mk-unfix')) askUnfix(); });
+    document.getElementById('mk-facs').addEventListener('click', function (e) {
+      var t = e.target.closest('[data-fac]');
+      if (t && t.dataset.fac !== mk.fac) { mk.fac = t.dataset.fac; mk.showAll = false; drawBoard(); }
+    });
     loadMake();
   }
 
@@ -623,7 +663,7 @@
   function keepEdits(quiet) {
     var n = Object.keys(mk.edits).length;
     if (!mk.board || !n || mk.saving) return;
-    mk.keep = { ym: mk.ym, edits: Object.assign({}, mk.edits) };
+    mk.keep = { ym: mk.ym, edits: Object.assign({}, mk.edits), fac: Object.assign({}, mk.editFac) };
     try { sessionStorage.setItem(KEEP_KEY, JSON.stringify(mk.keep)); } catch (_) {}
     if (!quiet) toast('シフト作成の保存していない ' + n + 'マスは預かっています。作成の画面に戻ると続きから直せます');
   }
@@ -633,7 +673,7 @@
     if (!k || k.ym !== ym || !k.edits) return null;
     mk.keep = null;
     try { sessionStorage.removeItem(KEEP_KEY); } catch (_) {}
-    return k.edits;
+    return k;
   }
 
   // 保存していない変更があるときに月を移ろうとしたら聞く
@@ -644,12 +684,12 @@
     var sheet = confirmSheet('保存していない変更があります', '<p>' + esc(ymLabel(mk.ym)) + 'の ' + cnt + 'マスがまだ保存されていません。</p>',
       '保存して移る', function () { saveMake(false, go); },
       '<button type="button" class="danger" data-drop>保存せずに移る</button>');
-    sheet.querySelector('[data-drop]').addEventListener('click', function () { closeSheet(); mk.edits = {}; go(); });
+    sheet.querySelector('[data-drop]').addEventListener('click', function () { closeSheet(); mk.edits = {}; mk.editFac = {}; go(); });
   }
 
   function loadMake() {
     var ym = mk.ym, gen = I.gen;
-    mk.edits = {}; mk.board = null; mk.showAll = false;
+    mk.edits = {}; mk.editFac = {}; mk.board = null; mk.showAll = false;
     document.getElementById('mk-ym').textContent = ymLabel(ym);
     ['mk-status', 'mk-short', 'mk-tools', 'mk-err'].forEach(function (id) { document.getElementById(id).innerHTML = ''; });
     document.getElementById('mk-board').innerHTML = loadingBar('職員の希望と勤務を読み込み中...');
@@ -659,10 +699,12 @@
       b.職員 = (b.職員 || []).map(function (p) { p.希望 = p.希望 || {}; p.シフト = p.シフト || {}; return p; });
       mk.board = b;
       // 前に離れたときに預かった変更を戻す（いない職員・この月でない日のマスは捨てる）
-      var kept = takeKept(ym), ids = b.職員.map(function (p) { return p.職員ID; }), back = 0;
+      var fl = facList();
+      if (fl.indexOf(mk.fac) < 0) mk.fac = fl[0] || ''; // 前に見ていた施設があればそのまま
+      var keptAll = takeKept(ym), kept = keptAll && keptAll.edits, ids = b.職員.map(function (p) { return p.職員ID; }), back = 0;
       if (kept) Object.keys(kept).forEach(function (k) {
         var a = k.split('|');
-        if (ids.indexOf(a[0]) >= 0 && a[1].slice(0, 7) === ym) { mk.edits[k] = kept[k]; back++; }
+        if (ids.indexOf(a[0]) >= 0 && a[1].slice(0, 7) === ym) { mk.edits[k] = kept[k]; if (keptAll.fac && keptAll.fac[k]) mk.editFac[k] = keptAll.fac[k]; back++; }
       });
       drawBoard();
       if (back) toast('保存していない ' + back + 'マスを戻しました。「下書き保存」で保存されます');
@@ -680,7 +722,8 @@
   function drawStatus() {
     var st = mk.board.状態 || {}, n = Object.keys(mk.edits).length;
     document.getElementById('mk-status').innerHTML =
-      (st.状態 === '確定' ? '<span class="pill ok">確定</span><small>' + esc(st.確定日時) + ' に確定。直して保存するとすぐ職員に見えます</small>'
+      (st.状態 === '確定' ? '<span class="pill ok">確定</span><small>' + esc(st.確定日時) + ' に確定。直して保存するとすぐ職員に見えます</small>' +
+          '<button type="button" class="sub small mk-unfix" id="mk-unfix">確定を取り消す</button>'
         : '<span class="pill wait">作成中</span><small>職員にはまだ見えません</small>');
     var note = document.getElementById('mk-bar-note');
     note.hidden = !n; note.textContent = n ? '保存していない変更 ' + n + 'マス' : '';
@@ -690,12 +733,22 @@
     document.getElementById('mk-fix').disabled = st.状態 === '確定' && !n;
   }
 
+  // 施設のタブ（2つ以上のときだけ）。足りない日・人数・仮入れは、選んだ施設の分だけで数える
+  function drawFacs() {
+    var el = document.getElementById('mk-facs'), fl = facList();
+    el.hidden = fl.length < 2;
+    el.innerHTML = fl.length < 2 ? '' : fl.map(function (f) {
+      var n = mk.board.職員.filter(function (p) { var x = p.所属施設 || []; return !x.length || x.indexOf(f) >= 0; }).length;
+      return '<button type="button" role="tab" class="sft-tab' + (f === mk.fac ? ' on' : '') + '" aria-selected="' + (f === mk.fac) + '" data-fac="' + esc(f) + '">' + esc(f) + '<small>' + n + '人</small></button>';
+    }).join('');
+  }
+
   // 足りない日の一覧（押すとその日の列へ移る）
   function drawShort() {
     var days = monthDays(mk.board.年月), td = I.today();
     var lack = days.map(function (d) { return { d: d, c: countOf(d) }; }).filter(function (x) { return x.c.lackDay || x.c.lackNight; });
     var el = document.getElementById('mk-short');
-    if (!mk.board.職員.length) { el.innerHTML = ''; return; }
+    if (!staffList().length) { el.innerHTML = ''; return; }
     if (!lack.length) {
       el.className = 'mk-short good';
       el.innerHTML = '<b class="mk-short-h"><i aria-hidden="true">✓</i>どの日も必要な人数がそろっています</b>';
@@ -727,9 +780,9 @@
   }
 
   function drawBoard() {
-    var b = mk.board, days = monthDays(b.年月), td = I.today();
-    drawStatus(); drawShort(); drawTools();
-    if (!b.職員.length) {
+    var b = mk.board, days = monthDays(b.年月), td = I.today(), staff = staffList();
+    drawStatus(); drawFacs(); drawShort(); drawTools();
+    if (!staff.length) {
       document.getElementById('mk-board').innerHTML = emptyBox('この月に割り当てる職員がいません', '職員の登録（所属・可能勤務）を確かめてください。');
       return;
     }
@@ -739,17 +792,18 @@
       var w = dateObj(d).getDay(), c = cnt[d], lack = c.lackDay || c.lackNight;
       return '<th scope="col" data-col="' + d + '" class="d' + w + (lack ? ' lack' : '') + (d === td ? ' today' : '') + '">' + +d.slice(8) + '<small>' + DOW[w] + '</small></th>';
     }).join('') + '<th scope="col" class="mk-tot">計</th></tr>';
-    var rows = b.職員.map(function (p) {
+    var rows = staff.map(function (p) {
       var tot = 0, night = 0;
       var cells = days.map(function (d) {
         var w = p.希望[d] && p.希望[d].希望, s = shiftAt(p, d), k = cellKey(p.職員ID, d);
         var memo = p.希望[d] && p.希望[d].メモ;
-        if (WORKING.indexOf(s) >= 0) tot++;
-        if (s === '夜勤') night++;
+        if (WORKING.indexOf(s) >= 0 && !away) tot++;
+        if (s === '夜勤' && !away) night++;
         // 希望が「出勤不可・休み希望」なのに勤務を入れたマスは斜線と「!」、可能勤務にない勤務は薄く点線で示す
-        var iss = issueOf(p, d), clash = iss.clash;
-        return '<td><button type="button" class="mk-cell' + (WISH_CLS[w] ? ' ' + WISH_CLS[w] : '') + (k in mk.edits ? ' dirty' : '') + (s && WORKING.indexOf(s) < 0 ? ' rest' : '') + (s === '夜勤' ? ' night' : '') + (clash ? ' clash' : '') + (iss.cannot ? ' cannot' : '') + '" data-id="' + esc(p.職員ID) + '" data-d="' + d + '"' +
-          ' aria-label="' + esc(p.氏名) + ' ' + dayLabel(d) + ' 希望 ' + (w || 'なし') + ' 勤務 ' + (s || '未設定') + (clash ? ' 希望と食い違い' : '') + (iss.cannot ? ' 可能勤務外' : '') + (memo ? ' メモ ' + esc(memo) : '') + '">' +
+        var iss = issueOf(p, d), clash = iss.clash, away = elsewhere(p, d);
+        if (away) { iss.cannot = false; clash = false; } // ほかの施設の勤務は、その施設のタブで確かめる
+        return '<td><button type="button" class="mk-cell' + (WISH_CLS[w] ? ' ' + WISH_CLS[w] : '') + (k in mk.edits ? ' dirty' : '') + (s && WORKING.indexOf(s) < 0 ? ' rest' : '') + (s === '夜勤' ? ' night' : '') + (clash ? ' clash' : '') + (iss.cannot ? ' cannot' : '') + (away ? ' away' : '') + '" data-id="' + esc(p.職員ID) + '" data-d="' + d + '"' +
+          ' aria-label="' + esc(p.氏名) + ' ' + dayLabel(d) + ' 希望 ' + (w || 'なし') + ' 勤務 ' + (s || '未設定') + (away ? ' ' + esc(facAt(p, d)) + 'の勤務' : '') + (clash ? ' 希望と食い違い' : '') + (iss.cannot ? ' 可能勤務外' : '') + (memo ? ' メモ ' + esc(memo) : '') + '">' +
           (SHORT[s] || esc(String(s || '').slice(0, 1))) + (memo ? '<i class="mk-memo" aria-hidden="true"></i>' : '') + (clash ? '<i class="mk-warn-mk" aria-hidden="true">!</i>' : '') + '</button></td>';
       }).join('');
       return '<tr><th scope="row" class="mk-name"><b>' + esc(p.氏名) + '</b><small>' + esc(p.職種) + (p.雇用形態 ? '・' + esc(p.雇用形態) : '') + '</small></th>' + cells +
@@ -792,7 +846,7 @@
   // 返すのは [マスのキー, 勤務] の並び（数えるときにも使う）
   function autoPlan(off) {
     var out = [];
-    mk.board.職員.forEach(function (p) {
+    staffList().forEach(function (p) {
       var can = canOf(p), days = monthDays(mk.board.年月), prev = '';
       days.forEach(function (d) {
         var cur = shiftAt(p, d), w = p.希望[d] && p.希望[d].希望, k = '';
@@ -809,7 +863,7 @@
   }
   function autoFill(off) {
     var plan = autoPlan(off);
-    plan.forEach(function (x) { mk.edits[x[0]] = x[1]; });
+    plan.forEach(function (x) { mk.edits[x[0]] = x[1]; if (useFac()) mk.editFac[x[0]] = mk.fac; });
     drawBoard();
     toast(off ? plan.length + 'マスを公休にしました。保存するまで職員には見えません'
       : plan.length + 'マスに仮の勤務を入れました。足りない日を直してから保存してください');
@@ -827,6 +881,7 @@
       '<p class="sft-count">' + esc(p.職種 || '') + '　可能勤務：' + esc(p.可能勤務 || '—') + '</p></div><button type="button" class="sft-x" data-close aria-label="閉じる">×</button></div>' +
       '<div class="mk-wish"><div class="mk-wish-row"><span>希望</span>' + (w.希望 ? '<span class="sft-chip ' + WISH_CLS[w.希望] + '">' + esc(w.希望) + '</span>' : '<span class="muted">出ていません</span>') + '</div>' +
         (w.メモ ? '<p class="mk-wish-memo">メモ：' + esc(w.メモ) + '</p>' : '') +
+        (elsewhere(p, date) ? '<p class="mk-wish-memo">この日は「' + esc(facAt(p, date)) + '」の勤務が入っています。ここで選び直すと「' + esc(mk.fac) + '」の勤務になります</p>' : '') +
         '<div class="mk-daystat">この日 ' + stat('日中', c.日中, c.need.日中) + stat('夜勤', c.夜勤, c.need.夜勤) + '</div></div>' +
       '<div class="mk-kinds">' + (mk.board.勤務区分 || []).map(function (k) {
         var cannot = WORKING.indexOf(k) >= 0 && can.length && can.indexOf(k) < 0;
@@ -842,7 +897,8 @@
       var b = e.target.closest('[data-k]');
       if (!b) return;
       var k = cellKey(id, date);
-      if (b.dataset.k === savedAt(p, date)) delete mk.edits[k]; else mk.edits[k] = b.dataset.k;
+      if (b.dataset.k === savedAt(p, date) && (!useFac() || facAt(p, date) === mk.fac)) { delete mk.edits[k]; delete mk.editFac[k]; }
+      else { mk.edits[k] = b.dataset.k; if (useFac()) mk.editFac[k] = mk.fac; else delete mk.editFac[k]; }
       drawBoard();
       // 選んだら同じ人の次の日へ進む（1人分を続けて入れられる）。月末なら閉じる
       if (idx < days.length - 1) editCell(id, days[idx + 1]); else closeSheet();
@@ -877,10 +933,39 @@
       '確定する', function () { saveMake(true); });
   }
 
+  // 確定の取消（GAS unfixShifts）。作成中に戻り、職員の「シフト確認」からは勤務が消える。入れた勤務は残る
+  function askUnfix() {
+    if (!mk.board || mk.saving) return;
+    var ym = mk.ym;
+    confirmSheet(ymLabel(ym) + 'の確定を取り消しますか',
+      '<p>取り消すと「作成中」に戻り、職員の「シフト確認」には<b>勤務が出なくなります</b>（入れた勤務は残ります）。</p>' +
+      '<p>直したあと、もう一度「確定する」を押してください。</p>',
+      '確定を取り消す', function () {
+        var gen = I.gen;
+        mk.saving = true; setBar(false); I.busy(true);
+        api('unfixShifts', { 年月: ym }).then(function () {
+          mk.saving = false; toast(ymLabel(ym) + 'の確定を取り消しました');
+          if (stale(gen)) return;
+          I.busy(false); keepEdits(true); loadMake(); // 保存していない変更は預かって、読み直したあと戻す
+        }).catch(function (e) {
+          mk.saving = false;
+          if (stale(gen)) { toast(e.message || '取り消せませんでした'); return; }
+          I.busy(false); drawStatus();
+          var err = document.getElementById('mk-err');
+          err.innerHTML = failBox(e); err.scrollIntoView({ block: 'center', behavior: 'smooth' });
+        });
+      });
+  }
+
   function saveMake(fix, then) {
     if (!mk.board) return;
     var err = document.getElementById('mk-err'); err.innerHTML = '';
-    var list = Object.keys(mk.edits).map(function (k) { var a = k.split('|'); return { 職員ID: a[0], 対象日: a[1], 勤務: mk.edits[k] }; });
+    // 施設タブで入れたマスは施設名を付ける（省くと GAS は本人の所属施設にする）
+    var list = Object.keys(mk.edits).map(function (k) {
+      var a = k.split('|'), o = { 職員ID: a[0], 対象日: a[1], 勤務: mk.edits[k] };
+      if (mk.editFac[k]) o.施設名 = mk.editFac[k];
+      return o;
+    });
     if (!fix && !list.length) { toast('変更はありません'); return; }
     if (mk.saving) return; // 保存・確定中の二度押し
     var ym = mk.ym, gen = I.gen;
