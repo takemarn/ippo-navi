@@ -134,6 +134,13 @@
   }
 
   // 駐車の入力チェック（gas/src/util.js の validateParkIn と同じ決まり）
+  // 名前の確認（GAS の util.js nameKey と同じ）。空白・全角半角・よくある旧字の違いは同じとみなす
+  var NAME_VARIANTS = { '髙': '高', '﨑': '崎', '嵜': '崎', '齋': '斉', '齊': '斉', '斎': '斉', '邊': '辺', '邉': '辺', '澤': '沢', '濱': '浜', '濵': '浜', '國': '国', '櫻': '桜', '廣': '広', '德': '徳', '惠': '恵', '藪': '薮', '冨': '富' };
+  function nameKey(s) {
+    s = String(s || '');
+    s = s.normalize ? s.normalize('NFKC') : s;
+    return s.replace(/[\s　・･]/g, '').replace(/./g, function (c) { return NAME_VARIANTS[c] || c; });
+  }
   function validateParkIn(input, lot, used) {
     var errors = [];
     if (!lot) errors.push('停める場所を選んでください');
@@ -213,7 +220,7 @@
     var r = RULES.filter(function (x) { return x.規程ID === data.規程ID; })[0];
     if (!r) throw new Error('規程が見つかりません');
     var errs = [];
-    if (String(data.氏名 || '').replace(/\s/g, '') !== me.氏名.replace(/\s/g, '')) errs.push('お名前は、職員として登録されている名前（フルネーム）と同じに入れてください');
+    if (nameKey(data.氏名) !== nameKey(me.氏名)) errs.push('お名前は、職員として登録されている名前（フルネーム）と同じに入れてください');
     if (data.確認 !== true) errs.push('「上記の取り扱いを確認しました」にチェックを入れてください');
     if (errs.length) { var e = new Error('入力を確認してください'); e.details = errs; throw e; }
     return Object.assign({}, r, { 閲覧日時: stamp(new Date()), 本文: (BODY[r.規程ID] || []).map(function (s) { return { 見出し: s[0], 本文: s[1] }; }) });
@@ -221,13 +228,14 @@
   D.orgChart = function () { return ORG; };
   D.manual = function (data, me) {
     var nurse = nurseOk(me);
-    return { 急変: MANUAL.急変, キーワード: MANUAL.キーワード, 看護職: nurse, 連絡先: [], ガイド: guidesFor(nurse) };
+    return { 急変: MANUAL.急変, キーワード: MANUAL.キーワード, 看護職: nurse, 連絡先: [{ 名前: 'オンコール当番（見本）', 電話: '000-0000-0000' }], ガイド: guidesFor(nurse) };
   };
   D.parking = function () { return parkingState(); };
   D.parkIn = function (data, me) {
     var lot = LOTS.filter(function (l) { return l.駐車場ID === data.駐車場ID; })[0];
     var used = parked.filter(function (p) { return lot && p.駐車場ID === lot.駐車場ID; }).map(function (p) { return p.区画; });
     var errs = validateParkIn(data, lot, used);
+    if (data.代理 && me.役割 !== '承認者' && me.役割 !== '管理者') errs.push('関係事業者の登録は運営だけができます');
     if (errs.length) { var e = new Error('入力を確認してください'); e.details = errs; throw e; }
     var h = Number(data.時間);
     parked.push({ 記録ID: 'PK-DEMO' + pad(++pseq), 駐車場ID: data.駐車場ID, 区画: data.区画, 氏名: data.代理 ? '関係事業者の方' : me.氏名,
@@ -236,7 +244,9 @@
   };
   D.parkOut = function (data, me) {
     var rec = parked.filter(function (p) { return p.記録ID === data.記録ID; })[0];
-    if (rec && rec.停めた職員ID !== me.職員ID && rec.氏名 !== me.氏名 && me.役割 !== '承認者' && me.役割 !== '管理者') {
+    // 本物（GAS）と同じく、停めた職員ID で本人かを見る（見本の最初の車だけ ID が無いので名前で見る）
+    var own = rec && (rec.停めた職員ID ? rec.停めた職員ID === me.職員ID : rec.氏名 === me.氏名);
+    if (rec && !own && me.役割 !== '承認者' && me.役割 !== '管理者') {
       var e = new Error('出庫は停めた本人か運営だけができます'); e.code = 403; throw e;
     }
     parked = parked.filter(function (p) { return p.記録ID !== data.記録ID; });

@@ -231,3 +231,9 @@ body.mnl-big .mnl-scene b, body.mnl-big .mnl-row b { font-size: 16px; }
 .ai-urgent b{display:block;font-size:14px;margin-bottom:2px}
 .ai-urgent-btns{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
 .ai-urgent-btns .btn{min-height:40px;display:inline-flex;align-items:center;padding:0 14px;font-size:13px}
+/* 見直し4周目: チェックの押しやすさ・自分の車・AIから開いた見出し・狭い画面のボタン */
+.ptl-check { min-height: 44px; padding: 6px 0; }
+.ptl-check input { width: 24px; height: 24px; }
+.pk-slot.mine { box-shadow: inset 4px 0 0 var(--danger); }
+.ptl-hit h2 { background: #fff6d6; border-radius: 6px; padding: 2px 6px; margin-left: -6px; }
+.pk-form .actions button, .pk-in, .pk-out { white-space: nowrap; }

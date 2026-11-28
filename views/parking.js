@@ -129,8 +129,8 @@
     }
     var mine = p.停めた職員ID ? p.停めた職員ID === me.職員ID : p.氏名 === me.氏名;
     var when = s.k === 'over' ? '予定 ' + hm(p.予定) + ' を ' + dur(s.left) + ' 超過' : '空く予定 ' + hm(p.予定) + '（あと ' + dur(s.left) + '）';
-    return '<div class="pk-slot ' + s.k + '">' + no +
-      '<div class="pk-who"><span class="pk-st">' + esc(s.label) + '</span><b>' + esc(p.氏名) + '</b>' +
+    return '<div class="pk-slot ' + s.k + (mine ? ' mine' : '') + '">' + no +
+      '<div class="pk-who"><span class="pk-st">' + esc(s.label) + '</span><b>' + esc(p.氏名) + (mine ? ' <span class="ptl-you">あなた</span>' : '') + '</b>' +
         '<small>' + (p.車 ? esc(p.車) + ' ／ ' : '') + '停めた ' + hm(p.停めた) + '</small><small>' + when + '</small></div>' +
       // 出庫は本人のほか、運営（承認者・管理者）が代わりに押せる（関係事業者の車や押し忘れのため）。押しまちがい防止で2回押す
       (mine || I.canApprove() ? '<button type="button" class="sub pk-out" data-out="' + esc(p.記録ID) + '"' + (mine ? '' : ' data-who="' + esc(p.氏名) + '"') + '>出庫</button>' : '') + '</div>';

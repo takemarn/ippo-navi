@@ -44,7 +44,7 @@
       { label: '就業規則・組織図・福利厚生', href: '#rules' },
       { label: '駐車場ナビ', href: '#parking' },
       { label: '看護マニュアル', href: '#manual' },
-      { label: 'AI相談', href: '#ai' },
+      { label: 'AIに聞く', href: '#ai' },
       { label: '日報' },
       { label: '経営資料' }
     ]);
@@ -116,7 +116,16 @@
   }
 
   // 選んだ規程は再読み込みしても残るよう sessionStorage にも置く。AI相談の「この規程を開く」からも使う
-  function pickRule(id) { try { sessionStorage.setItem('ippo.rule', id); } catch (_) {} I.portalRule = id; }
+  // sec: AIに聞く画面から開くとき、答えに出た見出し。本文を開いたらそこまで送る
+  function pickRule(id, sec) {
+    try { sessionStorage.setItem('ippo.rule', id); sessionStorage.setItem('ippo.ruleSec', sec || ''); } catch (_) {}
+    I.portalRule = id; I.portalRuleSec = sec || '';
+  }
+  function pickedSec() {
+    if (I.portalRuleSec !== undefined) return I.portalRuleSec;
+    try { return sessionStorage.getItem('ippo.ruleSec') || ''; } catch (_) { return ''; }
+  }
+  function savedName() { try { return sessionStorage.getItem('ippo.ruleName') || ''; } catch (_) { return ''; } }
   function pickedRule() {
     if (I.portalRule) return I.portalRule;
     try { return sessionStorage.getItem('ippo.rule'); } catch (_) { return null; }
@@ -136,13 +145,14 @@
       consent(r);
     }).catch(function (e) { if (ok()) app.innerHTML = failBox(e, true) + backBottom(); });
   }
-  function topRule() { return portalFrom() === '#ai' ? topBack('#ai', 'AI相談に戻る') : topBack('#rules-list', '規程の選び直し'); }
+  function topRule() { return portalFrom() === '#ai' ? topBack('#ai', 'AIに聞く画面に戻る') : topBack('#rules-list', '規程の選び直し'); }
   // 規程の画面の下の戻る: AI相談から開いたときは AI相談へ、ほかは規程の一覧へ
   function backBottom() {
-    return portalFrom() === '#ai' ? I.backHtml('#ai', 'AI相談に戻る') : I.backHtml('#rules-list', '規程の一覧に戻る');
+    return portalFrom() === '#ai' ? I.backHtml('#ai', 'AIに聞く画面に戻る') : I.backHtml('#rules-list', '規程の一覧に戻る');
   }
 
   function consent(r) {
+    var meName = (I.state.me || {}).氏名 || '';
     app.innerHTML = topRule() +
       '<form id="f" class="card ptl-consent" novalidate>' +
         '<h2>閲覧前のご確認</h2>' +
@@ -153,14 +163,16 @@
           '<li>規程は<b>会社の機密情報</b>です。社外への持ち出し・共有はできません。</li>' +
           '<li>守られなかった場合、<b>損害賠償の対象</b>となることがあります。</li>' +
           '</ul></div>' +
-        '<label>お名前（フルネームを入れてください）<input id="nm" autocomplete="name" placeholder="例）山田 太郎">' +
-          '<small class="ptl-hint">職員として登録されている名前と同じに入れてください。閲覧した人として記録します。</small></label>' +
+        '<label>お名前（フルネームを入れてください）<input id="nm" autocomplete="name" value="' + esc(savedName()) + '" placeholder="' + esc(meName ? '例）' + meName : '例）山田 太郎') + '">' +
+          '<small class="ptl-hint">' + (meName ? 'アプリに登録されている名前（<b>' + esc(meName) + '</b>）と同じに入れてください。' : '職員として登録されている名前と同じに入れてください。') +
+          '閲覧した人として記録します。</small></label>' +
         '<label class="ptl-check"><input type="checkbox" id="ok"> 上記の取り扱いを確認しました。</label>' +
         '<div id="err"></div>' +
         '<button type="submit" id="go" disabled>確認して閲覧する</button>' +
       '</form>' + backBottom();
     var nm = document.getElementById('nm'), chk = document.getElementById('ok'), go = document.getElementById('go');
     function sync() { go.disabled = !(nm.value.trim() && chk.checked); }
+    sync();
     nm.addEventListener('input', sync); chk.addEventListener('change', sync);
     document.getElementById('f').addEventListener('submit', function (e) {
       e.preventDefault();
@@ -171,6 +183,7 @@
       go.disabled = true; go.textContent = '確認中…'; I.busy(true);
       api('openRule', { 規程ID: r.規程ID, 氏名: nm.value.trim(), 確認: chk.checked }).then(function (doc) {
         if (!ok()) return; // 途中でほかの画面へ移ったら、本文は出さない
+        try { sessionStorage.setItem('ippo.ruleName', nm.value.trim()); } catch (_) {} // 次の規程では入力済みにする（確認のチェックは毎回）
         I.busy(false); readRule(doc);
       }).catch(function (e2) {
         if (!ok()) return;
@@ -199,6 +212,14 @@
         '<div class="ptl-wm" aria-hidden="true">' + new Array(13).join('<span>' + mark + '</span>') + '</div></div>' +
         '<p class="ptl-foot">この画面は ' + mark + ' の閲覧として記録しました。</p>' +
       '</article>' + backBottom();
+    // AIに聞く画面の答えに出た見出しがあれば、そこまで送る
+    var want = pickedSec();
+    if (want) {
+      var at = secs.map(function (s) { return s.見出し; }).indexOf(want);
+      var el0 = at >= 0 && document.getElementById('sec' + at);
+      if (el0) setTimeout(function () { el0.scrollIntoView({ block: 'start' }); el0.classList.add('ptl-hit'); }, 0);
+      pickRule(pickedRule(), '');
+    }
     app.querySelector('.ptl-toc') && app.querySelector('.ptl-toc').addEventListener('click', function (e) {
       var a = e.target.closest('a[data-sec]');
       if (!a) return;
@@ -211,7 +232,9 @@
 
   // ---------- 組織図 ----------
   function viewOrg() {
-    app.innerHTML = '<div id="og" class="ptl-stack">' + loading() + '</div>' + I.backHtml('#rules', '就業規則・組織図・福利厚生に戻る');
+    // AI相談の「組織図で見る」から来たときは AI相談へ戻す
+    app.innerHTML = '<div id="og" class="ptl-stack">' + loading() + '</div>' +
+      (portalFrom() === '#ai' ? I.backHtml('#ai', 'AIに聞く画面に戻る') : I.backHtml('#rules', '就業規則・組織図・福利厚生に戻る'));
     var ok = alive();
     api('orgChart').then(function (d) {
       var box = document.getElementById('og');

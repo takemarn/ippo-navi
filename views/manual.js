@@ -32,7 +32,7 @@
   function frame(kind) {
     var from = I.portalFrom && I.portalFrom() === '#ai';
     var back = kind === 'home' ? I.backHtml()
-      : (from ? I.backHtml('#ai', 'AI相談に戻る') : I.backHtml('#manual', 'マニュアルのトップに戻る'));
+      : (from ? I.backHtml('#ai', 'AIに聞く画面に戻る') : I.backHtml('#manual', 'マニュアルのトップに戻る'));
     app.innerHTML = '<div class="mnl-top"><h1>看護マニュアル</h1>' +
       '<button type="button" class="mnl-size" id="mnl-size" aria-pressed="false">文字 大</button></div>' +
       '<div id="mn" class="ptl-stack">' + T().loading() + '</div>' + back;
@@ -52,6 +52,11 @@
             '<a class="btn" href="tel:119">119番に電話する</a><a class="btn sub-link" href="#org">困ったときの窓口（組織図）</a></div>'
         : T().failBox(e, true);
     });
+  }
+
+  // 上の戻る: 下の戻ると同じく、AIに聞く画面から来たときは そこへ
+  function top() {
+    return I.portalFrom && I.portalFrom() === '#ai' ? T().topBack('#ai', 'AIに聞く画面に戻る') : T().topBack('#manual', 'マニュアルのトップ');
   }
 
   function scenes(list) {
@@ -83,7 +88,7 @@
       (first.length ? '<h2 class="ptl-sec">はじめての人へ</h2>' + scenes(first) : '') +
       (rest.length ? '<details class="mnl-more"><summary>＋ ほかのページ（' + rest.length + '）</summary>' + scenes(rest) + '</details>' : '') +
       (!all.length ? '<div class="loading">まだマニュアルが登録されていません。</div>' : '') +
-      (data.看護職 === false ? '<p class="ptl-note">看護職向けのページ（記録の書き方など）は、看護師・准看護師だけに出ます。</p>' : '');
+      (data.看護職 === false ? '<p class="ptl-note">看護職向けのページ（記録の書き方など）は、看護職と運営だけに出ます。</p>' : '');
     document.getElementById('mnl-f').addEventListener('submit', function (e) {
       e.preventDefault(); query = document.getElementById('mnl-q').value.trim(); search();
       document.getElementById('mnl-q').blur();
@@ -108,18 +113,19 @@
       '<button type="button" class="small sub" data-clear="1">消す</button></div>' +
       (hits.length ? hits.map(function (g) {
         return '<button type="button" class="mnl-row" data-guide="' + esc(g.ID) + '"><b>' + esc(g.題) + '</b><small>' + esc(g.分類) + '</small></button>';
-      }).join('') : '<p class="muted">見つかりませんでした。言葉を短くするか、<a href="#ai">AI相談</a>で聞いてみてください。</p>') + '</div>';
+      }).join('') : '<p class="muted">見つかりませんでした。言葉を短くするか、<a href="#ai">AIに聞く</a>で聞いてみてください。</p>') + '</div>';
   }
 
   function renderUrgent(box) {
     var u = data.急変 || {};
     var list = (u.見る順 || []).map(guide).filter(Boolean);
-    box.innerHTML = T().topBack('#manual', 'マニュアルのトップ') +
+    box.innerHTML = top() +
       '<h2 class="mnl-uh">' + esc(u.題 || '様子がおかしい・急変') + '</h2>' +
       '<a class="mnl-119" href="tel:119"><b>命に関わるときは 119番</b><small>押すと電話をかけます。施設への連絡は、そのあとで大丈夫です</small></a>' +
       (data.連絡先 || []).map(function (c) {
         return '<a class="mnl-call" href="tel:' + esc(c.電話) + '"><b>' + esc(c.名前) + 'に電話する</b><small>' + esc(c.電話) + '</small></a>';
       }).join('') +
+      (!(data.連絡先 || []).length ? '<p class="ptl-note">オンコール当番の電話番号は、施設の掲示や当番表で確認してください。</p>' : '') +
       '<p class="ptl-note">この場面で見るところ（上から順に）</p>' +
       '<ol class="mnl-steps">' + list.map(function (g) {
         return '<li><button type="button" data-jump="' + esc(g.ID) + '">' + esc(g.題) + '</button></li>';
@@ -141,7 +147,7 @@
   function renderGuide(box) {
     var g = guide(currentGuide());
     if (!g) { location.replace('#manual'); return; }
-    box.innerHTML = T().topBack('#manual', 'マニュアルのトップ') + guideCard(g, false);
+    box.innerHTML = top() + guideCard(g, false);
   }
 
   function onClick(e) {

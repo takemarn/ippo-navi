@@ -13,6 +13,7 @@
   function nurse() { var me = I.state.me || {}; return ['看護師', '准看護師'].indexOf(me.職種) >= 0 || I.canApprove(); }
   var log = []; // この画面を開いている間の やりとり（保存はしない）。{n, q, a}。a が null なら返事待ち
   var seq = 0, waiting = false;
+  var retryQ = ''; // ほかの画面に移っている間に失敗した質問。戻ってきたら入力欄に戻す
 
   function bubbleQ(q) { return '<div class="ai-q"><p>' + esc(q) + '</p></div>'; }
   function bubbleWait(n) { return '<div class="ai-a ai-wait" id="ai-wait-' + n + '"><span class="spin" aria-hidden="true"></span>探しています…</div>'; }
@@ -20,7 +21,7 @@
     var rows = (a.根拠 || []).map(function (h, i) {
       var open = h.種類 === '窓口' ? '<a class="ai-help" href="#org">組織図で見る</a>'
         : h.種類 === '規程'
-        ? '<button type="button" class="small sub" data-rule="' + esc(h.ID) + '">この規程を開く</button>'
+        ? '<button type="button" class="small sub" data-rule="' + esc(h.ID) + '" data-sec="' + esc(h.見出し || '') + '">この規程を開く</button>'
         : '<button type="button" class="small sub" data-guide="' + esc(h.ID) + '">マニュアルを開く</button>';
       return '<li><span class="ai-kind ' + (h.種類 === '規程' ? 'r' : h.種類 === '窓口' ? 'h' : 'm') + '">' + esc(h.種類) + '</span>' +
         '<b>' + esc(h.題) + '</b>' + (h.見出し ? '<small>' + esc(h.見出し) + '</small>' : '') +
@@ -37,7 +38,7 @@
   }
 
   function viewAi() {
-    app.innerHTML = '<h1>AI相談</h1>' +
+    app.innerHTML = '<h1>AIに聞く</h1>' +
       '<section class="card ai-intro"><p><b>規程やマニュアルのことを、ふだんの言葉で聞けます。</b></p>' +
         '<p class="muted">いまは、規程とマニュアルの中から関係がありそうなところを探して見せます。文章で答える AI は準備中です。</p>' +
         '<p class="muted">利用者さんの名前など、個人の情報は入れないでください。</p></section>' +
@@ -49,6 +50,7 @@
     var box = document.getElementById('ai-log');
     box.innerHTML = log.map(function (x) { return bubbleQ(x.q) + (x.a ? bubbleA(x.a) : bubbleWait(x.n)); }).join('');
     syncBtn();
+    if (retryQ) { document.getElementById('ai-in').value = retryQ; retryQ = ''; }
     document.getElementById('ai-f').addEventListener('submit', function (e) { e.preventDefault(); ask(document.getElementById('ai-in').value); });
     document.getElementById('ai-in').addEventListener('keydown', function (e) {
       // 日本語の変換を確定する Enter では送らない（Safari は isComposing が false のまま keyCode 229 を送る）
@@ -83,6 +85,8 @@
       if (w) w.outerHTML = bubbleA(a);
     }).catch(function (e) {
       log.splice(log.indexOf(item), 1);
+      // もう別の画面にいるときは、その画面のエラー欄に出さない（同じ id の欄がほかの画面にもあるため）
+      if (location.hash !== '#ai') { retryQ = q; return; }
       var w = document.getElementById('ai-wait-' + item.n);
       if (w) { if (w.previousElementSibling) w.previousElementSibling.remove(); w.remove(); }
       var inp = document.getElementById('ai-in'), er = document.getElementById('err');
@@ -92,10 +96,13 @@
   }
 
   function onClick(e) {
+    // 急変の流れ・組織図へのリンクも、戻るときは AI相談へ
+    var a = e.target.closest('a[href="#manual-urgent"], a[href="#org"]');
+    if (a && app.contains(a)) { I.setPortalFrom('#ai'); return; }
     var b = e.target.closest('button');
     if (!b || !app.contains(b)) return;
     if (b.dataset.ex) return ask(b.dataset.ex);
-    if (b.dataset.rule) { I.pickRule(b.dataset.rule); I.setPortalFrom('#ai'); location.hash = '#rule-read'; return; }
+    if (b.dataset.rule) { I.pickRule(b.dataset.rule, b.dataset.sec); I.setPortalFrom('#ai'); location.hash = '#rule-read'; return; }
     if (b.dataset.guide) { I.setPortalFrom('#ai'); I.openGuide(b.dataset.guide); }
   }
 
