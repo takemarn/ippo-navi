@@ -20,7 +20,8 @@
       '<button type="button" onclick="IPPO.route()">再読み込み</button></div>';
   }
   // 返事が来たときに、まだ同じ画面を見ているか（途中でほかの画面へ移ったら描かない）
-  function alive() { var h = location.hash; return function () { return location.hash === h; }; }
+  // ハッシュだけでなく core.js の画面の番号（I.gen）も見る。いったん離れて同じ画面に戻ったときに、前に開いたときの遅い返事で描き直さないため
+  function alive() { var h = location.hash, g = I.gen; return function () { return location.hash === h && I.gen === g; }; }
   // 規程やガイドをどこから開いたか（AI相談から開いたら「AI相談に戻る」を出す）
   function setPortalFrom(h) { try { sessionStorage.setItem('ippo.portalFrom', h); } catch (_) {} I._portalFrom = h; }
   function portalFrom() {

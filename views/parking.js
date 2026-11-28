@@ -13,6 +13,10 @@
   var SOON_MIN = 60;   // 空き予定まで これ以内なら「まもなく」
   var FREE = '空きスペース'; // 番号の無い駐車場に停めるときの区画名
   var st = null, skew = 0;
+  // 送信中の 出庫（記録ID）と 停める（駐車場ID|区画）。「更新」や1分ごとの描き直しでボタンが新しくなっても、
+  // 返事が来るまでは押せないままにする（同じ車を2回出庫する・同じ区画に2回停めるのを防ぐ）
+  var pendingOut = {}, pendingIn = {};
+  function inKey(lot, slot) { return lot + '|' + slot; }
   var flt = ''; // 上の台数を押したときの絞り込み（free / used / soon / over）。もう一度押すと解除
   var LABEL = { free: '空き', used: '使用中', soon: 'まもなく', over: '予定超過' };
   var WD = ['日', '月', '火', '水', '木', '金', '土']; // skew: サーバーの時刻 − 端末の時刻（ミリ秒）。端末の時計がずれていても正しく数える
@@ -43,6 +47,7 @@
   function slotState(p, at) {
     if (!p) return { k: 'free', label: '空き' };
     var left = mins(at, toDate(p.予定));
+    if (isNaN(left)) return { k: 'used', label: '使用中', left: NaN }; // 予定が読めない（空・形が違う）ときは使用中として出す
     if (left < 0) return { k: 'over', label: '予定超過', left: left };
     if (left <= SOON_MIN) return { k: 'soon', label: 'まもなく', left: left };
     return { k: 'used', label: '使用中', left: left };
@@ -147,15 +152,17 @@
     if (!p) {
       return '<div class="pk-slot free">' + no + '<div class="pk-who"><b>' + (r.space ? '空きスペースあり' : '空き') + '</b>' +
         '<small>' + (r.space ? 'あと約' + r.space + '台（番号なし）' : 'すぐ停められます') + '</small></div>' +
-        '<button type="button" class="pk-in" data-lot="' + esc(l.駐車場ID) + '" data-slot="' + esc(r.name || FREE) + '">停める</button></div>';
+        (pendingIn[inKey(l.駐車場ID, r.name || FREE)] ? '<button type="button" class="pk-in" disabled>送信中…</button></div>'
+          : '<button type="button" class="pk-in" data-lot="' + esc(l.駐車場ID) + '" data-slot="' + esc(r.name || FREE) + '">停める</button></div>');
     }
     var mine = p.停めた職員ID ? p.停めた職員ID === me.職員ID : p.氏名 === me.氏名;
-    var when = s.k === 'over' ? '予定 ' + hm(p.予定) + ' を ' + dur(s.left) + ' 超過' : '空く予定 ' + hm(p.予定) + '（あと ' + dur(s.left) + '）';
+    var when = isNaN(s.left) ? '空く予定 —' : s.k === 'over' ? '予定 ' + hm(p.予定) + ' を ' + dur(s.left) + ' 超過' : '空く予定 ' + hm(p.予定) + '（あと ' + dur(s.left) + '）';
     return '<div class="pk-slot ' + s.k + (mine ? ' mine' : '') + '">' + no +
       '<div class="pk-who"><span class="pk-st">' + esc(s.label) + '</span><b>' + esc(p.氏名) + (mine ? ' <span class="ptl-you">' + (p.氏名 === me.氏名 ? 'あなた' : 'あなたが登録') + '</span>' : '') + '</b>' +
         '<small>' + (p.車 ? esc(p.車) + ' ／ ' : '') + '停めた ' + hm(p.停めた) + '</small><small>' + when + '</small></div>' +
       // 出庫は本人のほか、運営（承認者・管理者）が代わりに押せる（関係事業者の車や押し忘れのため）。押しまちがい防止で2回押す
-      (mine || I.canApprove() ? '<button type="button" class="sub pk-out" data-out="' + esc(p.記録ID) + '" data-where="' + esc(l.名前 + (r.name ? 'の' + r.name : '')) + '"' + (mine ? '' : ' data-who="' + esc(p.氏名) + '"') + '>出庫</button>' : '') + '</div>';
+      (pendingOut[p.記録ID] ? '<button type="button" class="sub pk-out" disabled>出庫中…</button>'
+        : mine || I.canApprove() ? '<button type="button" class="sub pk-out" data-out="' + esc(p.記録ID) + '" data-where="' + esc(l.名前 + (r.name ? 'の' + r.name : '')) + '"' + (mine ? '' : ' data-who="' + esc(p.氏名) + '"') + '>出庫</button>' : '') + '</div>';
   }
 
   // 「停める」: 行の下に小さなフォームを開く（時間・車の目印・関係事業者の代わりに）
@@ -180,14 +187,17 @@
       e.preventDefault();
       var go = f.querySelector('button[type=submit]');
       if (go.disabled) return;
-      go.disabled = true; go.textContent = '送信中…';
+      var key = inKey(btn.dataset.lot, btn.dataset.slot);
+      if (pendingIn[key]) return;
+      go.disabled = true; go.textContent = '送信中…'; pendingIn[key] = 1;
       var px = f.querySelector('#pk-proxy'), ok = T().alive();
       api('parkIn', { 駐車場ID: btn.dataset.lot, 区画: btn.dataset.slot, 時間: Number(f.querySelector('#pk-h').value),
         車: f.querySelector('#pk-car').value.trim(), 代理: !!(px && px.checked) })
-        .then(function (res) { if (!ok()) return; take(res); render(); var where = lotName + (btn.dataset.slot === FREE ? '' : 'の' + btn.dataset.slot);
+        .then(function (res) { delete pendingIn[key]; if (!ok()) return; take(res); render(); var where = lotName + (btn.dataset.slot === FREE ? '' : 'の' + btn.dataset.slot);
           I.toast(px && px.checked ? where + 'に関係事業者の車を登録しました' : where + 'に停めました'); })
         .catch(function (e2) {
-          if (!f.isConnected) { I.toast(e2.message); return; }
+          delete pendingIn[key];
+          if (!f.isConnected) { I.toast(e2.message); if (ok()) render(); return; }
           go.disabled = false; go.textContent = 'ここに停める';
           f.querySelector('.pk-err').innerHTML = e2.details && e2.details.length ? I.errorsBox(e2.details) : T().failBox(e2);
         });
@@ -208,10 +218,12 @@
         setTimeout(function () { if (b.isConnected && b.dataset.armed) { delete b.dataset.armed; b.textContent = '出庫'; b.classList.remove('armed'); } }, 4000);
         return;
       }
-      b.disabled = true; b.textContent = '出庫中…';
+      var rid = b.dataset.out, where = b.dataset.where, who = b.dataset.who;
+      if (pendingOut[rid]) return;
+      b.disabled = true; b.textContent = '出庫中…'; pendingOut[rid] = 1;
       var ok = T().alive();
-      api('parkOut', { 記録ID: b.dataset.out }).then(function (res) { if (!ok()) return; take(res); render(); I.toast(b.dataset.where + (b.dataset.who ? 'の ' + b.dataset.who + 'さんの車を' : 'から') + '出庫しました'); })
-        .catch(function (e2) { if (!b.isConnected) return; b.disabled = false; delete b.dataset.armed; b.textContent = '出庫'; b.classList.remove('armed'); I.toast(e2.message); });
+      api('parkOut', { 記録ID: rid }).then(function (res) { delete pendingOut[rid]; if (!ok()) return; take(res); render(); I.toast(where + (who ? 'の ' + who + 'さんの車を' : 'から') + '出庫しました'); })
+        .catch(function (e2) { delete pendingOut[rid]; if (!b.isConnected) { I.toast(e2.message); if (ok()) render(); return; } b.disabled = false; delete b.dataset.armed; b.textContent = '出庫'; b.classList.remove('armed'); I.toast(e2.message); });
     }
   }
 
