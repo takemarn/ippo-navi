@@ -52,17 +52,27 @@
     var src = photoCache[c.利用者ID];
     return '<span class="cl-photo" data-photo="' + esc(c.利用者ID) + '">' + (src ? '<img alt="" src="' + esc(src) + '">' : '<i>読み込み中…</i>') + '</span>';
   }
-  // 写真は1人ずつあとから読む（一覧を先に出す）
+  // 写真は一覧を先に出してから、同時に3人までずつ読む（一度にたくさん頼むとサーバーが詰まるため）。読めなかったら「画像登録なし」
+  var photoQueue = [], photoBusy = 0;
   function fillPhotos() {
     document.querySelectorAll('[data-photo]').forEach(function (el) {
       var id = el.dataset.photo;
-      if (photoCache[id]) return;
-      api('clientPhoto', { 利用者ID: id }).then(function (r) {
-        if (!r.写真) return;
-        photoCache[id] = r.写真;
-        document.querySelectorAll('[data-photo="' + id + '"]').forEach(function (x) { x.innerHTML = '<img alt="" src="' + esc(r.写真) + '">'; });
-      }).catch(function () {});
+      if (!photoCache[id] && photoQueue.indexOf(id) < 0) photoQueue.push(id);
     });
+    pumpPhotos();
+  }
+  function pumpPhotos() {
+    while (photoBusy < 3 && photoQueue.length) loadPhoto(photoQueue.shift());
+  }
+  function loadPhoto(id) {
+    photoBusy++;
+    function paint(html) { document.querySelectorAll('[data-photo="' + id + '"]').forEach(function (x) { x.innerHTML = html; if (!/img/.test(html)) x.classList.add('none'); }); }
+    api('clientPhoto', { 利用者ID: id }).then(function (r) {
+      if (!r.写真) return paint('画像登録なし');
+      photoCache[id] = r.写真;
+      paint('<img alt="" src="' + esc(r.写真) + '">');
+    }).catch(function () { paint('画像を読めませんでした'); })
+      .then(function () { photoBusy--; pumpPhotos(); });
   }
   function clientCard(c, asLink) {
     var body = '<div class="cl-cc-text"><p class="cl-cc-name"><span class="cl-id">' + esc(c.利用者ID) + '</span><b>' + esc(c.氏名) + '</b></p>' +
@@ -91,6 +101,7 @@
   // 申請の中身（利用者登録・利用者修正・タスク）を承認待ち一覧・自分の申請で表示する
   I.bodyLines = function (r) {
     var b = (r.明細 || [])[0] || {};
+    if (b.非表示) return '<p class="muted">ほかの施設の利用者の申請なので、中身は表示しません。</p>';
     var rows = [];
     if (r.申請種類 === 'タスク') {
       rows = [['利用者', b.利用者氏名], ['タスク', b.タスク], ['保険種類', b.保険種類], ['生活保護', b.生活保護],
@@ -294,7 +305,7 @@
       if (errs.length) { err.innerHTML = I.errorsBox(errs); return; }
       err.innerHTML = ''; btn.disabled = true; btn.textContent = '登録中…'; overlay('読み込み中・・・');
       api('addRecord', data).then(function () {
-        I.busy(false); toast(kind + 'を登録しました'); location.hash = '#user-records';
+        I.busy(false); toast(kind + 'を登録しました'); location.hash = '#user'; // 参考アプリと同じく利用者操作へ戻る
       }).catch(function (x) {
         I.busy(false); btn.disabled = false; btn.textContent = '登録する';
         err.innerHTML = x.details && x.details.length ? I.errorsBox(x.details) : failHtml(x);
@@ -303,9 +314,11 @@
   }
 
   // ---------- 記録一覧（この利用者の過去の記録） ----------
-  var recQ = { 開始日: '', 終了日: '', 単日: '', 文字: '' };
+  function emptyRecQ() { return { 開始日: '', 終了日: '', 単日: '', 文字: '' }; }
+  var recQ = emptyRecQ(), recQFor = null;
   function viewRecords() {
     if (!needClient()) return;
+    if (recQFor !== cur.id) { recQ = emptyRecQ(); recQFor = cur.id; } // 絞り込みは利用者ごと
     app.innerHTML = shell('記録一覧', '日付やキーワードで絞り込み、利用者の記録を確認します。', '#user',
       clientCard(cur.card) +
       '<div class="cl-card"><p class="cl-label">検索条件</p>' + dateRange(recQ) +
@@ -320,7 +333,12 @@
         document.getElementById('cl-err').innerHTML = m ? I.errorsBox([m]) : '';
         if (!m) { recQ = q; loadRecs(); }
       }
-      if (e.target.closest('#cl-clear')) { recQ = { 開始日: '', 終了日: '', 単日: '', 文字: '' }; viewRecords(); }
+      if (e.target.closest('#cl-clear')) {
+        recQ = emptyRecQ();
+        ['cl-from', 'cl-to', 'cl-day', 'cl-text'].forEach(function (id) { var x = document.getElementById(id); if (x) x.value = ''; });
+        document.getElementById('cl-err').innerHTML = '';
+        loadRecs();
+      }
       var d = e.target.closest('[data-del]');
       if (d) delRecord(d);
     });
@@ -331,7 +349,7 @@
     el.innerHTML = loading('記録を読み込み中...');
     api('clientRecords', Object.assign({ 利用者ID: cur.id }, recQ)).then(function (r) {
       if (!document.getElementById('cl-recs')) return;
-      el.innerHTML = r.一覧.length ? r.一覧.map(function (x) { return recCard(x, false); }).join('') : '<div class="cl-empty">記録はありません。</div>';
+      el.innerHTML = r.一覧.length ? '<p class="cl-count">' + r.一覧.length + '件（削除できるのは自分が書いた記録だけ）</p>' + r.一覧.map(function (x) { return recCard(x, false); }).join('') : '<div class="cl-empty">記録はありません。</div>';
     }).catch(function (e) { el.innerHTML = failHtml(e); });
   }
   function recCard(r, withName) {
@@ -370,6 +388,8 @@
   function viewEdit() {
     var ed = cur.edit || { 種類: '新規' };
     if (ed.種類 !== '新規' && !needClient()) return;
+    // 修正の申請は、いま選んでいる利用者の分だけ（戻る操作などで別の人に変わっていたら操作画面からやり直す）
+    if (ed.種類 !== '新規' && String(ed.利用者ID) !== String(cur.id)) { location.hash = '#user'; return; }
     var isNew = ed.種類 === '新規';
     var title = isNew ? '利用者の新規登録' : '利用者データ修正';
     app.innerHTML = shell(title, isNew ? '利用者マスタの項目を新規登録申請します。承認されると利用者一覧に出ます。'
@@ -382,16 +402,24 @@
       .catch(function (e) { var el = document.getElementById('cl-edit'); if (el) el.innerHTML = failHtml(e); });
   }
   function categoriesTemplate() {
-    var cats = I.CLIENT_CATEGORIES || (cur.info || []).map(function (c) { return [c.名前, c.項目.map(function (f) { return f.項目; })]; });
+    // 項目の一覧は GAS の options（利用者項目）から。見本モードは views/clients-demo.js が I.CLIENT_CATEGORIES を置く
+    var cats = (state.options && state.options.利用者項目) || I.CLIENT_CATEGORIES || (cur.info || []).map(function (c) { return [c.名前, c.項目.map(function (f) { return f.項目; })]; });
     return cats.map(function (c) { return { 名前: c[0], 項目: c[1].map(function (k) { return { 項目: k, 値: '' }; }) }; });
   }
   function fieldInput(cat, f, i) {
     var key = cat + '/' + f.項目, id = 'e' + i, v = f.値 || '';
     if (f.項目 === '利用者ID' || f.項目 === '年齢') return '';
     var inner;
-    if (f.項目 === 'ステータス') inner = I.selectHtml(id, STATUS, v || '居住中');
-    else if (f.項目 === '施設名' && cat === '利用者データ') inner = I.selectHtml(id, facilities(), v || facilities()[0]);
-    else if (/(日|年月日)$/.test(f.項目) && !/期間/.test(f.項目)) inner = '<input type="date" id="' + id + '" value="' + esc(/^\d{4}-\d{2}-\d{2}$/.test(v) ? v : '') + '">';
+    // data-orig には「画面に出した値」を入れる（出せなかった値を空として送り、消してしまわないように）
+    function pick(list, dflt) {
+      var opts = list.indexOf(v) >= 0 || !v ? list : [v].concat(list);
+      v = v || dflt;
+      return I.selectHtml(id, opts, v);
+    }
+    if (f.項目 === 'ステータス') inner = pick(STATUS, '居住中');
+    else if (f.項目 === '施設名' && cat === '利用者データ') inner = pick(facilities(), facilities()[0]);
+    else if (cat === '生活保護' && f.項目 === '生活保護') inner = pick(['あり', 'なし'], '');
+    else if (/(日|年月日)$/.test(f.項目) && !/期間/.test(f.項目) && (!v || /^\d{4}-\d{2}-\d{2}$/.test(v))) inner = '<input type="date" id="' + id + '" value="' + esc(v) + '">';
     else if (f.項目 === '既往歴') inner = '<textarea id="' + id + '" rows="2">' + esc(v) + '</textarea>';
     else inner = '<input id="' + id + '" value="' + esc(v) + '"' + (/電話番号|連絡先|郵便番号/.test(f.項目) ? ' inputmode="tel"' : '') + '>';
     var need = cat === '利用者データ' && /^(氏名|ふりがな|施設名)$/.test(f.項目);
@@ -404,7 +432,7 @@
     el.innerHTML = '<form id="f" class="cl-form" novalidate>' +
       (del ? '<div class="cl-card"><p class="cl-label">削除の申請</p><p class="cl-desc">記録は消えずに残ります。利用者のステータスだけ「登録なし」になります。</p></div>'
         : cats.map(function (c) {
-          return '<details class="cl-card cl-fold"' + (c.名前 === '利用者データ' ? ' open' : '') + '><summary class="cl-label">' + esc(c.名前) + '</summary>' +
+          return '<details class="cl-card cl-fold"' + (c.名前 === '利用者データ' ? ' open' : '') + '><summary class="cl-label">' + esc(c.名前 === '利用者データ' ? '基本情報' : c.名前) + '</summary>' +
             c.項目.map(function (f) { return fieldInput(c.名前, f, i++); }).join('') + '</details>';
         }).join('')) +
       '<div class="cl-card"><label class="cl-lab">' + (del ? '<span>削除の理由<span class="req">(必須)</span></span>' : '<span>申請の理由・メモ<span class="opt">(任意)</span></span>') +
@@ -426,7 +454,7 @@
       var err = document.getElementById('err'), btn = e.target.querySelector('button[type=submit]');
       if (errs.length) { err.innerHTML = I.errorsBox(errs); err.scrollIntoView({ block: 'center' }); return; }
       btn.disabled = true; btn.textContent = '送信中…'; I.busy(true);
-      api('requestClientChange', { 種類: ed.種類, 利用者ID: ed.利用者ID || '', 項目: fields, 理由: why }).then(function () {
+      api('requestClientChange', { 種類: ed.種類, 利用者ID: ed.種類 === '新規' ? '' : cur.id, 項目: fields, 理由: why }).then(function () {
         I.busy(false); toast('申請しました。承認されると反映されます'); location.hash = '#requests';
       }).catch(function (x) {
         I.busy(false); btn.disabled = false; btn.textContent = '申請する';

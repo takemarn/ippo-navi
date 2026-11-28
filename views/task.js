@@ -1,7 +1,8 @@
 /* タスク管理のメニュー（#task）と「施設→本部事務」の依頼フォーム（#task-office）。参考動画 1:32〜1:48
    並び: 担当者 → 施設名 → 利用者名（かな で絞り込み＋選択） → 保険種類 → 生活保護 → タスク → 日程（期間） → 日程 → 時間
          → 訪問看護指示書変更 → 期間 → 状態 → 備考、カードの外に「送信」。
-   参考アプリと同じく、タスクを選ぶまで日程から下は使えない。特指示のときだけ 訪問看護指示書変更・期間・状態 が使える。
+   参考アプリと同じく、タスクを選ぶまで日程から下は使えない。日程は タスクによって「1日」か「期間」のどちらか（dateMode）。
+   特指示のときだけ 訪問看護指示書変更・期間・状態 が使え、そのときは必須。
    送ると「タスク」の申請になり、承認待ち一覧・自分の申請に出る（中身の表示は views/clients.js の I.bodyLines）。
    GAS: submitTask（決まりは kiroku-app の docs/api.md）。利用者の候補は searchClients で取る */
 (function () {
@@ -10,12 +11,20 @@
 
   I.views.task = function () { I.subMenu([{ label: '施設→本部事務', href: '#task-office' }, { label: '介護タスク' }]); };
 
+  // ひらがな・カタカナ・空白の違いを無視して比べる（GAS の normName と同じ考え方）
+  function norm(t) {
+    return String(t || '').replace(/[\s\u3000]/g, '').replace(/[\u3041-\u3096]/g, function (ch) { return String.fromCharCode(ch.charCodeAt(0) + 0x60); });
+  }
   function $(id) { return document.getElementById('tk-' + id); }
   function head(id, label, req) {
     return '<div class="exp-lab"><label for="tk-' + id + '">' + esc(label) + '</label>' +
       '<span class="' + (req ? 'exp-req">(必須)' : 'exp-opt">(任意)') + '</span></div>';
   }
   function field(key, inner) { return '<div class="exp-field" data-f="' + key + '">' + inner + '</div>'; }
+  // タスクごとに、日程を「1日」で入れるか「期間」で入れるか。参考動画で確かめられたのは 新入居 施設（1日）だけで、
+  // 期間にしたもの（点滴・訪問スケジュール入力）は推測。違っていたらここを直す（GAS の validateTask はどちらでも受け付ける）
+  var SPAN_TASKS = ['点滴', '訪問スケジュール入力'];
+  function dateMode(kind) { return !kind ? '' : SPAN_TASKS.indexOf(kind) >= 0 ? 'span' : 'day'; }
   function sel(id, list, first) {
     return '<select id="tk-' + id + '"><option value="">' + esc(first || '') + '</option>' +
       list.map(function (v) { return '<option>' + esc(v) + '</option>'; }).join('') + '</select>';
@@ -48,13 +57,12 @@
         field('保険種類', '<div class="exp-lab"><span class="exp-lab-name">保険種類</span><span class="exp-req">(必須)</span></div>' + toggles('ins', ['介護保険', '医療保険'])) +
         field('生活保護', '<div class="exp-lab"><span class="exp-lab-name">生活保護</span><span class="exp-req">(必須)</span></div>' + toggles('wel', ['有', '無', '確認中'])) +
         field('タスク', head('kind', 'タスク', true) + sel('kind', o.タスク種類 || [])) +
-        '<div class="exp-field exp-off" data-f="日程期間" data-need="any"><div class="exp-lab"><label for="tk-span-from">日程（期間）</label><span class="exp-req">(必須)</span></div>' + range('span') + '</div>' +
-        '<div class="exp-field exp-off" data-f="日程" data-need="any">' + head('day', '日程', true) + '<input type="date" id="tk-day"></div>' +
-        '<p class="exp-opt tk-hint">日程は「期間」か「1日」のどちらかを入れてください。</p>' +
+        '<div class="exp-field exp-off" data-f="日程期間" data-need="span"><div class="exp-lab"><label for="tk-span-from">日程（期間）</label><span class="exp-req">(必須)</span></div>' + range('span') + '</div>' +
+        '<div class="exp-field exp-off" data-f="日程" data-need="day">' + head('day', '日程', true) + '<input type="date" id="tk-day"></div>' +
         '<div class="exp-field exp-off" data-f="時間" data-need="any"><div class="exp-lab"><label for="tk-time-from">時間</label><span class="exp-opt">(任意)</span></div>' + timeRange() + '</div>' +
-        '<div class="exp-field exp-off" data-f="指示書" data-need="special">' + head('order', '訪問看護指示書変更', false) + sel('order', ['有', '無']) + '</div>' +
-        '<div class="exp-field exp-off" data-f="期間" data-need="special"><div class="exp-lab"><label for="tk-term-from">期間</label><span class="exp-opt">(任意)</span></div>' + range('term') + '</div>' +
-        '<div class="exp-field exp-off" data-f="状態" data-need="special">' + head('state', '状態', false) + '<input id="tk-state" placeholder="例: 状態に変化あり"></div>' +
+        '<div class="exp-field exp-off" data-f="指示書" data-need="special">' + head('order', '訪問看護指示書変更', true) + sel('order', ['有', '無']) + '</div>' +
+        '<div class="exp-field exp-off" data-f="期間" data-need="special"><div class="exp-lab"><label for="tk-term-from">期間</label><span class="exp-req">(必須)</span></div>' + range('term') + '</div>' +
+        '<div class="exp-field exp-off" data-f="状態" data-need="special">' + head('state', '状態', true) + '<input id="tk-state" placeholder="例: 状態に変化あり"></div>' +
         field('備考', head('memo', '備考', false) + '<textarea id="tk-memo"></textarea>') +
       '</div>' +
       '<div id="tk-err"></div>' +
@@ -65,9 +73,10 @@
     var form = $('form');
     // タスクを選ぶまで日程から下は使えない（参考アプリと同じ）
     function syncKind() {
-      var k = $('kind').value, special = k.indexOf('特指示') === 0;
+      var k = $('kind').value, mode = dateMode(k), special = k.indexOf('特指示') === 0;
       form.querySelectorAll('[data-need]').forEach(function (box) {
-        var on = box.dataset.need === 'any' ? !!k : special;
+        var n = box.dataset.need;
+        var on = n === 'any' ? !!k : n === 'special' ? special : n === mode;
         box.classList.toggle('exp-off', !on);
         box.querySelectorAll('input, select').forEach(function (x) { x.disabled = !on; });
       });
@@ -77,8 +86,8 @@
 
     // 利用者の候補（施設名を選ぶと読み込む。かな で絞り込み）
     function fillClients() {
-      var s = $('client'), kana = $('kana').value.trim();
-      var list = clients.filter(function (c) { return !kana || (c.ふりがな || '').indexOf(kana) >= 0 || c.氏名.indexOf(kana) >= 0; });
+      var s = $('client'), kana = norm($('kana').value);
+      var list = clients.filter(function (c) { return !kana || norm(c.ふりがな).indexOf(kana) >= 0 || norm(c.氏名).indexOf(kana) >= 0; });
       s.innerHTML = '<option value="">' + (clients.length ? (list.length ? '選んでください' : '見つかりません') : '施設名を先に選んでください') + '</option>' +
         list.map(function (c) { return '<option value="' + esc(c.利用者ID) + '">' + esc(c.利用者ID + ' ' + c.氏名) + '</option>'; }).join('');
       s.disabled = !list.length;
@@ -119,10 +128,19 @@
       if (!d.生活保護) errs.push('生活保護を選んでください');
       if (!d.タスク) errs.push('タスクを選んでください');
       else {
-        var hasRange = d.日程開始 && d.日程終了;
-        if (!hasRange && !d.日程) errs.push('日程（期間か1日）を入れてください');
-        if ((d.日程開始 || d.日程終了) && !hasRange) errs.push('日程（期間）は始まりと終わりの両方を入れてください');
-        if (hasRange && d.日程開始 > d.日程終了) errs.push('日程（期間）の終わりは始まりより後にしてください');
+        if (dateMode(d.タスク) === 'span') {
+          d.日程 = '';
+          if (!d.日程開始 || !d.日程終了) errs.push('日程（期間）の始まりと終わりを入れてください');
+          else if (d.日程開始 > d.日程終了) errs.push('日程（期間）の終わりは始まりより後にしてください');
+        } else {
+          d.日程開始 = ''; d.日程終了 = '';
+          if (!d.日程) errs.push('日程を入れてください');
+        }
+        if (d.タスク.indexOf('特指示') === 0) {
+          if (!d.訪問看護指示書変更) errs.push('訪問看護指示書変更を選んでください');
+          if (!d.期間開始 || !d.期間終了) errs.push('期間の始まりと終わりを入れてください');
+          if (!d.状態) errs.push('状態を入れてください');
+        }
         if (d.期間開始 && d.期間終了 && d.期間開始 > d.期間終了) errs.push('期間の終わりは始まりより後にしてください');
       }
       var err = $('err'), btn = form.querySelector('button[type=submit]');

@@ -181,3 +181,8 @@ button.cl-cc-link:active { background: #f6f8fd; border-color: #d9e0ee; }
 .cl-form input, .cl-form select, .cl-form textarea { border: 1px solid #e3e8ef; border-radius: 12px; box-shadow: none; background-color: #fff; }
 .cl-form textarea { min-height: 72px; }
 .cl-fold .cl-lab + .cl-lab { margin-top: 4px; }
+.cl-photo.none { white-space: nowrap; font-size: 9px; letter-spacing: -.03em; }
+@media (max-width: 340px) {
+  .tk-row { grid-template-columns: 1fr; gap: 4px; }
+  .tk-row span { text-align: center; line-height: 1; }
+}
