@@ -149,8 +149,9 @@
   }
 
   // ---------- 検索（gas/src/util.js の searchDocs と同じ決まり） ----------
+  function norm(s) { s = String(s || ''); return (s.normalize ? s.normalize('NFKC') : s).toLowerCase(); }
   function keywords(q) {
-    var words = String(q || '').match(/[一-龠々ァ-ヶーA-Za-z0-9０-９]{2,}/g) || [];
+    var words = (norm(q).match(/[一-龠々ァ-ヶーa-z0-9]+/g) || []).filter(function (w) { return w.length >= 2 || /[一-龠]/.test(w); });
     var out = [];
     words.forEach(function (w) {
       out.push(w);
@@ -163,13 +164,13 @@
     if (!keys.length) return [];
     return docs.map(function (d) {
       var score = 0, hit = '';
+      var title = norm(d.題), head = norm(d.見出し), kw = norm(d.キーワード), body = norm(d.本文);
       keys.forEach(function (k) {
-        var w = k.length >= 3 ? 2 : 1;
-        if ((d.題 || '').indexOf(k) >= 0) score += 3 * w;
-        if ((d.見出し || '').indexOf(k) >= 0) score += 2 * w;
-        if ((d.キーワード || '').indexOf(k) >= 0) score += 2 * w;
-        var at = (d.本文 || '').indexOf(k);
-        if (at >= 0) { score += w; if (!hit) hit = k; }
+        var w = k.length >= 3 ? 2 : (k.length === 2 ? 1 : 0.5);
+        if (title.indexOf(k) >= 0) score += 3 * w;
+        if (head.indexOf(k) >= 0) score += 2 * w;
+        if (kw.indexOf(k) >= 0) score += 2 * w;
+        if (body.indexOf(k) >= 0) { score += w; if (!hit) hit = k; }
       });
       return { d: d, score: score, hit: hit };
     }).filter(function (x) { return x.score > 0; })
@@ -178,7 +179,7 @@
       .map(function (x) { return Object.assign({ 点数: x.score, 抜粋: snippet(x.d.本文 || '', x.hit) }, x.d); });
   }
   function snippet(text, key) {
-    var at = key ? text.indexOf(key) : 0;
+    var at = key ? norm(text).indexOf(key) : 0;
     var line = text.lastIndexOf('\n', at) + 1, end = text.indexOf('\n', at);
     var s = text.slice(line, end < 0 ? undefined : end);
     return s.length > 90 ? s.slice(0, 90) + '…' : s;
@@ -195,7 +196,8 @@
     });
     return docs;
   }
-  function nurseOk(me) { return /看護/.test(me.職種) || me.役割 === '承認者' || me.役割 === '管理者'; }
+  // GAS と同じ: 職種が「マニュアル閲覧職種」（看護師・准看護師）か、承認者・管理者
+  function nurseOk(me) { return ['看護師', '准看護師'].indexOf(me.職種) >= 0 || me.役割 === '承認者' || me.役割 === '管理者'; }
 
   var D = I.demo;
   D.portal = function () {
@@ -205,8 +207,8 @@
     var r = RULES.filter(function (x) { return x.規程ID === data.規程ID; })[0];
     if (!r) throw new Error('規程が見つかりません');
     var errs = [];
-    if (String(data.氏名 || '').replace(/\s/g, '') !== me.氏名.replace(/\s/g, '')) errs.push('お名前は LINE に登録されている名前（フルネーム）と同じに入れてください');
-    if (!data.確認) errs.push('「上記の取り扱いを確認しました」にチェックを入れてください');
+    if (String(data.氏名 || '').replace(/\s/g, '') !== me.氏名.replace(/\s/g, '')) errs.push('お名前は、職員として登録されている名前（フルネーム）と同じに入れてください');
+    if (data.確認 !== true) errs.push('「上記の取り扱いを確認しました」にチェックを入れてください');
     if (errs.length) { var e = new Error('入力を確認してください'); e.details = errs; throw e; }
     return Object.assign({}, r, { 閲覧日時: stamp(new Date()), 本文: (BODY[r.規程ID] || []).map(function (s) { return { 見出し: s[0], 本文: s[1] }; }) });
   };
@@ -221,17 +223,23 @@
     var used = parked.filter(function (p) { return lot && p.駐車場ID === lot.駐車場ID; }).map(function (p) { return p.区画; });
     var errs = validateParkIn(data, lot, used);
     if (errs.length) { var e = new Error('入力を確認してください'); e.details = errs; throw e; }
+    var h = Number(data.時間);
     parked.push({ 記録ID: 'PK-DEMO' + pad(++pseq), 駐車場ID: data.駐車場ID, 区画: data.区画, 氏名: data.代理 ? '関係事業者の方' : me.氏名,
       停めた職員ID: me.職員ID, 車: data.車 || '', 停めた: stamp(new Date()), 予定: stamp(new Date(Date.now() + h * 3600000)) });
     return parkingState();
   };
-  D.parkOut = function (data) {
+  D.parkOut = function (data, me) {
+    var rec = parked.filter(function (p) { return p.記録ID === data.記録ID; })[0];
+    if (rec && rec.停めた職員ID !== me.職員ID && rec.氏名 !== me.氏名 && me.役割 !== '承認者' && me.役割 !== '管理者') {
+      var e = new Error('出庫は停めた本人か運営だけができます'); e.code = 403; throw e;
+    }
     parked = parked.filter(function (p) { return p.記録ID !== data.記録ID; });
     return parkingState();
   };
   D.askAi = function (data, me) {
     var q = String(data.質問 || '').trim();
     if (!q) { var e = new Error('質問を入れてください'); e.details = ['質問を入れてください']; throw e; }
+    if (q.length > 200) { var e2 = new Error('質問は200文字までにしてください'); e2.details = ['質問は200文字までにしてください']; throw e2; }
     var docs = docsForSearch().filter(function (d) { return d.種類 === '規程' || nurseOk(me); });
     var hits = searchDocs(q, docs, 3).map(function (h) {
       // 規程は閲覧前の確認が必要なので、本文の抜粋は返さず題と見出しだけにする

@@ -15,9 +15,10 @@
 
   // 'yyyy-MM-dd HH:mm(:ss)' を日本時間として読む（Safari でも同じ結果になるよう、自分で分けて読む）
   function toDate(s) {
-    var m = /^(\d{4})-(\d{1,2})-(\d{1,2})[ T](\d{1,2}):(\d{2})(?::(\d{2}))?/.exec(String(s || ''));
+    // 時刻がちょうど 0:00 のとき、シートからは日付だけが届くので、時刻は省略可
+    var m = /^(\d{4})-(\d{1,2})-(\d{1,2})(?:[ T](\d{1,2}):(\d{2})(?::(\d{2}))?)?$/.exec(String(s || '').trim());
     if (!m) return new Date(s);
-    return new Date(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +(m[6] || 0));
+    return new Date(+m[1], +m[2] - 1, +m[3], +(m[4] || 0), +(m[5] || 0), +(m[6] || 0));
   }
   function hm(s) { var d = toDate(s); return (d.getMonth() + 1) + '/' + d.getDate() + ' ' + d.getHours() + ':' + ('0' + d.getMinutes()).slice(-2); }
   function mins(a, b) { return Math.round((b - a) / 60000); }

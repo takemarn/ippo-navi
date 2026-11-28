@@ -150,7 +150,7 @@
           '<li>守られなかった場合、<b>損害賠償の対象</b>となることがあります。</li>' +
           '<li>みなさんの毎日の働き方に役立てるためのものです。</li></ul></div>' +
         '<label>お名前（フルネームを入れてください）<input id="nm" autocomplete="name" placeholder="例）山田 太郎">' +
-          '<small class="ptl-hint">LINE に登録されている名前と同じに入れてください。閲覧した人として記録します。</small></label>' +
+          '<small class="ptl-hint">職員として登録されている名前と同じに入れてください。閲覧した人として記録します。</small></label>' +
         '<label class="ptl-check"><input type="checkbox" id="ok"> 上記の取り扱いを確認しました。</label>' +
         '<div id="err"></div>' +
         '<button type="submit" id="go" disabled>確認して閲覧する</button>' +
