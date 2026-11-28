@@ -202,10 +202,15 @@
   // ---------- 利用者管理（入口） ----------
   function viewTop() {
     // 上にほかのメニューと同じ絵の見出し（views/menu.js の IPPO.menuHead）を置く
-    app.innerHTML = (I.menuHead ? I.menuHead() : '') + shell('利用者管理', '条件を組み合わせて利用者を検索し、情報閲覧や記録入力へ進みます。', null,
+    // 見出しは上の絵の「利用者一覧」だけにする（枠の中に「利用者管理」の大見出しを重ねない）。絵が無いときだけ枠に見出しを出す
+    var lead = '新規登録と、利用者・記録の検索ができます。条件を組み合わせて探し、情報閲覧や記録入力へ進みます。';
+    var top = I.menuHead
+      ? '<section class="cl-shell cl-shell-top"><p class="cl-lead">' + esc(lead) + '</p>'
+      : '<section class="cl-shell"><div class="cl-head"><div class="cl-h"><small aria-hidden="true">' + EN.利用者管理 + '</small><h1>利用者管理</h1></div></div><p class="cl-sub">' + esc(lead) + '</p>';
+    app.innerHTML = (I.menuHead ? I.menuHead() : '') + top + (
       '<div class="cl-card">' + lab('新規登録', 'NEW') + '<p class="cl-desc">利用者マスタの項目を新規登録申請します。</p>' +
         '<button type="button" class="cl-go" id="cl-new"><span aria-hidden="true" class="cl-plus">＋</span>新規登録</button></div>' +
-      lab('利用者検索', 'FIND CLIENTS', true, 'h2') + '<p class="cl-desc cl-out">何も選ばずに検索すると、見られる利用者を全員表示します。</p>' +
+      lab('利用者検索', 'FIND CLIENTS', true, 'h2') + '<p class="cl-desc cl-out">何も選ばなければ、見られる利用者を全員表示します。</p>' +
       sec('施設を選択', chips('fac', facilities(), cur.q.施設, true, '施設を選択'), '', 'FACILITY') +
       sec('氏名から検索', '<input id="cl-name" class="cl-input" type="search" enterkeyhint="search" aria-label="氏名から検索" placeholder="名前 / ふりがなで検索" value="' + esc(cur.q.氏名) + '" autocomplete="off">', '', 'NAME') +
       sec('ステータスを選択', chips('st', STATUS, cur.q.ステータス, true, 'ステータスを選択'), '', 'STATUS') +
@@ -216,7 +221,7 @@
       sec('記録種別を選択', chips('rkind', RECORD_KINDS, cur.rq.種別, true, '記録種別を選択'), '', 'TYPE') +
       sec('期間・単日指定', dateRange(cur.rq), '単日指定を入れると、開始日・終了日より優先します。', 'DATE') +
       '<div id="cl-err"></div>' +
-      '<button type="button" class="cl-go" id="cl-rsearch">この条件で記録を検索</button>') +
+      '<button type="button" class="cl-go" id="cl-rsearch">この条件で記録を検索</button>') + '</section>' +
       I.backHtml('#menu', 'メニュー一覧に戻る');
     trackClicks(function (e) {
       onChipTap(e);
@@ -352,7 +357,7 @@
   var infoTab = '利用者データ';
   function viewInfo() {
     if (!needClient()) return;
-    app.innerHTML = shell('情報閲覧', 'カテゴリを切り替えて、利用者情報を見やすく確認できます。', '#user',
+    app.innerHTML = shell('情報閲覧', 'カテゴリを切り替えて、利用者情報を確認できます。', '#user',
       clientCard(cur.card) + '<div id="cl-info"></div>');
     fillPhotos();
     function run() {
@@ -408,7 +413,7 @@
     // 書きかけのメモは利用者・種別ごとにこの端末（タブを閉じるまで）に残す。登録したら消す
     var dkey = 'ippo.draft.' + cur.id + '.' + kind, draft = '';
     try { draft = sessionStorage.getItem(dkey) || ''; } catch (_) {}
-    app.innerHTML = shell(kind, '必要事項を入力して登録します。担当者名は必要に応じて修正できます。', '#user',
+    app.innerHTML = shell(kind, '必要事項を入力して登録します。担当者名は直せます。', '#user',
       clientCard(cur.card) +
       '<form id="f" class="cl-form" novalidate><div class="cl-card cl-wcard ' + (KIND_CLASS[kind] || '') + '">' + lab('入力内容', 'INPUT') +
         '<label>記録日<input type="date" id="w-day" class="cl-input" value="' + I.today() + '" max="' + I.today() + '" required></label>' +
@@ -559,7 +564,7 @@
     if (ed.種類 !== '新規' && String(ed.利用者ID) !== String(cur.id)) { location.hash = '#user'; return; }
     var isNew = ed.種類 === '新規';
     var title = isNew ? '利用者の新規登録' : '利用者データ修正';
-    app.innerHTML = shell(title, isNew ? '利用者マスタの項目を新規登録申請します。承認されると利用者一覧に出ます。'
+    app.innerHTML = shell(title, isNew ? '利用者マスタへの新規登録を申請します。承認されると一覧に出ます。'
       : (ed.種類 === '削除' ? '利用者の登録をやめる申請をします（ステータスが「登録なし」になります）。' : '利用者マスタの項目を申請・修正します。直した項目だけが申請されます。'),
       isNew ? '#users' : '#user',
       (isNew ? '' : clientCard(cur.card)) + '<div id="cl-edit"></div>');
@@ -665,7 +670,7 @@
   function viewPhoto() {
     if (!needClient()) return;
     var picked = null;
-    app.innerHTML = shell('写真登録', '顔写真を撮るか選んで登録します。本人確認のための写真です。', '#user',
+    app.innerHTML = shell('写真登録', '本人確認用の顔写真を、撮るか選んで登録します。', '#user',
       clientCard(cur.card) +
       '<div class="cl-card">' + lab('写真', 'PHOTO') +
         '<div class="cl-pick"><span class="cl-photo big" id="ph-prev"><i>まだ選んでいません</i></span>' +
