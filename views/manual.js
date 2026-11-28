@@ -28,6 +28,48 @@
     try { return sessionStorage.getItem('ippo.guide'); } catch (_) { return null; }
   }
 
+  // ガイドの絵（参考アプリと同じく、場面ごとに色つきの丸に絵）。絵は portal.js の線画（I.portalTools.ic）。
+  // 絵文字は端末ごとに絵柄がちがい、ホームの線画・立体風の絵から浮くので使わない。
+  // シートに 絵 の列があれば、線画の名前（fall / note / pill / home / bath / thermo / bandage / eye / phone / ambulance / steth / sprout / book）として使う
+  var ICONS = [
+    [/転倒|転落/, 'fall', 'pink'], [/記録|SOAP/, 'note', 'blue'], [/服薬|点滴|薬/, 'pill', 'green'], [/入居/, 'home', 'amber'],
+    [/入浴/, 'bath', 'amber'], [/発熱|熱|血圧/, 'thermo', 'amber'], [/皮膚|けが|外傷/, 'bandage', 'blue'], [/様子/, 'eye', 'pink'],
+    [/オンコール|電話/, 'phone', 'pink'], [/救急|搬送/, 'ambulance', 'pink'], [/目安|呼ぶ/, 'steth', 'green'], [/最初|はじめ|新人/, 'sprout', 'green']
+  ];
+  function iconOf(g) {
+    // 場面・題で先に探し、当たらなければキーワードで（キーワードには ほかの場面の言葉も入るため）
+    var head = [g.場面, g.題].join(' '), kw = String(g.キーワード || '');
+    var hit = ICONS.filter(function (x) { return x[0].test(head); })[0] || ICONS.filter(function (x) { return x[0].test(kw); })[0];
+    var own = /^[a-z]+$/.test(String(g.絵 || '')) ? g.絵 : '';
+    return { e: own || (hit ? hit[1] : 'book'), c: hit ? hit[2] : 'blue' };
+  }
+  function icon(g, cls) { var i = iconOf(g); return '<span class="mnl-ic ' + i.c + (cls ? ' ' + cls : '') + '" aria-hidden="true">' + T().ic(i.e) + '</span>'; }
+  // 要点の「場面 → こうする」を色つきのカードにするときの色（危ない順に 赤 → 黄 → 青 → 緑）
+  function tone(t) {
+    return /転倒|転落|様子|意識|呼吸|SpO2|119|急/.test(t) ? 'pink' : /熱|血圧|入浴/.test(t) ? 'amber' : /皮膚|けが|外傷|写真/.test(t) ? 'blue' : 'green';
+  }
+  function dateShort(s) { var m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(s || '')); return m ? +m[1] + '/' + +m[2] + '/' + +m[3] : esc(s || ''); }
+  function meta(g) {
+    return [g.改定日 ? '改定 ' + dateShort(g.改定日) : '', g.読む分 ? '読む目安 ' + esc(g.読む分) + '分' : '', g.対象 ? esc(g.対象) + '向け' : ''].filter(String).join('・');
+  }
+
+  // 下に固定する もどる／さがす／目次（参考アプリの看護マニュアルと同じ3つ。片手で届く位置）
+  var jump = ''; // トップを開いたあと送る先（'search' か 'toc'）
+  function tabBar(kind) {
+    var backTo = kind === 'home' ? I.lastMenu() : (I.portalFrom && I.portalFrom() === '#ai' ? '#ai' : I.portalFrom && I.portalFrom() === '#portal' && kind === 'urgent' ? '#portal' : '#manual');
+    return '<nav class="mnl-tabs" aria-label="マニュアルの移動">' +
+      '<a href="' + esc(backTo) + '">' + T().ic('back') + 'もどる</a>' +
+      '<button type="button" data-tab="search">' + T().ic('search') + 'さがす</button>' +
+      '<button type="button" data-tab="toc">' + T().ic('list') + '目次</button></nav>';
+  }
+  function doJump(to) {
+    var el = document.getElementById(to === 'search' ? 'mnl-f' : 'mnl-toc');
+    if (!el) return;
+    if (to === 'toc' && el.tagName === 'DETAILS') el.open = true;
+    el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    if (to === 'search') { var q = document.getElementById('mnl-q'); if (q) q.focus({ preventScroll: true }); }
+  }
+
   // 3つの画面の共通の枠。kind: home / urgent / guide
   function frame(kind) {
     var from = I.portalFrom && I.portalFrom() === '#ai';
@@ -37,7 +79,7 @@
         : I.backHtml('#manual', 'マニュアルのトップに戻る'));
     app.innerHTML = '<div class="mnl-top"><h1>看護マニュアル</h1>' +
       '<button type="button" class="mnl-size" id="mnl-size" aria-pressed="false">文字 大</button></div>' +
-      '<div id="mn" class="ptl-stack">' + T().loading() + '</div>' + back;
+      '<div id="mn" class="ptl-stack">' + T().loading() + '</div>' + tabBar(kind) + back;
     bigText();
     I.cleanup.push(function () { document.body.classList.remove('mnl-big'); });
     app.addEventListener('click', onClick);
@@ -58,13 +100,13 @@
 
   // 上の戻る: 下の戻ると同じく、AIに聞く画面から来たときは そこへ
   function top() {
-    return I.portalFrom && I.portalFrom() === '#ai' ? T().topBack('#ai', 'AIに聞く画面に戻る') : T().topBack('#manual', 'マニュアルのトップ');
+    return I.portalFrom && I.portalFrom() === '#ai' ? T().topBack('#ai', 'AIに聞く画面に戻る') : T().topBack('#manual', 'マニュアルのトップに戻る');
   }
 
   function scenes(list) {
     return '<div class="mnl-scenes">' + list.map(function (g) {
-      return '<button type="button" class="mnl-scene" data-guide="' + esc(g.ID) + '"><b>' + esc(g.場面 || g.題) + '</b>' +
-        (g.説明 ? '<small>' + esc(g.説明) + '</small>' : '') + '</button>';
+      return '<button type="button" class="mnl-scene" data-guide="' + esc(g.ID) + '">' + icon(g) + '<span><b>' + esc(g.場面 || g.題) + '</b>' +
+        (g.説明 ? '<small>' + esc(g.説明) + '</small>' : '') + '</span></button>';
     }).join('') + '</div>';
   }
 
@@ -81,14 +123,14 @@
     box.innerHTML =
       '<section class="mnl-hero"><b>何に困ってる？</b><small>ここを見れば、マニュアルが見つかります。</small></section>' +
       '<a class="mnl-urgent" href="#manual-urgent"><span class="mnl-urgent-ic" aria-hidden="true">!</span>' +
-        '<span><b>' + esc((data.急変 || {}).題 || '様子がおかしい・急変') + '</b><small>夜の連絡・オンコール・救急搬送 → すぐ見る</small></span></a>' +
+        '<span><b>' + esc((data.急変 || {}).題 || '様子がおかしい・急変') + '</b><small>夜の連絡先・当番の看護師（オンコール）・救急車 → すぐ見る</small></span></a>' +
       '<form class="mnl-search" id="mnl-f" role="search"><input id="mnl-q" type="search" enterkeyhint="search" placeholder="例：転倒" value="' + esc(query) + '" aria-label="マニュアルを探す">' +
         '<button type="submit">探す</button></form>' +
       '<div class="mnl-keys">' + (data.キーワード || []).map(function (k) { return '<button type="button" data-key="' + esc(k) + '">' + esc(k) + '</button>'; }).join('') + '</div>' +
       '<div id="mnl-res" hidden></div>' +
       (now.length ? '<h2 class="ptl-sec">いま こんな時 <small>押すと、その場面のページが開きます</small></h2>' + scenes(now) : '') +
       (first.length ? '<h2 class="ptl-sec">はじめての人へ</h2>' + scenes(first) : '') +
-      (rest.length ? '<details class="mnl-more"><summary>＋ ほかのページ（' + rest.length + '）</summary>' + scenes(rest) + '</details>' : '') +
+      (all.length ? toc(all, rest.length) : '') +
       (!all.length ? '<div class="loading">まだマニュアルが登録されていません。</div>' : '') +
       (data.看護職 === false ? '<p class="ptl-note">看護職向けのページ（記録の書き方など）は、看護職と運営だけに出ます。</p>' : '');
     document.getElementById('mnl-f').addEventListener('submit', function (e) {
@@ -96,6 +138,21 @@
       document.getElementById('mnl-q').blur();
     });
     if (query) search();
+    if (jump) { var j = jump; jump = ''; setTimeout(function () { doJump(j); }, 0); }
+  }
+
+  // 目次: すべてのページを分類ごとに（題・改定日・読む目安）。参考アプリの「目次」にあたる
+  function toc(all, restN) {
+    var cats = [];
+    all.forEach(function (g) { var c = g.分類 || 'そのほか'; if (cats.indexOf(c) < 0) cats.push(c); });
+    return '<details class="mnl-toc" id="mnl-toc"><summary><span>' + T().ic('list') + '目次（すべてのページ ' + all.length + '）</span>' +
+        (restN ? '<small>ほかのページ ' + restN + ' もここにあります</small>' : '') + '</summary>' +
+      cats.map(function (c) {
+        return '<p class="mnl-toc-c">' + esc(c) + '</p>' + all.filter(function (g) { return (g.分類 || 'そのほか') === c; }).map(function (g) {
+          return '<button type="button" class="mnl-tocrow" data-guide="' + esc(g.ID) + '">' + icon(g, 'sm') +
+            '<span><b>' + esc(g.題) + '</b><small>' + meta(g) + '</small></span><span class="ptl-chev" aria-hidden="true">›</span></button>';
+        }).join('');
+      }).join('') + '</details>';
   }
 
   // 画面の中だけで探す（マニュアルは件数が少ないので、全部受け取ってから端末で探す）
@@ -114,7 +171,7 @@
     res.innerHTML = '<div class="mnl-res" role="status"><div class="row"><p class="ptl-note">「' + esc(query) + '」で ' + hits.length + ' 件</p>' +
       '<button type="button" class="small sub" data-clear="1">消す</button></div>' +
       (hits.length ? hits.map(function (g) {
-        return '<button type="button" class="mnl-row" data-guide="' + esc(g.ID) + '"><b>' + esc(g.題) + '</b><small>' + esc(g.分類) + '</small></button>';
+        return '<button type="button" class="mnl-tocrow" data-guide="' + esc(g.ID) + '">' + icon(g, 'sm') + '<span><b>' + esc(g.題) + '</b><small>' + esc(g.分類) + '</small></span><span class="ptl-chev" aria-hidden="true">›</span></button>';
       }).join('') : '<p class="muted">見つかりませんでした。言葉を短くするか、<a href="#ai">AIに聞く</a>で聞いてみてください。</p>') + '</div>';
   }
 
@@ -123,11 +180,8 @@
     var list = (u.見る順 || []).map(guide).filter(Boolean);
     box.innerHTML = top() +
       '<h2 class="mnl-uh">' + esc(u.題 || '様子がおかしい・急変') + '</h2>' +
-      '<a class="mnl-119" href="tel:119"><b>命に関わるときは 119番</b><small>押すと電話をかけます。オンコール当番への連絡は、そのあとで大丈夫です</small></a>' +
-      (data.連絡先 || []).map(function (c) {
-        return '<a class="mnl-call" href="tel:' + esc(String(c.電話).replace(/#/g, '%23')) + '"><b>' + esc(c.名前) + 'に電話する</b><small>' + esc(c.電話) + '</small></a>';
-      }).join('') +
-      (!(data.連絡先 || []).length ? '<p class="ptl-note">オンコール当番の電話番号は、施設の掲示や当番表で確認してください。</p>' : '') +
+      '<a class="mnl-119" href="tel:119"><b>命に関わるときは 119番</b><small>押すと電話をかけます。当番の看護師（オンコール）への連絡は、そのあとで大丈夫です</small></a>' +
+      '<div id="mnl-calls">' + calls() + '</div>' +
       '<p class="ptl-note">この場面で見るところ（上から順に）</p>' +
       '<ol class="mnl-steps">' + list.map(function (g) {
         return '<li><button type="button" data-jump="' + esc(g.ID) + '">' + esc(g.題) + '</button></li>';
@@ -136,13 +190,55 @@
       (!list.length ? '<div class="loading">急変のときに見るページがまだ決まっていません。</div>' : '');
   }
 
+  // 連絡先: 施設ごとに番号がちがうときは「どの施設ですか？」で選んでから出す（参考アプリと同じ流れ）。
+  // 連絡先の 施設 が空の行は、どの施設でも出す（本部・施設長など）。選んだ施設は次も使う（端末に保存）
+  function facility(v) {
+    if (v !== undefined) { try { localStorage.setItem('ippo.facility', v); } catch (_) {} return v; }
+    try { return localStorage.getItem('ippo.facility') || ''; } catch (_) { return ''; }
+  }
+  function calls() {
+    var list = data.連絡先 || [];
+    if (!list.length) return '<p class="ptl-note">オンコール当番の電話番号は、施設の掲示や当番表で確認してください。</p>';
+    var facs = [];
+    list.forEach(function (c) { if (c.施設 && facs.indexOf(c.施設) < 0) facs.push(c.施設); });
+    var cur = facs.length === 1 ? facs[0] : facility();
+    if (facs.indexOf(cur) < 0) cur = '';
+    var pick = facs.length > 1 ? '<section class="mnl-fac"><b>' + T().ic('home') + 'どの施設ですか？<small>（施設で連絡先がちがいます）</small></b><div class="mnl-fac-btns">' +
+      facs.map(function (f) { return '<button type="button" data-fac="' + esc(f) + '" aria-pressed="' + (f === cur) + '">' + esc(f) + '</button>'; }).join('') + '</div></section>' : '';
+    if (facs.length > 1 && !cur) {
+      // 施設を選ぶまでは、どの施設でも同じ連絡先（施設 が空の行）だけ先に出す
+      return pick + list.filter(function (c) { return !c.施設; }).map(callBtn).join('');
+    }
+    return pick + list.filter(function (c) { return !c.施設 || c.施設 === cur; }).map(callBtn).join('');
+  }
+  function callBtn(c) {
+    return '<a class="mnl-call" href="tel:' + esc(String(c.電話).replace(/#/g, '%23')) + '"><span class="mnl-call-ic" aria-hidden="true">' + T().ic('phone') + '</span><span><b>' + esc(c.名前) + 'に電話する</b><small>' +
+      (c.施設 ? esc(c.施設) + '　' : '') + esc(c.電話) + '</small></span></a>';
+  }
+
+  // 要点: 「場面 → こうする」の形が2つ以上あれば、色つきのカードを2列に並べる（参考アプリの「6つの場面 → こうする」）
+  function points(list) {
+    var pairs = list.map(function (p) { var m = /^(.+?)\s*(?:→|->)\s*(.+)$/.exec(String(p)); return m ? { h: m[1], d: m[2] } : null; });
+    var n = pairs.filter(Boolean).length;
+    if (n < 2 || n < list.length - 1) return '<ul class="mnl-points">' + list.map(function (p) { return '<li>' + esc(p) + '</li>'; }).join('') + '</ul>';
+    return '<p class="mnl-gridh">' + n + 'つの場面 → こうする</p><div class="mnl-grid">' + list.map(function (p, i) {
+      var x = pairs[i];
+      if (!x) return '<div class="mnl-cell wide green"><span>' + esc(p) + '</span></div>';
+      var t = tone(x.h);
+      return '<div class="mnl-cell ' + t + '"><b>' + esc(x.h) + '</b><span>' + esc(x.d) + '</span></div>';
+    }).join('') + '</div>';
+  }
+
   function guideCard(g, compact) {
+    var urgentCat = /緊急|急変|オンコール/.test(g.分類 || '');
+    var body = String(g.本文 || '').replace(/^（見本の文章です）$/, '');
     return '<article class="mnl-guide" id="g-' + esc(g.ID) + '" tabindex="-1">' +
-      '<p class="mnl-cat">' + esc(g.分類) + '</p><h2>' + esc(g.題) + '</h2>' +
-      '<p class="muted">' + (g.改定日 ? T().ymdJa(g.改定日) + ' 改定　' : '') + (g.読む分 ? '読む目安 ' + esc(g.読む分) + '分' : '') + '</p>' +
-      '<h3>パッと見</h3><ul class="mnl-points">' + (g.要点 || []).map(function (p) { return '<li>' + esc(p) + '</li>'; }).join('') + '</ul>' +
-      (g.本文 ? '<details' + (compact ? '' : ' open') + '><summary>くわしく読む（全文）</summary>' +
-        String(g.本文).split('\n').map(function (l) { return '<p>' + esc(l) + '</p>'; }).join('') + '</details>' : '') +
+      '<div class="mnl-gh">' + icon(g, 'lg') + '<div><p class="mnl-cat' + (urgentCat ? ' red' : '') + '">' + esc(g.分類) + '</p><h2>' + esc(g.題) + '</h2>' +
+      '<p class="muted">' + meta(g) + '</p></div></div>' +
+      ((g.要点 || []).length ? '<h3>パッと見</h3>' + points(g.要点) : '') +
+      (body ? '<details class="mnl-full"' + (compact ? '' : ' open') + '><summary>' + T().ic('book') + 'くわしく読む（原文）</summary>' +
+        body.split('\n').map(function (l) { return '<p>' + esc(l) + '</p>'; }).join('') + '</details>' : '') +
+      (!(g.要点 || []).length && !body ? '<p class="muted">このページは、まだ中身が書かれていません。</p>' : '') +
       '</article>';
   }
 
@@ -156,6 +252,15 @@
     var b = e.target.closest('button');
     if (!b || !app.contains(b)) return;
     if (b.id === 'mnl-size') return bigText(!document.body.classList.contains('mnl-big'));
+    if (b.dataset.tab) {
+      if (document.getElementById('mnl-f')) return doJump(b.dataset.tab); // トップにいるときはその場で
+      jump = b.dataset.tab; location.hash = '#manual'; return;
+    }
+    if (b.dataset.fac !== undefined) {
+      facility(b.dataset.fac);
+      var box = document.getElementById('mnl-calls'); if (box) box.innerHTML = calls();
+      return;
+    }
     if (b.dataset.key) { query = b.dataset.key; var q = document.getElementById('mnl-q'); if (q) q.value = query; return search(); }
     if (b.dataset.clear) { query = ''; var q2 = document.getElementById('mnl-q'); if (q2) q2.value = ''; return search(); }
     if (b.dataset.jump) {

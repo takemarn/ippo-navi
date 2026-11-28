@@ -67,9 +67,6 @@
 .att-dl dt { font-size: 12px; font-weight: 700; color: #5B6572; }
 .att-dl dd { overflow-wrap: anywhere; white-space: pre-wrap; }
 .att-none { color: #9AA5B1; }
-.att-lines { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; white-space: normal; }
-.att-lines li { display: flex; justify-content: space-between; gap: 8px; font-variant-numeric: tabular-nums; }
-.att-lines .att-sum { border-top: 1px dashed #C9DBF5; padding-top: 4px; font-weight: 700; }
 .att-senderr { background: #FCE1E4; color: #C0283A; border-radius: 10px; padding: 10px 12px; font-size: 13px; }
 .att-senderr p, .att-senderr ul { margin: 4px 0 0; }
 .att-senderr ul { padding-left: 1.2em; }
@@ -87,13 +84,13 @@
 .att-off .att-lab .att-lab-name { color: #9AA5B1; font-weight: 400; }
 .att-range { display: flex; align-items: center; gap: 8px; }
 .att-form .att-range input { width: 34%; flex: 0 0 34%; min-width: 104px; padding: 0 8px; }
-.att-tilde { font-size: 18px; color: #333; line-height: 1; }
-.att-off .att-tilde { color: #9AA5B1; }
+.att-tilde { font-size: 20px; color: #4A5563; line-height: 1; }
+.att-off .att-tilde { color: #7C8794; }
 .att-form input[type=time]::-webkit-calendar-picker-indicator { opacity: .45; }
 .att-form input[type=time]:disabled::-webkit-calendar-picker-indicator { display: none; }
 
 /* 補足文（入力欄の下）: 10px グレー */
-.att-hint { margin: -2px 0 0; font-size: 10px; color: #6E7782; line-height: 1.4; }
+.att-hint { margin: -2px 0 0; font-size: 11px; color: #555f6c; line-height: 1.4; }
 
 /* 遅延証明書: 白い入力欄風の「ファイルを選択」 */
 .att-file { position: relative; display: flex; align-items: center; }
@@ -109,8 +106,26 @@
   position: absolute; right: 6px; top: 50%; transform: translateY(-50%); width: 28px; height: 28px; padding: 0; border-radius: 50%;
   border: 0; background: #EEF2F8; color: #5B6572; font-size: 14px; line-height: 28px; cursor: pointer; box-shadow: none;
 }
+/* 遅延証明書の案内: 読めなかった・大きすぎたときは赤字 */
+.att-hint.att-hint-bad { color: #C0283A; }
+.att-note.att-note-ok { color: #2F7A45; }
 .att-note { display: block; font-size: 11px; color: #8A6A1E; margin-top: 2px; white-space: normal; }
 
 
 /* 共通の戻るリンク（core.js の backHtml）をフォームの下で詰めて置く */
 .att-form > .ipp-back, .att-actions > .ipp-back { align-self: center; min-height: 36px; margin-top: -8px; }
+/* 完了カードの「何を送ったか」1行（項目・対象日・時間） */
+.att-done-sum { font-size: 13px; color: #1b1f24; overflow-wrap: anywhere; }
+
+/* ---------- 見直し4周目（使う人の目）で足したもの ---------- */
+/* 入力欄は指で押しやすい高さ 42px に（前は 38px） */
+.att-form input, .att-form select, .att-file-btn { height: 42px; }
+/* 欄の下の案内は 11px・濃いめに（前は 10px で読みにくかった） */
+.att-hint { font-size: 11px; color: #555f6c; line-height: 1.5; }
+.att-hint:empty { display: none; }
+.att-opt { color: #5f6873; }
+/* ファイルを外す×は 36px に（前は 28px で押しにくかった） */
+.att-file-clear { width: 36px; height: 36px; line-height: 36px; right: 3px; font-size: 16px; }
+.att-send { min-height: 46px; font-size: 15px; font-weight: 700; }
+.att-back { min-height: 44px; font-size: 14px; }
+.att-form > .ipp-back, .att-actions > .ipp-back { min-height: 44px; }

@@ -35,27 +35,55 @@
   function backLink(href, label) { return backHtml(href, label); }
 
   // ---------- GAS とのやりとり ----------
-  function api(action, data) {
+  function api(action, data, retried) {
     if (DEMO) return Demo.call(action, data || {});
+    var ctl = window.AbortController ? new AbortController() : null;
+    var timer = ctl && setTimeout(function () { ctl.abort(); }, 60000); // GAS は順番待ち（最大20秒）＋処理があるので長めに
     return fetch(CFG.API_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify({ action: action, idToken: state.idToken, data: data || {} })
-    }).then(function (r) { return r.json(); }, function () {
-      throw new Error('通信できませんでした。電波の良い所でもう一度お試しください');
-    }).catch(function (e) {
-      if (e instanceof SyntaxError) throw new Error('サーバーの返事を読めませんでした。少し待ってからやり直してください');
-      throw e;
-    }).then(function (res) {
+      body: JSON.stringify({ action: action, idToken: freshToken(), data: data || {} }),
+      signal: ctl ? ctl.signal : undefined
+    }).then(function (r) { return r.text(); }, function (err) {
+      var e = new Error(err && err.name === 'AbortError' ? '時間がかかりすぎたため止めました。電波のよい所でもう一度試してください' : '通信できませんでした。電波のよい所でもう一度試してください');
+      e.code = 0; throw e;
+    }).then(function (text) {
+      if (timer) clearTimeout(timer);
+      var res;
+      try { res = JSON.parse(text); } catch (_) {
+        var e0 = new Error('サーバーから正しい返事がありませんでした。少し待ってからやり直してください'); e0.code = 500; throw e0;
+      }
       if (res.ok) return res.data;
-      var e = new Error(res.message || 'エラーが起きました'); e.code = res.code; e.details = res.details || [];
+      var e = new Error(res.message || 'エラーが起きました'); e.code = res.code; e.details = res.details || []; e.reason = res.reason || '';
+      // LINE の本人確認の期限切れは、1回だけ取り直してやり直す
+      if (e.reason === 'token' && !retried && renewToken()) return api(action, data, true);
+      if (e.reason === 'token') e.message = 'LINE の本人確認の期限が切れました。LINE を閉じて、もう一度開いてください';
       throw e;
     });
+  }
+  // LINE の IDトークン。送る前には取り直さない（入力中に画面が読み直されないように）。期限切れは GAS の 401（reason: token）で知る
+  function freshToken() {
+    if (DEMO || !window.liff) return state.idToken;
+    try { return liff.getIDToken() || state.idToken; } catch (_) { return state.idToken; }
+  }
+  // 取り直し: まだ使えるトークンがあればそれ。無ければ LINE の中は開き直し、ブラウザはログインし直す。
+  // 開き直しが2分以内に2回続いたら止めて「LINE を閉じて開き直して」と出す（読み直しが止まらなくなるのを防ぐ）
+  function renewToken() {
+    try {
+      var t = liff.getIDToken(), d = liff.getDecodedIDToken();
+      if (t && t !== state.idToken && d && d.exp * 1000 > Date.now() + 60000) { state.idToken = t; return true; }
+      var last = 0;
+      try { last = Number(sessionStorage.getItem('ippo.renewAt') || 0); sessionStorage.setItem('ippo.renewAt', String(Date.now())); } catch (_) {}
+      if (Date.now() - last < 120000) return false;
+      if (liff.isInClient()) location.reload(); else { liff.logout(); liff.login({ redirectUri: location.href }); }
+    } catch (_) {}
+    return false;
   }
 
   // ---------- 見本モード（架空のデータ） ----------
   var Demo = {
     seq: 3,
+    sent: {}, // 送信ID → 1回目の返事（二重送信の見本）
     me: { 職員ID: 'STF-0001', 氏名: '見本 太郎', 職種: '看護師', 役割: '承認者', 当月残業合計: '3:30', 雇用形態: '常勤', 可能勤務: '日勤、早出、遅出、夜勤', 資格: '正看護師' },
     options: {
       経費区分: ['看護', '介護', '施設', '利用者立替', 'その他', '救急搬送', '本部', '交通'],
@@ -73,16 +101,18 @@
       { 申請ID: 'EXP-20261120-DEMO05', 申請種類: '経費', 申請者職員ID: 'STF-0001', 申請日時: '2026-11-20 15:02:00', 状態: '差戻し', 現在段階: '', コメント: '領収書の金額と合っていません。確認して出し直してください。', 承認者: '',
         明細: [{ 行番号: 1, 対象日: '2026-11-20', 経費区分: '交通', 物品: 'バス代（往診同行）', 個数: 1, 金額: 1200 }] },
       { 申請ID: 'ATT-20261115-DEMO06', 申請種類: '勤怠', 申請者職員ID: 'STF-0001', 申請日時: '2026-11-15 08:10:00', 状態: '取消', 現在段階: '', コメント: '', 承認者: '',
-        明細: [{ 項目: '遅刻', 対象日: '2026-11-15', 開始: '09:00', 終了: '09:20', 備考: '電車遅延' }] }
+        明細: [{ 項目: '遅刻', 対象日: '2026-11-15', 開始: '09:00', 終了: '09:20', 備考: '電車遅延', 施設名: 'モア一津屋', 添付ファイルID: 'FILE-DEMO-0006' }] }
     ],
     pending: [
-      { 申請ID: 'EXP-20261128-DEMO03', 申請種類: '経費', 申請者: '見本 花子', 申請日時: '2026-11-28 09:05:00', 状態: '承認待ち', 現在段階: 1, 承認者: '見本 太郎', 担当: true,
+      { 申請ID: 'EXP-20261128-DEMO03', 申請種類: '経費', 申請者: '見本 花子', 申請者職員ID: 'STF-0002', 申請日時: '2026-11-28 09:05:00', 状態: '承認待ち', 現在段階: 1, 承認者: '見本 太郎', 担当: true,
         明細: [{ 行番号: 1, 対象日: '2026-11-28', 経費区分: '看護', 物品: '滅菌ガーゼ', 個数: 2, 金額: 640 }, { 行番号: 2, 対象日: '2026-11-28', 経費区分: '看護', 物品: '絆創膏', 個数: 1, 金額: 380 }] },
-      { 申請ID: 'ATT-20261127-DEMO04', 申請種類: '勤怠', 申請者: '見本 次郎', 申請日時: '2026-11-27 20:31:00', 状態: '承認待ち', 現在段階: 1, 承認者: '見本 太郎', 担当: true,
-        明細: [{ 項目: '残業・前残業', 対象日: '2026-11-27', 開始: '18:00', 終了: '19:30', 備考: '記録の入力' }] },
-      { 申請ID: 'ATT-20261126-DEMO07', 申請種類: '勤怠', 申請者: '見本 三郎', 申請日時: '2026-11-26 12:44:00', 状態: '承認待ち', 現在段階: 1, 承認者: '見本 一郎', 担当: false,
+      { 申請ID: 'ATT-20261127-DEMO04', 申請種類: '勤怠', 申請者: '見本 次郎', 申請者職員ID: 'STF-0003', 申請日時: '2026-11-27 20:31:00', 状態: '承認待ち', 現在段階: 1, 承認者: '見本 太郎', 担当: true,
+        明細: [{ 項目: '残業・前残業', 対象日: '2026-11-27', 開始: '18:00', 終了: '19:30', 備考: '記録の入力', 施設名: 'モア一津屋' }] },
+      { 申請ID: 'ATT-20261127-DEMO09', 申請種類: '勤怠', 申請者: '見本 さくら', 申請者職員ID: 'STF-0006', 申請日時: '2026-11-27 09:50:00', 状態: '承認待ち', 現在段階: 1, 承認者: '見本 太郎', 担当: true,
+        明細: [{ 項目: '遅刻', 対象日: '2026-11-27', 開始: '09:00', 終了: '09:40', 備考: '電車遅延（証明書あり）', 施設名: 'モア一津屋', 添付ファイルID: 'FILE-DEMO-0009' }] },
+      { 申請ID: 'ATT-20261126-DEMO07', 申請種類: '勤怠', 申請者: '見本 三郎', 申請者職員ID: 'STF-0004', 申請日時: '2026-11-26 12:44:00', 状態: '承認待ち', 現在段階: 1, 承認者: '見本 一郎', 担当: false,
         明細: [{ 項目: '有給', 対象日: '2026-12-03', 開始: '09:00', 終了: '18:00', 備考: '' }] },
-      { 申請ID: 'EXP-20261125-DEMO08', 申請種類: '経費', 申請者: '見本 四郎', 申請日時: '2026-11-25 17:20:00', 状態: '承認待ち', 現在段階: 2, 承認者: '見本 一郎', 担当: false,
+      { 申請ID: 'EXP-20261125-DEMO08', 申請種類: '経費', 申請者: '見本 四郎', 申請者職員ID: 'STF-0005', 申請日時: '2026-11-25 17:20:00', 状態: '承認待ち', 現在段階: 2, 承認者: '見本 一郎', 担当: false,
         明細: [{ 行番号: 1, 対象日: '2026-11-25', 経費区分: '施設', 物品: '電球（共用部）', 個数: 1, 金額: 3300 }] }
     ],
     call: function (action, data) {
@@ -98,25 +128,71 @@
       // 見本モードで送った申請も「自分の申請」で中身が見えるよう、受け取った data から明細を作って残す
       function newReq(type, prefix, d) {
         d = d || {};
+        // 送信ID: 同じIDの2回目は前の返事を返す（GAS と同じ。「もう一度送信する」で2件にしない）
+        if (d.送信ID && self.sent[d.送信ID]) return self.sent[d.送信ID];
+        check(type, d);
         var r = { 申請ID: prefix + '-' + today().replace(/-/g, '') + '-DEMO' + ('0' + (++self.seq)).slice(-2), 申請種類: type,
           申請者職員ID: self.me.職員ID, 申請日時: today() + ' 12:00:00', 状態: '承認待ち', 現在段階: 1 };
         if (type === '経費') {
           r.小口先出 = d.小口先出 || ''; r.備考 = d.備考 || '';
           r.明細 = (d.物品 || []).map(function (it, i) {
             return { 行番号: i + 1, 対象日: d.対象日 || '', 経費区分: d.経費区分 || '',
-              物品: it.物品 === 'フリー入力' ? (it.自由入力 || 'フリー入力') : (it.物品 || ''), 個数: Number(it.個数) || 0, 金額: Number(it.金額) || 0 };
+              物品: it.物品 === 'フリー入力' ? (it.自由入力 || 'フリー入力') : (it.物品 || ''), 個数: Number(it.個数) || 0, 金額: Number(it.金額) || 0, 施設名: d.施設名 || '' };
           });
         } else {
-          var m = { 項目: d.項目 || '', 対象日: d.対象日 || '', 備考: d.備考 || '' };
+          var m = { 項目: d.項目 || '', 対象日: d.対象日 || '', 備考: d.備考 || '', 施設名: d.施設名 || '', 添付ファイルID: d.添付ファイルID || '' };
           if (d.打刻時刻) m.打刻時刻 = d.打刻時刻; else { m.開始 = d.開始 || ''; m.終了 = d.終了 || ''; }
           r.備考 = d.備考 || ''; r.明細 = [m];
         }
-        self.requests.unshift(r); return { 申請ID: r.申請ID, 状態: r.状態 };
+        self.requests.unshift(r);
+        var res = { 申請ID: r.申請ID, 状態: r.状態 };
+        if (d.送信ID) self.sent[d.送信ID] = res;
+        return res;
+      }
+      // GAS と同じ入力チェック（docs/api.md「入力チェックと決まり」）。だめなら {code: 400, details} を投げる
+      function check(type, d) {
+        var errs = [], o = self.options, td = today();
+        function realDay(v) { var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(v || ''), x = m && new Date(+m[1], +m[2] - 1, +m[3]); return !!x && x.getMonth() === +m[2] - 1 && x.getDate() === +m[3]; }
+        function hm(v) { var m = /^(\d{2}):(\d{2})$/.exec(v || ''); return m && +m[1] < 24 && +m[2] < 60 ? +m[1] * 60 + +m[2] : null; }
+        if (d.施設名 && o.施設.indexOf(d.施設名) < 0) errs.push('施設名は選択肢から選んでください');
+        if (!realDay(d.対象日)) errs.push('対象日が正しくありません');
+        if (String(d.備考 || '').length > 500) errs.push('備考は500文字までです');
+        if (type === '経費') {
+          if (realDay(d.対象日) && d.対象日 > td) errs.push('対象日は今日までの日にしてください');
+          if (o.経費区分.indexOf(d.経費区分) < 0) errs.push('経費区分を選んでください');
+          if (o.小口先出.indexOf(d.小口先出) < 0) errs.push('小口先出を選んでください');
+          var items = d.物品 || [];
+          if (!items.length) errs.push('物品を1つ以上入れてください');
+          if (items.length > 50) errs.push('物品は50行までです');
+          items.forEach(function (it, i) {
+            var n = (i + 1) + '行目: ', q = Number(it.個数), y = Number(it.金額);
+            if (!it.物品) errs.push(n + '物品を選んでください');
+            if (it.物品 === 'フリー入力' && !String(it.自由入力 || '').trim()) errs.push(n + '物品名を書いてください');
+            if (String(it.自由入力 || '').length > 100) errs.push(n + '物品名は100文字までです');
+            if (!(q === Math.floor(q) && q >= 1 && q <= 9999)) errs.push(n + '個数は1〜9999の整数にしてください');
+            if (it.金額 === '' || !(y === Math.floor(y) && y >= 0 && y <= 1000000)) errs.push(n + '金額は0〜1,000,000の整数にしてください');
+          });
+        } else {
+          var k = d.項目 || '', s = hm(d.開始), e = hm(d.終了);
+          if (o.勤怠項目.indexOf(k) < 0) errs.push('項目を選んでください');
+          if (/^(残業|遅刻|早退|打刻修正)/.test(k) && realDay(d.対象日) && d.対象日 > td) errs.push(k + 'は先の日付では出せません');
+          if (/^打刻修正/.test(k)) { if (hm(d.打刻時刻) === null) errs.push('打刻時刻を入れてください'); }
+          else if (/^(欠勤|有給|冬期休暇|夏季休暇|特別休暇)$/.test(k)) {
+            if (!d.開始 !== !d.終了) errs.push('時間は開始・終了の両方を入れるか、両方空にしてください');
+            else if (d.開始 && (s === null || e === null || s >= e)) errs.push('時間が正しくありません');
+          } else if (k) {
+            if (s === null || e === null) errs.push('開始・終了の時刻を入れてください');
+            else if (k === '残業・前残業') { var len = (e - s + 1440) % 1440; if (!len || len > 720) errs.push('残業の時間は12時間までで、開始と終了を同じにはできません'); }
+            else if (s >= e) errs.push('終了は開始より後の時刻にしてください');
+          }
+        }
+        if (errs.length) { var x = new Error('入力を確認してください'); x.code = 400; x.details = errs; throw x; }
       }
       // 第2段階以降の見本データは各画面のファイル（例 views/shift-demo.js）が IPPO.demo に登録する
       if (window.IPPO.demo[action]) return window.IPPO.demo[action](data || {}, self.me);
       switch (action) {
         case 'me': return this.me;
+        case 'linkLine': return this.me;
         case 'options': return this.options;
         case 'submitExpense': return newReq('経費', 'EXP', data);
         case 'submitAttendance': return newReq('勤怠', 'ATT', data);
@@ -155,12 +231,44 @@
     });
   }
 
-  // 開けなかったときのカード（参考アプリの「日報を開けませんでした」と同じ形: 理由＋再読み込み）
+  // 開けなかったときのカード（参考アプリの「日報を開けませんでした」と同じ形: 理由＋もう一度読み込む）。
+  // エラー表示は2つの形にそろえてある: 画面ごと開けない → この白いカード（views/portal.js の failBox も同じ）、
+  // 画面の一部（一覧など）が読めない → 赤い枠の「! 読み込めませんでした」（clients.js の showFail・shift.js の failBox）
   function showError(e) {
     busy(false);
+    if (e && e.reason === 'unregistered') return showRegister();
     app.innerHTML = '<div class="card fail" role="alert"><h2>画面を開けませんでした</h2>' +
       '<p class="fail-msg">' + esc(e && e.message || 'エラーが起きました') + '</p>' +
-      (e && e.code === 401 ? '<p class="muted">LINE からもう一度開き直してください。</p>' : '<button onclick="location.reload()">再読み込み</button>') + '</div>';
+      // 言い方は画面ごとのエラー表示（承認待ち一覧・自分の申請など）とそろえる:「電波の良い所で…」＋「もう一度読み込む」
+      (e && e.code === 401 ? '<p class="fail-note">LINE からもう一度開き直してください。</p>'
+        : (/電波/.test(e && e.message || '') ? '' : '<p class="fail-note">電波の良い所で、もう一度読み込んでください。</p>') +
+          '<button type="button" onclick="location.reload()">もう一度読み込む</button>') + '</div>';
+  }
+
+  // ---------- はじめての登録（LINE と職員名簿の紐づけ） ----------
+  // 職員名簿にまだ LINE がつながっていない人が開いたときに出る。運営からもらった6けたの登録コードを入れる
+  function showRegister() {
+    busy(false);
+    app.innerHTML = '<div class="card register"><h2>はじめての登録</h2>' +
+      '<p>IPPO管理ナビを使うには、はじめに1回だけ登録が必要です。運営からもらった<b>6けたの登録コード</b>を入れてください。</p>' +
+      '<form id="regForm" novalidate><label>登録コード' +
+      '<input id="regCode" inputmode="numeric" autocomplete="one-time-code" maxlength="8" placeholder="例 482913"></label>' +
+      '<div id="regErr" aria-live="polite"></div>' +
+      '<button type="submit" class="primary" id="regBtn">登録する</button></form>' +
+      '<p class="muted">コードがわからないときは、運営に「IPPO管理ナビの登録コード」を聞いてください。</p></div>';
+    document.getElementById('regForm').addEventListener('submit', function (ev) {
+      ev.preventDefault();
+      var code = document.getElementById('regCode').value.replace(/[０-９]/g, function (c) { return String.fromCharCode(c.charCodeAt(0) - 0xFEE0); }).replace(/\s/g, '');
+      var err = document.getElementById('regErr'), btn = document.getElementById('regBtn');
+      if (!/^[1-9][0-9]{5}$/.test(code)) { err.innerHTML = '<div class="errors" role="alert">登録コードは6けたの数字です</div>'; return; }
+      btn.disabled = true; btn.textContent = '登録中…'; busy(true);
+      api('linkLine', { 登録コード: code }).then(function () {
+        toast('登録しました'); boot();
+      }).catch(function (e) {
+        busy(false); btn.disabled = false; btn.textContent = '登録する';
+        err.innerHTML = '<div class="errors" role="alert">' + esc(e.message) + '</div>';
+      });
+    });
   }
 
   // ---------- 読み込み中の表示（参考 0-6） ----------
@@ -198,7 +306,7 @@
     var appr = canApprove()
       ? '<a class="mbtn" href="#approvals">承認待ち一覧<span id="pcount"></span></a>'
       : '<button type="button" class="mbtn locked" data-locked="1">承認待ち一覧<span class="mtag">承認者のみ</span></button>';
-    app.innerHTML = '<h1>メニュー</h1><nav class="mgroup" aria-label="メニュー">' + items.map(btn).join('') + '</nav>' +
+    app.innerHTML = (IPPO.menuHead ? IPPO.menuHead() : '<h1>メニュー</h1>') + '<nav class="mgroup" aria-label="メニュー">' + items.map(btn).join('') + '</nav>' +
       '<div class="msolo">' + appr + '</div>' +
       backHtml('#menu', 'メニュー一覧に戻る');
     function onTap(e) {
@@ -269,10 +377,17 @@
       if (!liff.isLoggedIn()) { liff.login({ redirectUri: location.href }); return new Promise(function () {}); }
       state.idToken = liff.getIDToken();
     });
-    ready.then(function () { return Promise.all([api('me'), api('options')]); })
+    ready.then(boot, showError);
+  }
+  // 本人の情報と選択肢を読んでから画面を出す（はじめての登録のあとにも呼ぶ）
+  function boot() {
+    // 見本モードで「はじめての登録」の見た目を確かめる: index.html?register
+    if (DEMO && /(^|[?&])register\b/.test(location.search) && !boot.done) { boot.done = true; return showRegister(); }
+    return Promise.all([api('me'), api('options')])
       .then(function (r) {
         state.me = r[0]; state.options = r[1];
         document.getElementById('who').textContent = state.me.氏名;
+        window.removeEventListener('hashchange', route);
         window.addEventListener('hashchange', route);
         route();
       })

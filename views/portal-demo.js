@@ -1,7 +1,11 @@
 /* 相談AI（社内ポータル）の見本データ（見本モードのときだけ使う）。
    規程・マニュアルの文章はすべて見本として新しく書いたもので、実際の規程ではない。本番はスプレッドシートの
    「規程」「規程本文」「マニュアル」「ポータル」「組織」「駐車場」シートから GAS が返す（kiroku-app の docs/api.md「相談AI」）。
-   検索のしくみ（searchDocs）は kiroku-app の gas/src/util.js と同じ決まり */
+   検索のしくみ（searchDocs）は kiroku-app の gas/src/util.js と同じ決まり
+   【GAS側にも要る】画面の作り込みで足した項目（どれも空なら今までどおりに出る）:
+     manual の 連絡先[].施設 … 施設ごとに電話番号がちがうとき。2つ以上あると急変の画面で「どの施設ですか？」を出す。空の行はどの施設でも出す
+     manual の ガイド[].絵   … 場面カードの絵の名前（任意。fall・note・pill・home・bath・thermo・bandage・eye・phone・ambulance・steth・sprout・book のどれか。空なら題やキーワードから画面が選ぶ）
+     parking の 駐車場[].区画 は今までどおり。並べた順に「区画の並び」を描く */
 (function () {
   'use strict';
   var I = window.IPPO;
@@ -117,8 +121,8 @@
 
   // ---------- 駐車場 ----------
   var LOTS = [
-    { 駐車場ID: 'P1', 名前: '第1駐車場（見本）', 説明: '施設の裏・番号つき', 目安: '番号つき・3台', 地図: 'https://www.google.com/maps/search/?api=1&query=%E6%91%82%E6%B4%A5%E5%B8%82', 区画: ['1番', '2番', '3番'] },
-    { 駐車場ID: 'P2', 名前: '第2駐車場（見本）', 説明: '道路をはさんだ向かい・番号なし', 目安: '平地・最大3台目安', 地図: 'https://www.google.com/maps/search/?api=1&query=%E6%91%82%E6%B4%A5%E5%B8%82', 区画: [], 台数: 3 }
+    { 駐車場ID: 'P1', 名前: '第1駐車場（見本）', 説明: '施設の裏・番号つき', 目安: '番号つき・3台', 地図: 'https://www.google.com/maps/search/?api=1&query=%E9%A7%90%E8%BB%8A%E5%A0%B4', 区画: ['1番', '2番', '3番'] },
+    { 駐車場ID: 'P2', 名前: '第2駐車場（見本）', 説明: '道路をはさんだ向かい・番号なし', 目安: '平地・最大3台目安', 地図: 'https://www.google.com/maps/search/?api=1&query=%E9%A7%90%E8%BB%8A%E5%A0%B4', 区画: [], 台数: 3 }
   ];
   var parked = [
     { 記録ID: 'PK-DEMO01', 駐車場ID: 'P1', 区画: '2番', 氏名: '見本 花子', 車: '白い軽（見本）', 停めた: hoursAgo(3), 予定: hoursAgo(-5) },
@@ -228,7 +232,10 @@
   D.orgChart = function () { return ORG; };
   D.manual = function (data, me) {
     var nurse = nurseOk(me);
-    return { 急変: MANUAL.急変, キーワード: MANUAL.キーワード, 看護職: nurse, 連絡先: [{ 名前: 'オンコール当番（見本）', 電話: '000-0000-0000' }, { 名前: '看護主任（見本）', 電話: '000-0000-0001' }, { 名前: '施設長（見本）', 電話: '000-0000-0002' }], ガイド: guidesFor(nurse) };
+    return { 急変: MANUAL.急変, キーワード: MANUAL.キーワード, 看護職: nurse, 連絡先: [
+      { 名前: 'オンコール当番（見本）', 電話: '000-0000-0000', 施設: 'ひだまり（見本）' }, { 名前: '施設長（見本）', 電話: '000-0000-0002', 施設: 'ひだまり（見本）' },
+      { 名前: 'オンコール当番（見本）', 電話: '000-0000-0010', 施設: 'あおぞら（見本）' }, { 名前: '施設長（見本）', 電話: '000-0000-0012', 施設: 'あおぞら（見本）' },
+      { 名前: '看護主任（見本）', 電話: '000-0000-0001' }], ガイド: guidesFor(nurse) };
   };
   D.parking = function () { return parkingState(); };
   D.parkIn = function (data, me) {

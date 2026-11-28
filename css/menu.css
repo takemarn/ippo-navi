@@ -1,30 +1,105 @@
-/* views/menu.js・views/apply.js 専用の見た目（入口の6タイルと、各メニュー画面）。共通部分は style.css */
+/* views/menu.js・views/apply.js 専用の見た目（入口のホームと、各メニュー画面）。共通部分は style.css */
 
-/* ---------- 入口: リッチメニューと同じ 3列×2段 ---------- */
-.tiles {
-  display: grid; grid-template-columns: repeat(3, 1fr); gap: 2px; margin-top: 2px;
-  background: #fff; border: 2px solid #fff; border-radius: 16px; overflow: hidden; box-shadow: var(--glass-shadow);
+/* ---------- 入口（ホーム #menu）: あいさつ → 今やること → 6タイル → よく使う ---------- */
+.hm-sec { display: flex; align-items: baseline; gap: 8px; font-size: 14px; font-weight: 800; margin: 6px 2px -2px; letter-spacing: .04em; }
+.hm-sec small { font-size: 9px; font-weight: 700; letter-spacing: .14em; color: #7b8697; } /* 飾りの英語（読み上げない） */
+
+.hm-hero {
+  position: relative; overflow: hidden; display: flex; align-items: center; gap: 14px;
+  padding: 16px 16px 18px; border-radius: 18px; color: #fff;
+  background: radial-gradient(120% 140% at 100% 0%, #3b6fd8 0%, rgba(59, 111, 216, 0) 55%), linear-gradient(135deg, #12317d 0%, #1d4aa8 60%, #2f7bd6 100%);
+  box-shadow: 0 10px 24px rgba(18, 49, 125, .28);
 }
-.tile {
-  position: relative; overflow: hidden; display: flex; flex-direction: column; align-items: center; justify-content: flex-end;
-  min-height: 140px; padding: 10px 4px 9px; text-decoration: none; color: var(--fg); text-align: center;
-  background: linear-gradient(160deg, #fff 0%, #fff 45%, var(--tint) 100%);
+.hm-logo { width: 56px; height: 56px; border-radius: 50%; background: #fff; flex: none; box-shadow: 0 4px 12px rgba(0, 0, 0, .18); position: relative; }
+.hm-hi { position: relative; min-width: 0; }
+.hm-hi h1 { text-align: left; font-size: 15px; font-weight: 700; margin: 2px 0 0; line-height: 1.4; }
+.hm-hi h1 span { display: block; font-size: 20px; font-weight: 800; letter-spacing: .02em; overflow-wrap: anywhere; }
+.hm-date { font-size: 11px; font-weight: 700; letter-spacing: .08em; opacity: .85; }
+.hm-sub { margin-top: 4px; font-size: 11px; opacity: .9; }
+.hm-sub i { font-style: normal; margin: 0 4px; opacity: .6; }
+/* 右下のぼかした光の輪（参考の背景のぼかし波と同じ雰囲気） */
+.hm-wave {
+  position: absolute; right: -40px; bottom: -70px; width: 200px; height: 160px; border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(255, 255, 255, .28), rgba(255, 255, 255, 0)); pointer-events: none;
 }
-.tile:active { filter: brightness(.94); }
-.tblob {
-  position: absolute; left: -22px; top: -22px; width: 64px; height: 64px; border-radius: 50%;
-  background: var(--tint); opacity: .9;
+
+.hm-todo { display: flex; flex-direction: column; gap: 8px; }
+.hm-todo .loading { width: 100%; }
+.hm-todo-list { display: flex; flex-direction: column; background: #fff; border-radius: 14px; box-shadow: var(--glass-shadow); overflow: hidden; }
+.hm-todo-row {
+  display: flex; align-items: center; gap: 10px; min-height: 56px; padding: 8px 12px; text-decoration: none; color: var(--fg);
+  border-top: 1px solid #edf1f7;
 }
-.ticon { position: relative; width: 64px; height: 64px; margin-bottom: 2px; fill: none; stroke: currentColor; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
-.ticon .f { fill: currentColor; fill-opacity: .13; stroke: none; }
-.ticon .w { fill: #fff; }
-.tlabel { position: relative; font-size: 13px; font-weight: 800; letter-spacing: .06em; line-height: 1.3; }
-.ten { position: relative; font-size: 7px; letter-spacing: .08em; color: #9aa3ad; line-height: 1.4; margin-top: 1px; white-space: nowrap; }
-.tno {
-  position: relative; margin-top: 6px; width: 17px; height: 17px; border-radius: 50%; background: var(--badge); color: #fff;
-  font-size: 10px; font-weight: 800; display: grid; place-items: center; line-height: 1;
+.hm-todo-row:first-child { border-top: 0; }
+.hm-todo-row:active { background: #f2f5fa; }
+.hm-todo-dot { width: 8px; height: 32px; border-radius: 4px; flex: none; background: var(--tone); }
+.hm-todo-row.wait { --tone: #e8901f; --tone-fg: #a0520a; }
+.hm-todo-row.back { --tone: #d8394b; --tone-fg: #b0202f; }
+.hm-todo-row.info { --tone: #2f7bd6; --tone-fg: #1f5fb4; }
+.hm-todo-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.hm-todo-txt b { font-size: 13px; font-weight: 800; }
+.hm-todo-txt small { font-size: 11px; color: var(--muted); }
+.hm-todo-n { font-size: 22px; font-weight: 800; color: var(--tone-fg); font-variant-numeric: tabular-nums; line-height: 1; }
+.hm-todo-n small { font-size: 11px; margin-left: 2px; }
+.hm-arrow svg, .hm-go svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; display: block; }
+.hm-arrow { color: #a9b3c1; }
+.hm-todo-none { background: #fff; border-radius: 14px; padding: 12px 14px; font-size: 12px; color: var(--label); box-shadow: var(--glass-shadow); }
+.hm-todo-none.ok { display: flex; align-items: center; gap: 8px; }
+.hm-todo-none.ok span { width: 22px; height: 22px; border-radius: 50%; background: var(--ok-soft); color: #1d8a3a; display: grid; place-items: center; font-weight: 800; flex: none; }
+
+/* 6タイル: リッチメニュー画像（richmenu/richmenu.jpg）と同じ白カード＋立体風の絵＋英語の小見出し＋＞の丸 */
+.hm-tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.hm-tile {
+  position: relative; overflow: hidden; display: flex; flex-direction: column; align-items: center;
+  padding: 8px 4px 10px; border-radius: 14px; text-decoration: none; color: var(--fg); text-align: center;
+  background: #fff; border: 1px solid rgba(255, 255, 255, .9);
+  box-shadow: 0 4px 14px rgba(60, 80, 120, .12), 0 1px 2px rgba(60, 80, 120, .08);
+  transition: transform .12s;
 }
-.tiles-note { font-size: 10px; color: var(--muted); text-align: center; }
+.hm-tile:active { transform: scale(.97); }
+.hm-tile-bg {
+  position: absolute; inset: 0; pointer-events: none;
+  background: radial-gradient(80% 50% at 100% 100%, var(--tint), rgba(255, 255, 255, 0) 70%), radial-gradient(60% 40% at 0% 0%, var(--tint), rgba(255, 255, 255, 0) 70%);
+  opacity: .9;
+}
+.hm-art { position: relative; width: 100%; max-width: 132px; aspect-ratio: 6 / 5; height: auto; filter: drop-shadow(0 6px 6px rgba(30, 40, 60, .16)); }
+.hm-art.line { fill: none; stroke: currentColor; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; padding: 12%; filter: none; }
+.hm-tile b { position: relative; font-size: 13px; font-weight: 800; letter-spacing: .06em; line-height: 1.3; margin-top: 2px; }
+/* タイルの下の一言（中で何ができるか）。11px・濃いグレーで読める大きさに。幅が狭いときは2行に折り返す */
+.hm-tile small { position: relative; font-size: 11px; font-weight: 600; color: #4f5966; line-height: 1.35; margin-top: 2px; padding: 0 2px; overflow-wrap: anywhere; }
+.hm-go {
+  position: relative; margin-top: 6px; width: 22px; height: 22px; border-radius: 50%; background: var(--badge); color: #fff;
+  display: grid; place-items: center; box-shadow: 0 2px 5px rgba(0, 0, 0, .18);
+}
+.hm-go svg { width: 12px; height: 12px; stroke-width: 2.6; }
+.hm-note { font-size: 11px; color: #5b6572; text-align: center; margin-top: -4px; }
+@media (min-width: 520px) { .hm-tile b { font-size: 15px; } .hm-tile small { font-size: 12px; } .hm-tiles { gap: 12px; } }
+
+.hm-quick { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.hm-q {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; min-height: 76px; padding: 8px 2px;
+  background: rgba(255, 255, 255, .85); border-radius: 14px; text-decoration: none; color: var(--navy); font-size: 11px; font-weight: 700; text-align: center; line-height: 1.3;
+  box-shadow: 0 2px 8px rgba(60, 90, 140, .1);
+}
+.hm-q:active { background: #e9eef6; }
+.hm-q svg { width: 26px; height: 26px; padding: 6px; box-sizing: content-box; border-radius: 50%; background: var(--accent-soft); fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.hm-q.urgent { color: var(--danger); }
+.hm-q.urgent svg { background: var(--danger-soft); }
+.hm-foot { display: flex; align-items: center; justify-content: center; gap: 6px; margin-top: 10px; font-size: 11px; font-weight: 700; letter-spacing: .12em; color: #5b6572; }
+.hm-foot img { border-radius: 50%; background: #fff; }
+
+/* ---------- 各メニュー画面の見出し（IPPO.menuHead）: 左に絵、右に英語の小見出し＋名前 ---------- */
+.mh {
+  position: relative; overflow: hidden; display: flex; align-items: center; gap: 8px; min-height: 96px; padding: 6px 14px 6px 6px;
+  border-radius: 16px; background: #fff; box-shadow: 0 4px 14px rgba(60, 80, 120, .12);
+}
+.mh-bg { position: absolute; inset: 0; pointer-events: none; background: radial-gradient(70% 90% at 100% 100%, var(--tint), rgba(255, 255, 255, 0) 70%), radial-gradient(40% 70% at 0% 0%, var(--tint), rgba(255, 255, 255, 0) 70%); }
+.mh-art { position: relative; width: 108px; height: 90px; flex: none; filter: drop-shadow(0 5px 5px rgba(30, 40, 60, .16)); }
+.mh-art.line { fill: none; stroke: currentColor; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; padding: 14px; filter: none; }
+.mh-txt { position: relative; min-width: 0; }
+.mh-txt small { display: block; font-size: 9px; font-weight: 700; letter-spacing: .14em; color: var(--tc); }
+.mh-txt h1 { text-align: left; font-size: 20px; margin: 0; letter-spacing: .06em; }
+.mh-txt p { font-size: 12px; color: #4f5966; line-height: 1.5; margin-top: 2px; }
 
 /* ---------- メニュー画面（参考 2章）: すりガラスのグループ＋白い角丸ボタン、下に単独ボタン ---------- */
 .mgroup {
@@ -35,9 +110,9 @@
 }
 .mbtn {
   position: relative; display: flex; align-items: center; justify-content: center; gap: 6px; width: 100%;
-  min-height: 40px; padding: 6px 12px; border: 0; border-radius: 10px; background: #fff; color: #3583da;
-  font: inherit; font-size: 13px; font-weight: 500; text-decoration: none; cursor: pointer;
-  box-shadow: 0 1px 3px rgba(60, 90, 140, .12);
+  min-height: 44px; padding: 6px 12px; border: 0; border-radius: 10px; background: #fff; color: #1a52a0;
+  font: inherit; font-size: 14px; font-weight: 700; text-decoration: none; cursor: pointer;
+  box-shadow: 0 1px 2px rgba(60, 90, 140, .10), 0 3px 8px rgba(60, 90, 140, .10);
 }
 .mbtn:active { background: #e6e9ee; }
 .mbtn:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
@@ -45,8 +120,14 @@
 .msolo .mbtn { box-shadow: 0 2px 8px rgba(60, 90, 140, .12); }
 .mtag {
   position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
-  font-size: 10px; font-weight: 700; color: var(--muted); background: #eef1f5; border-radius: 999px; padding: 0 8px; line-height: 1.7;
+  font-size: 11px; font-weight: 700; color: #5b6572; background: #eef1f5; border-radius: 999px; padding: 0 8px; line-height: 1.7;
 }
 
 .mbtn .badge { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); }
 
+
+/* ---------- 見直し4周目（使う人の目）で足したもの ---------- */
+/* タイルの一言・近道の名前は、語の途中で折り返さない（折り返し位置は menu.js の | → <wbr>） */
+.hm-tile small, .hm-q span { word-break: keep-all; }
+/* 幅が狭い（320px など）ときは、タイルの名前（経費勤怠申請）が1行に収まるよう字間を詰める */
+@media (max-width: 360px) { .hm-tile b { letter-spacing: 0; font-size: 12.5px; } .hm-tile { padding-left: 2px; padding-right: 2px; } }
