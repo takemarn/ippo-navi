@@ -97,7 +97,7 @@
       '<path d="M3 3.5A2.5 2.5 0 015.5 1H21v22H5.5A2.5 2.5 0 003 25.5z" fill="currentColor"/><path d="M3 25.5A2.5 2.5 0 015.5 23H21v4H5.5A2.5 2.5 0 013 24.5" fill="#fff" stroke="currentColor" stroke-width="1.2"/></svg>';
   }
   function viewRulesList() {
-    app.innerHTML = '<h1 class="ptl-h1l">就業規則・各規程</h1>' +
+    app.innerHTML = topBack('#rules', '就業規則・組織図・福利厚生にもどる') + '<h1 class="ptl-h1l">就業規則・各規程</h1>' +
       '<p class="muted" id="rl-ed"></p>' +
       '<p class="ptl-note">閲覧には<b>お名前の確認</b>が必要です（会社の機密情報のため）。</p>' +
       '<div id="rl" class="list">' + loading() + '</div>' + I.backHtml('#rules', '就業規則・組織図・福利厚生に戻る');
@@ -113,7 +113,7 @@
         return '<a class="ptl-rule" href="#rule-read" data-id="' + esc(r.規程ID) + '">' + ruleIcon(r) +
           '<span class="ptl-rule-t"><b>' + esc(r.題) + '</b><small>' + ymdJa(r.施行日) + ' 施行</small></span>' +
           '<span class="ptl-tag">' + esc(r.対象 || '') + '</span></a>';
-      }).join('') : '<div class="loading">まだ規程が登録されていません。</div>';
+      }).join('') : '<div class="ptl-empty"><b>まだ規程が登録されていません</b><small>本部が規程を登録すると、ここに並びます。</small></div>';
       box.addEventListener('click', function (e) {
         var a = e.target.closest('a[data-id]');
         if (a) { pickRule(a.dataset.id); setPortalFrom('#rules-list'); }
@@ -239,7 +239,8 @@
   // ---------- 組織図 ----------
   function viewOrg() {
     // AI相談の「組織図で見る」から来たときは AI相談へ戻す
-    app.innerHTML = '<div id="og" class="ptl-stack">' + loading() + '</div>' +
+    app.innerHTML = (portalFrom() === '#ai' ? topBack('#ai', 'AIに聞く画面に戻る') : topBack('#rules', 'トップに戻る')) +
+      '<div id="og" class="ptl-stack">' + loading('組織図を読み込んでいます…') + '</div>' +
       (portalFrom() === '#ai' ? I.backHtml('#ai', 'AIに聞く画面に戻る') : I.backHtml('#rules', '就業規則・組織図・福利厚生に戻る'));
     var ok = alive();
     api('orgChart').then(function (d) {
