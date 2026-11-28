@@ -20,11 +20,17 @@
     return m[1] + '年' + Number(m[2]) + '月' + Number(m[3]) + '日（' + '日月火水木金土'.charAt(d.getDay()) + '）';
   }
 
-  // 空行を先頭に置くセレクト（参考アプリと同じく、未選択は空）
-  function sel(id, list, value, first, disabled) {
+  // 小口先出は社内の言葉で、パートの職員には分かりにくい。選ぶ欄と確認では「何のお金で払ったか」を添えて見せる
+  // （送る値は 小口／先出 のまま。GAS の形は変えない。知らない値はそのまま出す）
+  var PAY_LABEL = { 小口: '小口（施設の小口現金で払った）', 先出: '先出（自分のお金で立て替えた）' };
+  function payLabel(v) { return PAY_LABEL[v] || v; }
+  // 空行を先頭に置くセレクト（参考アプリと同じく、未選択は空）。label があれば見せる文字だけ変える（value は元のまま）
+  function sel(id, list, value, first, disabled, label) {
     return '<select id="' + id + '"' + (disabled ? ' disabled' : '') + '>' +
       (first === null ? '' : '<option value="">' + esc(first || '') + '</option>') +
-      list.map(function (v) { return '<option' + (v === value ? ' selected' : '') + '>' + esc(v) + '</option>'; }).join('') +
+      list.map(function (v) {
+        return '<option' + (label ? ' value="' + esc(v) + '"' : '') + (v === value ? ' selected' : '') + '>' + esc(label ? label(v) : v) + '</option>';
+      }).join('') +
       '</select>';
   }
   function head(forId, label, req, extra) {
@@ -70,30 +76,35 @@
     app.innerHTML =
       '<h1 class="exp-title">経費申請</h1>' +
       (redo ? '<div class="exp-redo" role="note"><b>差し戻された申請を出し直します</b>' +
-        '<span>前の内容を入れてあります。理由を見て直してから送信してください。</span>' +
+        '<span>前の内容を入れてあります。下の理由のところを直して、「内容を確認する」を押してください。</span>' +
         (redo.コメント ? '<span class="exp-redo-why">差戻しの理由：' + esc(redo.コメント) + '</span>' : '') + '</div>' : '') +
       '<div id="exp-stage">' +
       '<form id="exp-form" class="exp-form" novalidate>' +
         '<div class="card exp-card">' +
           field('申請者', head('exp-申請者', '申請者', true) +
             '<input id="exp-申請者" value="' + esc(state.me && state.me.氏名) + '" readonly aria-readonly="true">') +
-          field('小口先出', head('exp-小口先出', '小口先出', true) + sel('exp-小口先出', o.小口先出 || [], redo && (redo.小口先出 || rd.小口先出))) +
-          // 参考アプリと同じく、小口先出を選ぶまで対象日は使えない。先の日付は選べない（max）
-          field('対象日', head('exp-対象日', '対象日', true) + '<input type="date" id="exp-対象日" value="' + esc(rd.対象日 || today()) + '" max="' + today() + '" disabled>') +
+          field('小口先出', head('exp-小口先出', '小口先出', true) + sel('exp-小口先出', o.小口先出 || [], redo && (redo.小口先出 || rd.小口先出), '選んでください', false, payLabel).replace('<select', '<select aria-describedby="exp-小口先出-hint"') +
+            '<p class="exp-hint" id="exp-小口先出-hint">何のお金で払ったかを選びます。自分のお金で立て替えたときは「先出」です。</p>') +
+          // 参考アプリと同じく、小口先出を選ぶまで対象日は使えない。先の日付は選べない（max）。使えない間は理由を下に出す
+          field('対象日', head('exp-対象日', '対象日', true) + '<input type="date" id="exp-対象日" value="' + esc(rd.対象日 || today()) + '" max="' + today() + '" disabled aria-describedby="exp-対象日-hint">' +
+            '<p class="exp-hint" id="exp-対象日-hint">買った日（お金を払った日）を入れます。先に「小口先出」を選ぶと入れられます。</p>') +
           field('施設名', head('exp-施設名', '施設名', true) + (oneFac ? sel('exp-施設名', FACILITIES, FACILITIES[0], null) : sel('exp-施設名', FACILITIES, '').replace('<select', '<select class="exp-empty"'))) +
-          field('経費区分', head('exp-経費区分', '経費区分', true) + sel('exp-経費区分', o.経費区分 || [], rd.経費区分)) +
+          field('経費区分', head('exp-経費区分', '経費区分', true) + sel('exp-経費区分', o.経費区分 || [], rd.経費区分, '選んでください')) +
           '<div class="exp-field" data-f="物品">' +
             '<div class="exp-lab"><span class="exp-lab-name" id="exp-物品-lab">物品</span>' +
-              '<button type="button" class="exp-pill exp-add" id="exp-add">追加</button>' +
-              '<button type="button" class="exp-pill exp-del" id="exp-del">削除</button>' +
+              // 「削除」が何を消すのか分かるよう、読み上げ名で補う（見た目は参考アプリと同じ短い名前）
+              '<button type="button" class="exp-pill exp-add" id="exp-add" aria-label="物品の行を追加">＋ 追加</button>' +
+              '<button type="button" class="exp-pill exp-del" id="exp-del" aria-label="最後の物品の行を削除">－ 削除</button>' +
               '<span class="exp-req">(必須)</span></div>' +
             '<div id="exp-items" class="exp-items" role="group" aria-labelledby="exp-物品-lab"></div>' +
             '<p class="exp-total" id="exp-total" hidden></p>' +
+            '<p class="exp-hint">物品が2つ以上なら「＋ 追加」で行を増やします（「－ 削除」は最後の行を消す）。金額は個数ぶんの合計です。</p>' +
           '</div>' +
           field('備考', head('exp-備考', '備考', false) + '<textarea id="exp-備考">' + esc(redo && (redo.備考 || rd.備考) || '') + '</textarea>') +
         '</div>' +
         '<p class="exp-formerr" id="exp-formerr" role="alert" hidden></p>' +
-        '<button type="submit" class="exp-send">送信</button>' +
+        // 押すとすぐ送られるのではなく、まず確認カードが出る。そのことが分かる名前にした（前は「送信」）
+        '<button type="submit" class="exp-send">内容を確認する</button>' +
         (I.backHtml ? I.backHtml('#apply') : '') +
       '</form>' +
       '<div id="exp-after"></div>' +
@@ -135,8 +146,9 @@
             sel('exp-物品_' + i, goods, r.物品, '物品').replace('<select', '<select aria-label="物品 ' + (i + 1) + '行目"' + (r.物品 ? '' : ' class="exp-empty"')) +
             // 物品（と物品名）は1行全部を使い、個数と金額は次の行に並べる（幅320pxでも文字が切れないように）
             (free ? '<input class="exp-free" id="exp-自由入力_' + i + '" placeholder="物品名を入力" aria-label="物品名 ' + (i + 1) + '行目" value="' + esc(r.自由入力 || '') + '">' : '') +
-            '<input type="number" inputmode="numeric" min="1" max="' + MAX_QTY + '" step="1" id="exp-個数_' + i + '" placeholder="個数" aria-label="個数 ' + (i + 1) + '行目" value="' + esc(r.個数 || '') + '">' +
-            '<input type="number" inputmode="numeric" min="0" max="' + MAX_YEN + '" step="1" id="exp-金額_' + i + '" placeholder="金額（円）" aria-label="金額（円） ' + (i + 1) + '行目" value="' + esc(r.金額 === undefined || r.金額 === null ? '' : r.金額) + '">' +
+            // 個数・金額は、数を入れたあとも何の欄か分かるよう右端に「個」「円」を出す（exp-unit）
+            '<span class="exp-unit" data-u="個"><input type="number" inputmode="numeric" min="1" max="' + MAX_QTY + '" step="1" id="exp-個数_' + i + '" placeholder="個数" aria-label="個数 ' + (i + 1) + '行目" value="' + esc(r.個数 || '') + '"></span>' +
+            '<span class="exp-unit" data-u="円"><input type="number" inputmode="numeric" min="0" max="' + MAX_YEN + '" step="1" id="exp-金額_' + i + '" placeholder="金額" aria-label="金額（円） ' + (i + 1) + '行目" value="' + esc(r.金額 === undefined || r.金額 === null ? '' : r.金額) + '"></span>' +
           '</div>' +
           '<p class="exp-err" id="exp-err-物品_' + i + '" hidden></p>' +
         '</div>';
@@ -168,8 +180,11 @@
       var on = !!$('小口先出').value;
       $('対象日').disabled = !on;
       $('対象日').closest('.exp-field').classList.toggle('exp-off', !on);
+      $('対象日-hint').textContent = on ? '買った日（お金を払った日）を入れます。今日より後の日は選べません。' : '買った日（お金を払った日）を入れます。先に「小口先出」を選ぶと入れられます。';
     }
     syncDate();
+    // まだ選んでいない欄は「選んでください」を薄い字で（選ぶと濃くなる。change で切り替え）
+    ['小口先出', '経費区分'].forEach(function (k) { $(k).classList.toggle('exp-empty', !$(k).value); });
 
     form.addEventListener('input', function (e) {
       if (/^exp-金額_/.test(e.target.id)) updateTotal();
@@ -321,7 +336,7 @@
           '<h2 id="exp-cf-h" class="exp-cf-h">この内容で送信しますか？</h2>' +
           '<dl class="exp-dl">' +
             '<dt>申請者</dt><dd>' + esc(state.me && state.me.氏名) + '</dd>' +
-            '<dt>小口先出</dt><dd>' + esc(d.小口先出) + '</dd>' +
+            '<dt>小口先出</dt><dd>' + esc(payLabel(d.小口先出)) + '</dd>' +
             '<dt>対象日</dt><dd>' + esc(fmtDate(d.対象日)) + '</dd>' +
             '<dt>施設名</dt><dd>' + esc($('施設名').value) + '</dd>' +
             '<dt>経費区分</dt><dd>' + esc(d.経費区分) + '</dd>' +

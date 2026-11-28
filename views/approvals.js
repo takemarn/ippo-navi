@@ -110,7 +110,9 @@
     return '<section class="apv-sum" aria-label="件数のまとめ">' +
       '<div class="apv-sum-top"><p class="apv-sum-main">未承認 ' + list.length + '件 / 承認者 ' + g.length + '名</p>' +
         '<button type="button" class="apv-reload" data-act="再読み込み" aria-label="最新にする（' + at + ' に読み込み）">' +
-          '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M16 10a6 6 0 11-1.8-4.3M16 3v3.5h-3.5"/></svg>' + esc(at) + '</button></div>' +
+          '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M16 10a6 6 0 11-1.8-4.3M16 3v3.5h-3.5"/></svg>' +
+          // 前は時刻だけで、押すと何が起きるか分からなかった。「最新にする」と、いつの時点の件数かを出す
+          '<span class="apv-reload-t">最新にする<small>' + esc(at) + ' 時点</small></span></button></div>' +
       (!list.length ? '' : '<div class="apv-mine' + (my.length ? '' : ' is-zero') + '">' +
         '<p class="apv-mine-n"><span>あなたが承認</span><strong>' + my.length + '</strong>件</p>' +
         (soon ? '<p class="apv-mine-old"><span class="apv-dot" aria-hidden="true"></span>予定日が今日・明日の申請 ' + soon + '件</p>' : '') +

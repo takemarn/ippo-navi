@@ -19,6 +19,20 @@
   }
   function tileOf(hash) { return TILES.filter(function (t) { return t.hash === hash; })[0]; }
 
+  // タイルと見出しに出す「中で何ができるか」の一言（初めて開いた人が名前だけで迷わないように）。
+  // tile = タイルの下の短い一言（幅320pxの3列で2行まで。| は折り返してよい所。語の途中で切れないように）、head = 各メニュー画面の見出しの下の説明
+  var DESC = {
+    apply: { tile: '立て替え・|遅刻・残業', head: '立て替えたお金（経費）や、遅刻・残業・休みなど（勤怠）を申請します。' },
+    status: { tile: '出した申請の|結果', head: '自分が出した申請が、承認されたか・差し戻されたかを見られます。' },
+    task: { tile: '本部への|手続き依頼', head: '利用者の入居・退院・指示書などの手続きを、本部事務に依頼します。' },
+    users: { tile: '利用者の|情報', head: '利用者の情報を見たり、登録・修正を申請したりします。' },
+    shift: { tile: '希望の提出・|確認', head: 'シフトの希望を出したり、決まったシフトを見たりします。' },
+    portal: { tile: '規程・手順を|調べる', head: '規程やマニュアルを調べたり、AI に質問したりできます。' }
+  };
+
+  // '|' を折り返し位置（<wbr>）にする。CSS の word-break: keep-all と組み合わせて、ここ以外では切らない
+  function wrapAt(t) { return esc(t).split('|').join('<wbr>'); }
+
   // 右向きの小さな矢印（丸の中）
   var ARROW = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6.5 4.5L10 8l-3.5 3.5"/></svg>';
 
@@ -66,7 +80,7 @@
       if (pend) {
         // 自分が承認する件数だけ数える（担当が無い古い形のデータは自分の分とみなす。approvals.js と同じ決まり）
         var n = pend.filter(function (x) { return x.担当 === undefined ? true : x.担当; }).length;
-        if (n) rows += todoRow('#approvals', 'wait', 'あなたの承認待ち', '確認して承認・差戻しをしてください', n);
+        if (n) rows += todoRow('#approvals', 'wait', 'あなたの承認待ち', '中を見て、承認か差戻しをしてください', n);
       }
       if (mine) {
         var back = mine.filter(function (x) { return x.状態 === '差戻し'; }).length;
@@ -84,7 +98,9 @@
     return '<nav class="hm-tiles" aria-label="メニュー">' + TILES.map(function (t) {
       return '<a class="hm-tile" href="#' + t.hash + '" style="--tint:' + t.tint + ';--tc:' + t.color + ';--badge:' + t.badge + '">' +
         '<span class="hm-tile-bg" aria-hidden="true"></span>' + art(t, 'hm-art') +
-        '<b>' + esc(t.label) + '</b><small aria-hidden="true">' + esc(t.en) + '</small>' +
+        '<b>' + esc(t.label) + '</b>' +
+        // 前は英語の小見出し（7px）を出していたが、読めず意味も伝わらないので、日本語の一言にした（読み上げにも入れる）
+        (DESC[t.hash] ? '<small>' + wrapAt(DESC[t.hash].tile) + '</small>' : '') +
         '<span class="hm-go" aria-hidden="true">' + ARROW + '</span></a>';
     }).join('') + '</nav>';
   }
@@ -94,13 +110,13 @@
     { href: '#requests', label: '自分の申請', ic: '<path d="M7 4h10a2 2 0 012 2v13a2 2 0 01-2 2H7a2 2 0 01-2-2V6a2 2 0 012-2z"/><path d="M9 9h6M9 13h6M9 17h3"/>' },
     { href: '#shift-view', label: 'シフト確認', ic: '<rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M9 3v4M15 3v4M8 14h2M14 14h2M8 17h2"/>' },
     { href: '#ai', label: 'AIに聞く', ic: '<path d="M5 5h14a2 2 0 012 2v8a2 2 0 01-2 2h-7l-4 3v-3H5a2 2 0 01-2-2V7a2 2 0 012-2z"/><path d="M8 13l2-5 2 5M8.7 11.5h2.6M15 8v5"/>' },
-    { href: '#manual-urgent', label: '急変時の対応', urgent: true, ic: '<path d="M12 3l9.5 17h-19z"/><path d="M12 10v4.5M12 17.2v.1"/>' }
+    { href: '#manual-urgent', label: '急変時の|対応', urgent: true, ic: '<path d="M12 3l9.5 17h-19z"/><path d="M12 10v4.5M12 17.2v.1"/>' }
   ];
   function quick() {
     return '<h2 class="hm-sec">よく使う<small aria-hidden="true">SHORTCUTS</small></h2><nav class="hm-quick" aria-label="よく使う">' +
       QUICK.filter(function (q) { return I.views[q.href.slice(1)]; }).map(function (q) {
         return '<a class="hm-q' + (q.urgent ? ' urgent' : '') + '" href="' + q.href + '">' +
-          '<svg viewBox="0 0 24 24" aria-hidden="true">' + q.ic + '</svg><span>' + esc(q.label) + '</span></a>';
+          '<svg viewBox="0 0 24 24" aria-hidden="true">' + q.ic + '</svg><span>' + wrapAt(q.label) + '</span></a>';
       }).join('') + '</nav>';
   }
 
@@ -108,7 +124,7 @@
     app.innerHTML = hero() +
       '<div id="hm-todo">' + todoBox('<div class="loading" role="status">読み込み中...</div>') + '</div>' +
       '<h2 class="hm-sec">メニュー<small aria-hidden="true">MENU</small></h2>' + tiles() +
-      '<p class="hm-note">LINE のトーク画面下のメニューと同じ並びです。</p>' +
+      '<p class="hm-note">LINE のトーク画面の下にあるメニューと同じ並びです。</p>' +
       quick() +
       '<footer class="hm-foot"><img src="img/logo.png" alt="" width="20" height="20" onerror="this.remove()">株式会社IPPO</footer>';
     loadTodo();
@@ -120,7 +136,8 @@
     if (!t) return '<h1>メニュー</h1>';
     return '<header class="mh" style="--tint:' + t.tint + ';--tc:' + t.color + '">' +
       '<span class="mh-bg" aria-hidden="true"></span>' + art(t, 'mh-art') +
-      '<div class="mh-txt"><small aria-hidden="true">' + esc(t.en) + '</small><h1>' + esc(t.label) + '</h1><p>メニュー</p></div></header>';
+      '<div class="mh-txt"><small aria-hidden="true">' + esc(t.en) + '</small><h1>' + esc(t.label) + '</h1>' +
+      '<p>' + esc(DESC[t.hash] ? DESC[t.hash].head : 'メニュー') + '</p></div></header>';
   };
 
   I.views.menu = viewMenu;

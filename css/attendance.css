@@ -93,7 +93,7 @@
 .att-form input[type=time]:disabled::-webkit-calendar-picker-indicator { display: none; }
 
 /* 補足文（入力欄の下）: 10px グレー */
-.att-hint { margin: -2px 0 0; font-size: 10px; color: #6E7782; line-height: 1.4; }
+.att-hint { margin: -2px 0 0; font-size: 11px; color: #555f6c; line-height: 1.4; }
 
 /* 遅延証明書: 白い入力欄風の「ファイルを選択」 */
 .att-file { position: relative; display: flex; align-items: center; }
@@ -119,3 +119,16 @@
 .att-form > .ipp-back, .att-actions > .ipp-back { align-self: center; min-height: 36px; margin-top: -8px; }
 /* 完了カードの「何を送ったか」1行（項目・対象日・時間） */
 .att-done-sum { font-size: 13px; color: #1b1f24; overflow-wrap: anywhere; }
+
+/* ---------- 見直し4周目（使う人の目）で足したもの ---------- */
+/* 入力欄は指で押しやすい高さ 42px に（前は 38px） */
+.att-form input, .att-form select, .att-file-btn { height: 42px; }
+/* 欄の下の案内は 11px・濃いめに（前は 10px で読みにくかった） */
+.att-hint { font-size: 11px; color: #555f6c; line-height: 1.5; }
+.att-hint:empty { display: none; }
+.att-opt { color: #5f6873; }
+/* ファイルを外す×は 36px に（前は 28px で押しにくかった） */
+.att-file-clear { width: 36px; height: 36px; line-height: 36px; right: 3px; font-size: 16px; }
+.att-send { min-height: 46px; font-size: 15px; font-weight: 700; }
+.att-back { min-height: 44px; font-size: 14px; }
+.att-form > .ipp-back, .att-actions > .ipp-back { min-height: 44px; }

@@ -2,7 +2,7 @@
 
 /* ---------- 入口（ホーム #menu）: あいさつ → 今やること → 6タイル → よく使う ---------- */
 .hm-sec { display: flex; align-items: baseline; gap: 8px; font-size: 14px; font-weight: 800; margin: 6px 2px -2px; letter-spacing: .04em; }
-.hm-sec small { font-size: 9px; font-weight: 700; letter-spacing: .14em; color: #9aa6b6; }
+.hm-sec small { font-size: 9px; font-weight: 700; letter-spacing: .14em; color: #7b8697; } /* 飾りの英語（読み上げない） */
 
 .hm-hero {
   position: relative; overflow: hidden; display: flex; align-items: center; gap: 14px;
@@ -65,14 +65,15 @@
 .hm-art { position: relative; width: 100%; max-width: 132px; aspect-ratio: 6 / 5; height: auto; filter: drop-shadow(0 6px 6px rgba(30, 40, 60, .16)); }
 .hm-art.line { fill: none; stroke: currentColor; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; padding: 12%; filter: none; }
 .hm-tile b { position: relative; font-size: 13px; font-weight: 800; letter-spacing: .06em; line-height: 1.3; margin-top: 2px; }
-.hm-tile small { position: relative; font-size: 7px; font-weight: 700; letter-spacing: .1em; color: var(--tc); line-height: 1.5; white-space: nowrap; }
+/* タイルの下の一言（中で何ができるか）。11px・濃いグレーで読める大きさに。幅が狭いときは2行に折り返す */
+.hm-tile small { position: relative; font-size: 11px; font-weight: 600; color: #4f5966; line-height: 1.35; margin-top: 2px; padding: 0 2px; overflow-wrap: anywhere; }
 .hm-go {
   position: relative; margin-top: 6px; width: 22px; height: 22px; border-radius: 50%; background: var(--badge); color: #fff;
   display: grid; place-items: center; box-shadow: 0 2px 5px rgba(0, 0, 0, .18);
 }
 .hm-go svg { width: 12px; height: 12px; stroke-width: 2.6; }
-.hm-note { font-size: 10px; color: var(--muted); text-align: center; margin-top: -4px; }
-@media (min-width: 520px) { .hm-tile b { font-size: 15px; } .hm-tile small { font-size: 8px; } .hm-tiles { gap: 12px; } }
+.hm-note { font-size: 11px; color: #5b6572; text-align: center; margin-top: -4px; }
+@media (min-width: 520px) { .hm-tile b { font-size: 15px; } .hm-tile small { font-size: 12px; } .hm-tiles { gap: 12px; } }
 
 .hm-quick { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
 .hm-q {
@@ -84,7 +85,7 @@
 .hm-q svg { width: 26px; height: 26px; padding: 6px; box-sizing: content-box; border-radius: 50%; background: var(--accent-soft); fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 .hm-q.urgent { color: var(--danger); }
 .hm-q.urgent svg { background: var(--danger-soft); }
-.hm-foot { display: flex; align-items: center; justify-content: center; gap: 6px; margin-top: 10px; font-size: 10px; font-weight: 700; letter-spacing: .12em; color: #9aa6b6; }
+.hm-foot { display: flex; align-items: center; justify-content: center; gap: 6px; margin-top: 10px; font-size: 11px; font-weight: 700; letter-spacing: .12em; color: #5b6572; }
 .hm-foot img { border-radius: 50%; background: #fff; }
 
 /* ---------- 各メニュー画面の見出し（IPPO.menuHead）: 左に絵、右に英語の小見出し＋名前 ---------- */
@@ -98,7 +99,7 @@
 .mh-txt { position: relative; min-width: 0; }
 .mh-txt small { display: block; font-size: 9px; font-weight: 700; letter-spacing: .14em; color: var(--tc); }
 .mh-txt h1 { text-align: left; font-size: 20px; margin: 0; letter-spacing: .06em; }
-.mh-txt p { font-size: 11px; color: var(--muted); }
+.mh-txt p { font-size: 12px; color: #4f5966; line-height: 1.5; margin-top: 2px; }
 
 /* ---------- メニュー画面（参考 2章）: すりガラスのグループ＋白い角丸ボタン、下に単独ボタン ---------- */
 .mgroup {
@@ -109,8 +110,8 @@
 }
 .mbtn {
   position: relative; display: flex; align-items: center; justify-content: center; gap: 6px; width: 100%;
-  min-height: 40px; padding: 6px 12px; border: 0; border-radius: 10px; background: #fff; color: #3583da;
-  font: inherit; font-size: 13px; font-weight: 600; text-decoration: none; cursor: pointer;
+  min-height: 44px; padding: 6px 12px; border: 0; border-radius: 10px; background: #fff; color: #1a52a0;
+  font: inherit; font-size: 14px; font-weight: 700; text-decoration: none; cursor: pointer;
   box-shadow: 0 1px 2px rgba(60, 90, 140, .10), 0 3px 8px rgba(60, 90, 140, .10);
 }
 .mbtn:active { background: #e6e9ee; }
@@ -119,8 +120,14 @@
 .msolo .mbtn { box-shadow: 0 2px 8px rgba(60, 90, 140, .12); }
 .mtag {
   position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
-  font-size: 10px; font-weight: 700; color: var(--muted); background: #eef1f5; border-radius: 999px; padding: 0 8px; line-height: 1.7;
+  font-size: 11px; font-weight: 700; color: #5b6572; background: #eef1f5; border-radius: 999px; padding: 0 8px; line-height: 1.7;
 }
 
 .mbtn .badge { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); }
 
+
+/* ---------- 見直し4周目（使う人の目）で足したもの ---------- */
+/* タイルの一言・近道の名前は、語の途中で折り返さない（折り返し位置は menu.js の | → <wbr>） */
+.hm-tile small, .hm-q span { word-break: keep-all; }
+/* 幅が狭い（320px など）ときは、タイルの名前（経費勤怠申請）が1行に収まるよう字間を詰める */
+@media (max-width: 360px) { .hm-tile b { letter-spacing: 0; font-size: 12.5px; } .hm-tile { padding-left: 2px; padding-right: 2px; } }

@@ -85,7 +85,7 @@
 .apv-who-row:focus-visible { outline: 3px solid #9DB8EA; outline-offset: -3px; }
 .apv-who-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .apv-who-name { color: #2F7BD6; font-weight: 700; font-size: 15px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; overflow-wrap: anywhere; }
-.apv-you { font-size: 10px; font-weight: 700; color: #fff; background: #12317D; border-radius: 999px; padding: 1px 7px; }
+.apv-you { font-size: 11px; font-weight: 700; color: #fff; background: #12317D; border-radius: 999px; padding: 1px 7px; }
 .apv-who-sub { font-size: 11px; color: #6B7480; display: flex; flex-wrap: wrap; gap: 0 8px; }
 .apv-who-age { display: inline-flex; align-items: center; gap: 4px; }
 .apv-who-age.is-old { color: #A2560B; font-weight: 700; }
@@ -116,7 +116,7 @@
 .apv-meta > span { white-space: nowrap; }
 .apv-meta > span:last-child { white-space: normal; overflow-wrap: anywhere; }
 .apv-nw { white-space: nowrap; }
-.apv-tag { flex: none; font-size: 10px; color: #6B7480; border: 1px solid #D5DAE1; background: #F4F5F7; border-radius: 999px; padding: 2px 8px; white-space: nowrap; }
+.apv-tag { flex: none; font-size: 11px; color: #6B7480; border: 1px solid #D5DAE1; background: #F4F5F7; border-radius: 999px; padding: 2px 8px; white-space: nowrap; }
 .apv-tag-mine { color: #12317D; border-color: #A9C3EE; background: #EAF1FB; font-weight: 700; }
 .apv-item.is-done { opacity: 0; transform: translateX(24px); }
 @media (prefers-reduced-motion: no-preference) { .apv-item { transition: opacity .25s, transform .25s; } }
@@ -248,7 +248,7 @@
 .req-step.is-done::before, .req-step.is-now::before, .req-step.is-back::before, .req-step.is-cancel::before { background: #9FB6DA; }
 .req-step-dot { position: relative; width: 14px; height: 14px; border-radius: 50%; background: #fff; border: 2px solid #CBD3DE; box-sizing: border-box; }
 .req-step-l { font-size: 11px; color: #8A93A0; line-height: 1.3; overflow-wrap: anywhere; }
-.req-step-l small { display: block; font-size: 10px; }
+.req-step-l small { display: block; font-size: 11px; }
 .req-step.is-done .req-step-dot { background: #12317D; border-color: #12317D; }
 .req-step.is-done .req-step-l { color: #333; }
 .req-step.is-now .req-step-dot { background: #fff; border: 4px solid #E8891C; }
@@ -293,3 +293,17 @@
 .apv-del svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
 .apv-del:active { background: #FCE1E4; }
 .apv-del:focus-visible { outline: 2px solid #E0707E; outline-offset: 1px; }
+
+/* ---------- 見直し4周目（使う人の目）で足したもの ---------- */
+/* 最新にする: 文字で何をするボタンか分かるように。時刻はその下に小さく */
+.apv-reload { color: #1F5FB4; font-weight: 700; font-size: 12px; }
+.apv-reload-t { display: flex; flex-direction: column; align-items: flex-start; line-height: 1.25; }
+.apv-reload-t small { font-size: 11px; font-weight: 400; color: #5B6572; }
+/* 小さすぎ・うすすぎた文字を読める大きさ・濃さに（11px 以上、白地で 4.5:1 以上） */
+.apv-you, .apv-tag { font-size: 11px; }
+.apv-who-name { color: #1F5FB4; }
+.apv-chev { color: #6B7480; }
+.req-step-l { color: #5F6873; }
+.req-step-l small { font-size: 11px; }
+.req-new { color: #1F5FB4; }
+.req-cancelbtn { min-height: 40px; }

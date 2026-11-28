@@ -46,6 +46,22 @@
   // 終日の項目は時間が任意（GAS の FULL_DAY_KINDS と同じ）
   var FULL_DAY = ['欠勤', '有給', '冬期休暇', '夏季休暇', '特別休暇'];
   var isFullDay = function (k) { return FULL_DAY.indexOf(k) >= 0; };
+  // 項目を選んだら、時間に何を入れるかを一言で出す（遅刻の「時間」が何時から何時なのか、などで迷わないように）
+  // 見本データ（遅刻 09:00〜09:20）と同じ考え方: 遅刻は 本来の出勤時刻〜着いた時刻、早退は 帰った時刻〜本来の退勤時刻
+  var KIND_HINT = {
+    '残業・前残業': '残業した時間（始め～終わり）を入れてください。日をまたいでもそのまま入れられます。',
+    '遅刻': '本来の出勤時刻 ～ 実際に着いた時刻 を入れてください。電車の遅れなら遅延証明書も添付できます。',
+    '早退': '帰った時刻 ～ 本来の退勤時刻 を入れてください。',
+    '休日出勤': '出勤した時間（始め～終わり）を入れてください。',
+    '打刻修正出勤': '打刻を忘れた・間違えたときに、本当の出勤時刻を入れてください。',
+    '打刻修正退勤': '打刻を忘れた・間違えたときに、本当の退勤時刻を入れてください。'
+  };
+  function kindHint(k) {
+    if (!k) return '項目を選ぶと、時間の入れ方が出ます。';
+    if (KIND_HINT[k]) return KIND_HINT[k];
+    if (isFullDay(k)) return '1日休むときは時間は空のままでかまいません。半日などのときだけ時間を入れてください。' + (k === '特別休暇' ? '理由は備考に書いてください。' : '');
+    return '';
+  }
 
   // 当月の残業合計。me の返事の 当月残業合計（'H:mm'）を出す。値が無いときは誤解を避けて何も出さない
   function overtimeLabel() {
@@ -124,7 +140,7 @@
     app.innerHTML =
       '<h1 class="att-title">勤怠申請</h1>' +
       (redo ? '<div class="exp-redo" role="note"><b>差し戻された申請を出し直します</b>' +
-        '<span>前の内容を入れてあります。理由を見て直してから送信してください。</span>' +
+        '<span>前の内容を入れてあります。下の理由のところを直して、「内容を確認する」を押してください。</span>' +
         (redo.コメント ? '<span class="exp-redo-why">差戻しの理由：' + esc(redo.コメント) + '</span>' : '') + '</div>' : '') +
       '<div id="att-stage">' +
       '<form id="att-form" class="att-form" novalidate>' +
@@ -132,7 +148,8 @@
           field('申請者', head('att-申請者', '申請者' + overtimeLabel(), true) +
             '<input id="att-申請者" value="' + esc(state.me && state.me.氏名) + '" readonly aria-readonly="true">') +
           field('施設名', head('att-施設名', '施設名', true) + (oneFac ? sel('att-施設名', FACILITIES, FACILITIES[0], false) : sel('att-施設名', FACILITIES, '', true).replace('<select', '<select class="att-empty"'))) +
-          field('項目', head('att-項目', '項目', true) + sel('att-項目', kinds, rd.項目 || '', true).replace('<select', '<select class="att-empty"')) +
+          field('項目', head('att-項目', '項目', true) + sel('att-項目', kinds, rd.項目 || '', true).replace('<select', '<select class="att-empty" aria-describedby="att-項目-hint"').replace('<option value=""></option>', '<option value="">選んでください</option>') +
+            '<p class="att-hint" id="att-項目-hint" aria-live="polite"></p>') +
           field('対象日', head('att-対象日', '対象日', true) + '<input type="date" id="att-対象日" value="' + esc(rd.対象日 || today()) + '">') +
           '<div class="att-field att-off" data-f="時間" role="group" aria-labelledby="att-時間-lab">' +
             '<div class="att-lab"><span class="att-lab-name" id="att-時間-lab">時間</span><span class="att-req" id="att-時間-mark">(必須)</span></div>' +
@@ -145,8 +162,9 @@
           '</div>' +
           field('打刻時間', head('att-打刻時刻', '打刻時間', true) + '<div class="att-range"><input type="time" id="att-打刻時刻" disabled></div>', 'att-off') +
           field('備考', head('att-備考', '備考', false) +
-            '<input id="att-備考" placeholder="特別休暇の場合は備考欄に詳細を表示" aria-describedby="att-備考-hint" value="' + esc(redo && (redo.備考 || rd.備考) || '') + '">' +
-            '<p class="att-hint" id="att-備考-hint">特別休暇の場合は備考欄に詳細を表示</p>') +
+            // 前は「特別休暇の場合は備考欄に詳細を表示」（参考アプリの文）で、何を書くのか分かりにくかった
+            '<input id="att-備考" placeholder="例: 電車の遅れ、記録の入力" aria-describedby="att-備考-hint" value="' + esc(redo && (redo.備考 || rd.備考) || '') + '">' +
+            '<p class="att-hint" id="att-備考-hint">理由をひとこと書くと、承認が早く進みます。特別休暇のときは、何の休暇かを書いてください。</p>') +
           // 遅延証明書: カメラ・写真・PDF から1つ。選んだときに送れる形にしておき、送信のときに先にアップロードする
           field('遅延証明書', head('att-file', '遅延証明書', false) +
             '<div class="att-file">' +
@@ -154,10 +172,11 @@
               '<label for="att-file" class="att-file-btn" id="att-file-name">ファイルを選択</label>' +
               '<button type="button" class="att-file-clear" id="att-file-clear" aria-label="選んだファイルを外す" hidden>×</button>' +
             '</div>' +
-            '<p class="att-hint" id="att-file-hint" aria-live="polite">ある場合は添付してください（写真・PDF、2MBまで。写真は自動で小さくします）</p>') +
+            '<p class="att-hint" id="att-file-hint" aria-live="polite">電車などの遅れで遅刻したときに添付します（写真・PDF、2MBまで。写真は自動で小さくします）</p>') +
         '</div>' +
         '<p class="att-formerr" id="att-formerr" role="alert" hidden></p>' +
-        '<button type="submit" class="att-send">送信</button>' +
+        // 押すとまず確認カードが出る。そのことが分かる名前にした（前は「送信」）
+        '<button type="submit" class="att-send">内容を確認する</button>' +
         (I.backHtml ? I.backHtml('#apply') : '') +
       '</form>' +
       '<div id="att-after"></div>' +
@@ -198,6 +217,7 @@
       form.querySelector('[data-f="時間"]').classList.toggle('att-off', !useRange);
       form.querySelector('[data-f="打刻時間"]').classList.toggle('att-off', !useStamp);
       $('項目').classList.toggle('att-empty', !k);
+      $('項目-hint').textContent = kindHint(k);
       // 済んだことの申請は、日付を今日までに（先の日付を選べないように）
       if (pastOnly(k)) $('対象日').max = today(); else $('対象日').removeAttribute('max');
       // 欠勤・有給・各種休暇は時間を任意にする（使えるが (任意) 表示）

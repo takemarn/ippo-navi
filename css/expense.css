@@ -172,3 +172,26 @@
 @media (max-width: 340px) {
   .tk-form .tk-times input { flex: 1 1 0; width: auto; min-width: 0; }
 }
+
+/* ---------- 見直し4周目（使う人の目）で足したもの ---------- */
+/* 入力欄は指で押しやすい高さ 42px に（前は 38px） */
+.exp-form input, .exp-form select, .exp-form .att-file-btn { height: 42px; }
+/* 欄の下の短い案内（何を入れるか・なぜ今は使えないか）。11px・白地でも読める濃さ */
+.exp-hint { margin: -2px 0 0; font-size: 11px; color: #555f6c; line-height: 1.5; }
+.exp-hint:empty { display: none; }
+/* 画面の上の一言（何をする画面か） */
+.exp-lead { margin: -4px 2px 0; font-size: 12px; color: #444d59; line-height: 1.6; text-align: center; }
+/* (任意) の文字を濃く（前は #8A93A0 でうすく読みにくかった） */
+.exp-opt { color: #5f6873; }
+/* 追加・削除: 見た目 34px、当たり判定は上下左右 4px 広げて 42px。文字の色も濃く */
+.exp-pill { min-height: 34px; height: 34px; font-size: 13px; }
+.exp-add { color: #17702F; }
+/* 個数・金額の右端に単位（個・円） */
+.exp-unit { position: relative; display: block; min-width: 0; }
+.exp-unit::after { content: attr(data-u); position: absolute; right: 12px; top: 50%; transform: translateY(-50%); font-size: 13px; color: #555f6c; pointer-events: none; }
+.exp-item-row .exp-unit input { padding-right: 30px; }
+/* 主ボタンは少し大きく太く（どれを押せば先へ進むか分かるように） */
+.exp-send { min-height: 46px; font-size: 15px; font-weight: 700; }
+.exp-back { min-height: 44px; font-size: 14px; }
+.exp-form > .ipp-back, .exp-actions > .ipp-back { min-height: 44px; }
+.tk-hint { color: #555f6c; }
