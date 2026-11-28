@@ -20,9 +20,19 @@
     if (!m) return new Date(s);
     return new Date(+m[1], +m[2] - 1, +m[3], +(m[4] || 0), +(m[5] || 0), +(m[6] || 0));
   }
-  function hm(s) { var d = toDate(s); return (d.getMonth() + 1) + '/' + d.getDate() + ' ' + d.getHours() + ':' + ('0' + d.getMinutes()).slice(-2); }
+  // 今日なら時刻だけ（7:08）、ほかの日は 11/27 23:47。途中で折り返さないよう1つのかたまりにする
+  function hm(s) {
+    var d = toDate(s), n = now();
+    var t = d.getHours() + ':' + ('0' + d.getMinutes()).slice(-2);
+    var same = d.getFullYear() === n.getFullYear() && d.getMonth() === n.getMonth() && d.getDate() === n.getDate();
+    return '<span class="nw">' + (same ? t : (d.getMonth() + 1) + '/' + d.getDate() + ' ' + t) + '</span>';
+  }
   function mins(a, b) { return Math.round((b - a) / 60000); }
-  function dur(m) { m = Math.abs(m); return (m >= 60 ? Math.floor(m / 60) + '時間' : '') + (m % 60) + '分'; }
+  function dur(m) {
+    m = Math.abs(m);
+    var h = Math.floor(m / 60), r = m % 60;
+    return '<span class="nw">' + (h ? h + '時間' : '') + (r || !h ? r + '分' : '') + '</span>';
+  }
   function now() { return new Date(Date.now() + skew); }
 
   // 区画の状態: 空き / まもなく / 使用中 / 予定超過
@@ -93,7 +103,7 @@
       '<div class="pk-best' + (best.name ? '' : ' none') + '" role="status">' + (best.name
         ? '<p>✓ 今すぐ停めるなら <b>' + esc(best.name) + '</b> が空いています。</p><small>空き ' + c.free + ' 台 ／ 場所は各カードの「地図で開く」から</small>'
         : '<p>いま空いている場所はありません。「まもなく」の場所を見てください。</p>') + '</div>' +
-      '<div class="row pk-listhead"><h2 class="ptl-sec">駐車場一覧（どこに停めて・だれが・いつから）</h2><button type="button" class="sub pk-reload" data-reload="1">更新</button></div>' +
+      '<div class="pk-listhead"><h2 class="ptl-sec">駐車場一覧 <small>どこに・だれが・いつから</small></h2><button type="button" class="sub pk-reload" data-reload="1">更新</button></div>' +
       (lots.length ? lots.map(function (x) {
         var map = T().safeUrl(x.l.地図), photo = T().safeUrl(x.l.写真);
         return '<section class="pk-lot">' +
@@ -117,10 +127,10 @@
         '<button type="button" class="pk-in" data-lot="' + esc(l.駐車場ID) + '" data-slot="' + esc(r.name || FREE) + '">停める</button></div>';
     }
     var mine = p.停めた職員ID ? p.停めた職員ID === me.職員ID : p.氏名 === me.氏名;
-    var when = s.k === 'over' ? '予定 ' + hm(p.予定) + ' を ' + dur(s.left) + ' 超過' : '空き予定 ' + hm(p.予定) + '（あと ' + dur(s.left) + '）';
+    var when = s.k === 'over' ? '予定 ' + hm(p.予定) + ' を ' + dur(s.left) + ' 超過' : '空く予定 ' + hm(p.予定) + '（あと ' + dur(s.left) + '）';
     return '<div class="pk-slot ' + s.k + '">' + no +
       '<div class="pk-who"><span class="pk-st">' + esc(s.label) + '</span><b>' + esc(p.氏名) + '</b>' +
-        '<small>' + (p.車 ? esc(p.車) + ' ／ ' : '') + '停めた ' + hm(p.停めた) + '</small><small>' + esc(when) + '</small></div>' +
+        '<small>' + (p.車 ? esc(p.車) + ' ／ ' : '') + '停めた ' + hm(p.停めた) + '</small><small>' + when + '</small></div>' +
       // 出庫は本人のほか、運営（承認者・管理者）が代わりに押せる（関係事業者の車や押し忘れのため）。押しまちがい防止で2回押す
       (mine || I.canApprove() ? '<button type="button" class="sub pk-out" data-out="' + esc(p.記録ID) + '">出庫</button>' : '') + '</div>';
   }

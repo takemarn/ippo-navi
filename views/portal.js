@@ -33,7 +33,7 @@
     return +s.slice(0, 4) + '年' + +s.slice(5, 7) + '月' + +s.slice(8, 10) + '日';
   }
   // 上に置く小さな戻るリンク（参考アプリの「← 福利厚生にもどる」「← 規程の選び直し」と同じ位置）
-  function topBack(href, label) { return '<a class="ptl-topback" href="' + href + '"><span aria-hidden="true">←</span> ' + esc(label) + '</a>'; }
+  function topBack(href, label) { return '<a class="ptl-topback" href="' + href + '"><span aria-hidden="true">‹</span> ' + esc(label) + '</a>'; }
 
   // ---------- 相談AIのメニュー ----------
   I.views.portal = function () {
@@ -75,7 +75,7 @@
           return (i === 0 ? '<h2 class="ptl-sec">福利厚生・制度</h2>' : '') +
             '<section class="ptl-benefit' + (i === 0 ? ' hot' : '') + '">' +
               '<b>' + esc(b.題) + '</b><p>' + esc(b.本文) + '</p>' +
-              (b.札 && b.札.length ? '<div class="ptl-tags">' + b.札.map(function (t) { return '<span>' + esc(t) + 'OK</span>'; }).join('') + '</div>' : '') +
+              (b.札 && b.札.length ? '<div class="ptl-tags">' + b.札.map(function (t) { return '<span>' + esc(t) + '</span>'; }).join('') + '</div>' : '') +
               (b.担当 ? '<small>問い合わせ: ' + esc(b.担当) + '</small>' : '') +
             '</section>';
         }).join('');
@@ -88,7 +88,7 @@
       '<path d="M3 3.5A2.5 2.5 0 015.5 1H21v22H5.5A2.5 2.5 0 003 25.5z" fill="currentColor"/><path d="M3 25.5A2.5 2.5 0 015.5 23H21v4H5.5A2.5 2.5 0 013 24.5" fill="#fff" stroke="currentColor" stroke-width="1.2"/></svg>';
   }
   function viewRulesList() {
-    app.innerHTML = topBack('#rules', '就業規則・組織図・福利厚生にもどる') +
+    app.innerHTML = topBack('#rules', '就業規則・組織図・福利厚生に戻る') +
       '<h1 class="ptl-h1l">就業規則・各規程</h1>' +
       '<p class="muted" id="rl-ed"></p>' +
       '<p class="ptl-note">閲覧には<b>お名前の確認</b>が必要です（会社の機密情報のため）。</p>' +
@@ -134,21 +134,23 @@
       consent(r);
     }).catch(function (e) { if (ok()) app.innerHTML = failBox(e, true) + backBottom(); });
   }
+  function topRule() { return portalFrom() === '#ai' ? topBack('#ai', 'AI相談に戻る') : topBack('#rules-list', '規程の選び直し'); }
   // 規程の画面の下の戻る: AI相談から開いたときは AI相談へ、ほかは規程の一覧へ
   function backBottom() {
     return portalFrom() === '#ai' ? I.backHtml('#ai', 'AI相談に戻る') : I.backHtml('#rules-list', '規程の一覧に戻る');
   }
 
   function consent(r) {
-    app.innerHTML = topBack('#rules-list', '規程の選び直し') +
+    app.innerHTML = topRule() +
       '<form id="f" class="card ptl-consent" novalidate>' +
         '<h2>閲覧前のご確認</h2>' +
         '<p class="ptl-sel">選択中: <b>' + esc(r.題) + '</b></p>' +
+        '<p class="ptl-note">規程は、みなさんの毎日の働き方に役立てるためのものです。読む前に次のお願いを確認してください。</p>' +
         '<div class="ptl-warn" role="note"><b>⚠ 取り扱いに関する大事なお願い</b><ul>' +
           '<li><b>スクリーンショット・撮影・コピー・転送は禁止</b>です。</li>' +
           '<li>規程は<b>会社の機密情報</b>です。社外への持ち出し・共有はできません。</li>' +
           '<li>守られなかった場合、<b>損害賠償の対象</b>となることがあります。</li>' +
-          '<li>みなさんの毎日の働き方に役立てるためのものです。</li></ul></div>' +
+          '</ul></div>' +
         '<label>お名前（フルネームを入れてください）<input id="nm" autocomplete="name" placeholder="例）山田 太郎">' +
           '<small class="ptl-hint">職員として登録されている名前と同じに入れてください。閲覧した人として記録します。</small></label>' +
         '<label class="ptl-check"><input type="checkbox" id="ok"> 上記の取り扱いを確認しました。</label>' +
@@ -178,9 +180,10 @@
 
   function readRule(doc) {
     var me = I.state.me || {};
-    var mark = esc((me.氏名 || '') + ' ' + (doc.閲覧日時 || '').slice(0, 16));
+    var t = /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2})/.exec(doc.閲覧日時 || '');
+    var mark = esc((me.氏名 || '') + ' ' + (t ? +t[2] + '月' + +t[3] + '日 ' + +t[4] + ':' + t[5] : ''));
     var secs = doc.本文 || [];
-    app.innerHTML = topBack('#rules-list', '規程の選び直し') +
+    app.innerHTML = topRule() +
       '<article class="ptl-doc">' +
         '<header><h1 class="ptl-h1l">' + esc(doc.題) + '</h1><p class="muted">' + ymdJa(doc.施行日) + ' 施行 ／ 対象: ' + esc(doc.対象 || '') + '</p></header>' +
         (secs.length > 1 ? '<nav class="ptl-toc" aria-label="目次">' + secs.map(function (s, i) {
@@ -206,7 +209,7 @@
 
   // ---------- 組織図 ----------
   function viewOrg() {
-    app.innerHTML = topBack('#rules', '就業規則・組織図・福利厚生にもどる') + '<div id="og" class="ptl-stack">' + loading() + '</div>' + I.backHtml('#rules', '就業規則・組織図・福利厚生に戻る');
+    app.innerHTML = topBack('#rules', '就業規則・組織図・福利厚生に戻る') + '<div id="og" class="ptl-stack">' + loading() + '</div>' + I.backHtml('#rules', '就業規則・組織図・福利厚生に戻る');
     var ok = alive();
     api('orgChart').then(function (d) {
       var box = document.getElementById('og');

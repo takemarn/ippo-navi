@@ -6,7 +6,10 @@
 (function () {
   'use strict';
   var I = window.IPPO, app = I.app, api = I.api, esc = I.esc;
-  var EXAMPLES = ['有給休暇は何日もらえる？', '残業の申請はどうする？', '夜間に急変したら？', '転倒したときは？', '給料日はいつ？'];
+  var EXAMPLES = ['有給休暇は何日もらえる？', '残業の申請はどうする？', '給料日はいつ？', '育児休業はとれる？'];
+  var NURSE_EXAMPLES = ['夜間に急変したら？', '転倒したときは？'];
+  // 看護マニュアルを見られる人（GAS の「マニュアル閲覧職種」と同じ初期値）。見られない人には看護の例を出さない
+  function nurse() { var me = I.state.me || {}; return ['看護師', '准看護師'].indexOf(me.職種) >= 0 || I.canApprove(); }
   var log = []; // この画面を開いている間の やりとり（保存はしない）。{n, q, a}。a が null なら返事待ち
   var seq = 0, waiting = false;
 
@@ -23,7 +26,8 @@
         open + '</li>';
     }).join('');
     var none = !(a.根拠 || []).length
-      ? '<a class="ai-help" href="#org">困ったときの窓口を見る（組織図）</a>' : '';
+      ? (!nurse() ? '<p class="ai-small">急変・看護のことは看護マニュアル（看護職向け）にあります。急ぐときは、まず看護師・オンコール当番へ。</p>' : '') +
+        '<a class="ai-help" href="#org">困ったときの窓口を見る（組織図）</a>' : '';
     return '<div class="ai-a"><p>' + esc(a.回答) + '</p>' + (rows ? '<ol class="ai-hits">' + rows + '</ol>' : '') + none +
       '<p class="ai-small">答えは規程・マニュアルの文章が正しいものです。迷ったら上長に確認してください。</p></div>';
   }
@@ -31,10 +35,10 @@
   function viewAi() {
     app.innerHTML = '<h1>AI相談</h1>' +
       '<section class="card ai-intro"><p><b>規程やマニュアルのことを、ふだんの言葉で聞けます。</b></p>' +
-        '<p class="muted">いまは「近いところを探して見せる」しくみです（無料）。文章で答える AI は準備中です。</p>' +
+        '<p class="muted">いまは、規程とマニュアルの中から関係がありそうなところを探して見せます。文章で答える AI は準備中です。</p>' +
         '<p class="muted">利用者さんの名前など、個人の情報は入れないでください。</p></section>' +
       '<div id="ai-log" class="ai-log" aria-live="polite"></div>' +
-      '<div class="ai-ex" id="ai-ex"' + (log.length ? ' hidden' : '') + '>' + EXAMPLES.map(function (q) { return '<button type="button" data-ex="' + esc(q) + '">' + esc(q) + '</button>'; }).join('') + '</div>' +
+      '<div class="ai-ex" id="ai-ex"' + (log.length ? ' hidden' : '') + '>' + (nurse() ? NURSE_EXAMPLES.concat(EXAMPLES) : EXAMPLES).map(function (q) { return '<button type="button" data-ex="' + esc(q) + '">' + esc(q) + '</button>'; }).join('') + '</div>' +
       '<form id="ai-f" class="ai-form"><label><span class="sr">質問</span><textarea id="ai-in" rows="2" maxlength="200" placeholder="例）有給休暇は何日もらえる？"></textarea></label>' +
         '<button type="submit">聞く</button></form>' +
       '<div id="err"></div>' + I.backHtml();

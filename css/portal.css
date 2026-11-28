@@ -149,7 +149,9 @@ body.mnl-big .mnl-scene b, body.mnl-big .mnl-row b { font-size: 16px; }
 .pk-best small { font-size: 11px; color: var(--muted); }
 .pk-best b { color: #157a33; }
 .pk-best.none { border-left-color: var(--warn); }
-.pk-listhead { align-items: center; }
+.pk-listhead { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.pk-listhead .ptl-sec { margin: 0; flex: 1; min-width: 0; }
+.pk-listhead .ptl-sec::after { display: none; }
 .pk-lot { background: #fff; border-radius: 14px; padding: 12px; display: flex; flex-direction: column; gap: 8px; box-shadow: 0 1px 4px rgba(60, 90, 140, .1); }
 .pk-lot-h { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
 .pk-lot-h b { display: block; font-size: 15px; }
@@ -165,16 +167,17 @@ body.mnl-big .mnl-scene b, body.mnl-big .mnl-row b { font-size: 16px; }
 .pk-who { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .pk-who b { font-size: 13px; }
 .pk-who small { font-size: 11px; color: var(--label); }
-.pk-st { font-size: 11px; font-weight: 800; }
+.pk-st { align-self: flex-start; font-size: 10px; font-weight: 800; color: #fff !important; border-radius: 999px; padding: 1px 8px; background: #888; }
+.nw { white-space: nowrap; }
 .pk-slot.free .pk-no { background: #2e9a4a; }
 .pk-slot.free b { color: #157a33; }
 .pk-slot.soon .pk-no { background: #d99a1e; }
-.pk-slot.soon .pk-st { color: #a86512; }
+.pk-slot.soon .pk-st { background: #c4840f; }
 .pk-slot.used .pk-no { background: #d24a4a; }
-.pk-slot.used .pk-st { color: #b0202f; }
+.pk-slot.used .pk-st { background: #c63b3b; }
 .pk-slot.over { background: #f7f0ff; border-color: #dcc8f5; }
 .pk-slot.over .pk-no { background: #8a3bd0; }
-.pk-slot.over .pk-st { color: #7a2bc0; }
+.pk-slot.over .pk-st { background: #7a2bc0; }
 .pk-slot button { flex: none; }
 .pk-slot button { min-height: 40px; padding: 6px 14px; font-size: 13px; }
 .pk-slot button.pk-in { background: #2e9a4a; border-color: #2e9a4a; border-radius: 999px; }
@@ -212,3 +215,11 @@ body.mnl-big .mnl-scene b, body.mnl-big .mnl-row b { font-size: 16px; }
 
 .ai-help { align-self: flex-start; font-size: 13px; font-weight: 700; min-height: 40px; display: inline-flex; align-items: center; }
 .ai-ex[hidden], button.mnl-size[hidden] { display: none; }
+
+.mnl-119 { display: flex; flex-direction: column; background: #fff; border: 2px solid #c22035; color: #c22035; border-radius: 12px; padding: 10px 14px; text-decoration: none; min-height: 52px; }
+.mnl-119 b { font-size: 16px; }
+.mnl-119 small { font-size: 11px; color: var(--label); }
+.fail .btn { margin-top: 4px; }
+.fail .btn.sub-link { background: #fff; color: var(--navy); border-color: var(--glass-line); }
+.ai-hits button { min-height: 40px; border: 1px solid var(--glass-line); padding: 4px 12px; font-size: 12px; }
+.mnl-guide details summary { min-height: 40px; display: flex; align-items: center; }

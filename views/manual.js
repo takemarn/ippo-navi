@@ -46,7 +46,9 @@
       var size = document.getElementById('mnl-size');
       if (size && e.code === 403) size.hidden = true;
       document.getElementById('mn').innerHTML = e.code === 403
-        ? '<div class="card fail"><h2>このマニュアルは見られません</h2><p class="fail-msg">' + esc(e.message) + '</p></div>'
+        ? '<div class="card fail"><h2>このマニュアルは見られません</h2><p class="fail-msg">' + esc(e.message) + '</p>' +
+            '<p class="fail-msg"><b>急変のときは、まず看護師かオンコール当番へ連絡してください。</b>命に関わるときは119番。</p>' +
+            '<a class="btn" href="tel:119">119番に電話する</a><a class="btn sub-link" href="#org">困ったときの窓口（組織図）</a></div>'
         : T().failBox(e, true);
     });
   }
@@ -74,8 +76,8 @@
       '<form class="mnl-search" id="mnl-f" role="search"><input id="mnl-q" type="search" enterkeyhint="search" placeholder="例：転倒　夜間　発熱" value="' + esc(query) + '" aria-label="マニュアルを探す">' +
         '<button type="submit">探す</button></form>' +
       '<div class="mnl-keys">' + (data.キーワード || []).map(function (k) { return '<button type="button" data-key="' + esc(k) + '">' + esc(k) + '</button>'; }).join('') + '</div>' +
-      '<div id="mnl-res"></div>' +
-      (now.length ? '<h2 class="ptl-sec">いま こんな時 <small>押すと「見るところ」だけ出ます</small></h2>' + scenes(now) : '') +
+      '<div id="mnl-res" hidden></div>' +
+      (now.length ? '<h2 class="ptl-sec">いま こんな時 <small>押すと、その場面のページが開きます</small></h2>' + scenes(now) : '') +
       (first.length ? '<h2 class="ptl-sec">はじめての人へ</h2>' + scenes(first) : '') +
       (rest.length ? '<details class="mnl-more"><summary>＋ ほかのページ（' + rest.length + '）</summary>' + scenes(rest) + '</details>' : '') +
       (!all.length ? '<div class="loading">まだマニュアルが登録されていません。</div>' : '');
@@ -90,6 +92,7 @@
   function search() {
     var res = document.getElementById('mnl-res');
     if (!res) return;
+    res.hidden = !query;
     if (!query) { res.innerHTML = ''; return; }
     var words = query.split(/[\s　、,]+/).filter(String);
     var hits = (data.ガイド || []).filter(function (g) {
@@ -107,7 +110,9 @@
     var u = data.急変 || {};
     var list = (u.見る順 || []).map(guide).filter(Boolean);
     box.innerHTML = T().topBack('#manual', 'マニュアルのトップ') +
-      '<h2 class="mnl-uh">' + esc(u.題 || '様子がおかしい・急変') + '</h2><p class="ptl-note">この場面で見るところ（上から順に）</p>' +
+      '<h2 class="mnl-uh">' + esc(u.題 || '様子がおかしい・急変') + '</h2>' +
+      '<a class="mnl-119" href="tel:119"><b>命に関わるときは 119番</b><small>押すと電話をかけます。連絡はそのあとでよい</small></a>' +
+      '<p class="ptl-note">この場面で見るところ（上から順に）</p>' +
       '<ol class="mnl-steps">' + list.map(function (g) {
         return '<li><button type="button" data-jump="' + esc(g.ID) + '">' + esc(g.題) + '</button></li>';
       }).join('') + '</ol>' +
@@ -120,7 +125,7 @@
       '<p class="mnl-cat">' + esc(g.分類) + '</p><h2>' + esc(g.題) + '</h2>' +
       '<p class="muted">' + (g.改定日 ? T().ymdJa(g.改定日) + ' 改定　' : '') + (g.読む分 ? '読む目安 ' + esc(g.読む分) + '分' : '') + '</p>' +
       '<h3>パッと見</h3><ul class="mnl-points">' + (g.要点 || []).map(function (p) { return '<li>' + esc(p) + '</li>'; }).join('') + '</ul>' +
-      (g.本文 ? '<details' + (compact ? '' : ' open') + '><summary>くわしく読む（原文）</summary>' +
+      (g.本文 ? '<details' + (compact ? '' : ' open') + '><summary>くわしく読む（全文）</summary>' +
         String(g.本文).split('\n').map(function (l) { return '<p>' + esc(l) + '</p>'; }).join('') + '</details>' : '') +
       '</article>';
   }
