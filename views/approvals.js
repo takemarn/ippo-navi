@@ -6,7 +6,9 @@
      - 申請カードは古い順。申請者を大きく、何日前の申請か・予定日まであと何日か を札で出す
      - 承認は確認つき（だれの何を承認するかを文で出す）、差戻しは理由必須＋よく使う理由の一言ボタン
      - 読み込み中は形だけの仮の行（スケルトン）、空のとき・エラーのとき（権限なし／通信）を分けて案内
-   データの形（GAS の pendingApprovals / decide）は変えていない。
+   管理者だけ: 各カードに「削除」。理由を必須で書いてから deleteRequest {申請ID, 理由} を送る（承認待ちの申請だけ）。
+     見本モードは core.js の Demo に deleteRequest が無いので、ここで IPPO.demo に「見本の承認待ちから取り除く」ものを登録する。
+   データの形（GAS の pendingApprovals / decide / deleteRequest）は変えていない。
    pendingApprovals の各行に「承認者」（いまの段階の承認者の氏名）と「担当」（自分が承認できるか）があれば使う。
    無いとき（今の GAS）は「自分が承認する段階の申請」とみなし、承認者は自分として数える。 */
 (function () {
@@ -41,6 +43,18 @@
     if (r.申請種類 === 'タスク') return b.日程開始 || '';
     return '';
   }
+
+  function isAdmin() { return !!(state.me && state.me.役割 === '管理者'); }
+  // 見本モード: 削除は見本の承認待ちから取り除くだけ
+  if (I.DEMO && I.demo && !I.demo.deleteRequest) {
+    I.demo.deleteRequest = function (d) {
+      if (!d || !d.申請ID || !String(d.理由 || '').trim()) throw new Error('削除の理由を書いてください');
+      var D = I.demoCore; if (D) D.pending = D.pending.filter(function (r) { return r.申請ID !== d.申請ID; });
+      return { 申請ID: d.申請ID, 状態: '削除' };
+    };
+  }
+  var SENDING_LABEL = { 承認: '承認中…', 差戻し: '差し戻し中…', 削除: '削除中…' };
+  var DONE_LABEL = { 承認: '承認しました', 差戻し: '差し戻しました', 削除: '削除しました' };
 
   // ---------- データの組み立て ----------
   function meName() { return (state.me && state.me.氏名) || '自分'; }
@@ -137,7 +151,7 @@
     if (r.申請種類 === '経費') {
       var head = d[0] || {}, kind = r.小口先出 || head.小口先出, memo = r.備考 || head.備考;
       return '<dl class="apv-dl">' +
-        '<dt>対象日</dt><dd>' + esc(head.対象日 || '—') + '</dd>' +
+        '<dt>対象日</dt><dd class="apv-num">' + esc(head.対象日 || '—') + '</dd>' +
         '<dt>経費区分</dt><dd>' + esc(head.経費区分 || '—') + '</dd>' +
         (kind ? '<dt>小口先出</dt><dd>' + esc(kind) + '</dd>' : '') +
         d.map(function (x) {
@@ -150,7 +164,7 @@
     return '<dl class="apv-dl">' + d.map(function (x) {
       var time = x.打刻時刻 ? '打刻 ' + x.打刻時刻 : (x.開始 || x.終了 ? (x.開始 || '') + '〜' + (x.終了 || '') : '');
       return '<dt>項目</dt><dd>' + esc(x.項目) + '</dd>' +
-        '<dt>対象日</dt><dd>' + esc(x.対象日) + '</dd>' +
+        '<dt>対象日</dt><dd class="apv-num">' + esc(x.対象日) + '</dd>' +
         (time ? '<dt>時間</dt><dd class="apv-num">' + esc(time) + '</dd>' : '') +
         (x.備考 ? '<dt class="apv-wide">備考</dt><dd class="apv-wide">' + esc(x.備考) + '</dd>' : '');
     }).join('') + '</dl>';
@@ -174,14 +188,24 @@
   }
   function item(r) {
     var can = mine(r), id = esc(r.申請ID);
-    var ops;
-    if (can && view.sending[r.申請ID]) {
+    var ops, sending = view.sending[r.申請ID], conf = view.confirm && view.confirm.id === r.申請ID ? view.confirm.act : '';
+    if (sending) {
       // 送信中（ほかのカードを押して描き直しても、ここは押せないまま）
-      ops = '<div class="apv-btns"><button type="button" class="apv-btn apv-btn-' + (view.sending[r.申請ID] === '差戻し' ? 'back' : 'ok') + '" disabled aria-busy="true">' +
-        '<span class="apv-spin" aria-hidden="true"></span>' + esc(view.sending[r.申請ID] === '差戻し' ? '差し戻し中…' : '承認中…') + '</button></div>';
+      ops = '<div class="apv-btns"><button type="button" class="apv-btn apv-btn-' + (sending === '承認' ? 'ok' : 'back') + '" disabled aria-busy="true">' +
+        '<span class="apv-spin" aria-hidden="true"></span>' + esc(SENDING_LABEL[sending]) + '</button></div>';
+    } else if (conf === '削除') {
+      // 管理者の削除: 理由は必須（記録に残る）。元に戻せないことを書く
+      ops = '<div class="apv-confirm is-back" role="group" aria-label="削除の確認">' +
+        '<p>' + esc(r.申請者 || '申請者') + ' さんの' + esc(what(r)) + 'を削除します。削除すると元に戻せません。</p>' +
+        '<div class="apv-label"><label for="del-' + id + '">削除の理由</label><span class="apv-opt">(必須)</span></div>' +
+        '<textarea id="del-' + id + '" class="apv-cmt" data-k="del:" rows="2" maxlength="300" placeholder="例: 二重に出された申請のため">' + esc(view.cmts['del:' + r.申請ID] || '') + '</textarea>' +
+        '<div class="apv-err" role="alert"></div>' +
+        '<div class="apv-btns"><button type="button" class="apv-btn apv-btn-ghost" data-act="やめる">やめる</button>' +
+        '<button type="button" class="apv-btn apv-btn-back" data-act="確定">削除する</button></div>' +
+      '</div>';
     } else if (!can) {
       ops = '<p class="apv-note">' + esc(approverOf(r)) + ' さんが承認する段階です。あなたは見るだけです。</p>';
-    } else if (view.confirm && view.confirm.id === r.申請ID && view.confirm.act === '差戻し') {
+    } else if (conf === '差戻し') {
       // 差戻し: 押したときだけ理由の欄を開く（理由は必須。申請者の「自分の申請」に出る）
       ops = '<div class="apv-confirm is-back" role="group" aria-label="差戻しの理由">' +
         '<p>' + esc(r.申請者 || '申請者') + ' さんに差し戻します</p>' +
@@ -194,7 +218,7 @@
         '<div class="apv-btns"><button type="button" class="apv-btn apv-btn-ghost" data-act="やめる">やめる</button>' +
         '<button type="button" class="apv-btn apv-btn-back" data-act="確定">差し戻す</button></div>' +
       '</div>';
-    } else if (view.confirm && view.confirm.id === r.申請ID) {
+    } else if (conf === '承認') {
       ops = '<div class="apv-confirm" role="group" aria-label="承認の確認">' +
         '<p>' + esc(r.申請者 || '申請者') + ' さんの' + esc(what(r)) + 'を承認します。よろしいですか？</p>' +
         '<div class="apv-btns"><button type="button" class="apv-btn apv-btn-ghost" data-act="やめる">やめる</button>' +
@@ -212,6 +236,9 @@
       '<p class="apv-meta"><span>申請日時：' + esc(md(r.申請日時)) + ' ' + esc(hm(r.申請日時)) + '</span>' +
         '<span>承認段階：' + esc(r.現在段階 || '—') + '</span><span>申請ID：' + id + '</span></p>' +
       contentLines(r) + ops +
+      // 管理者だけ: カードの下に小さく「削除」（送信中・確認中は出さない）
+      (isAdmin() && !sending && !conf ? '<div class="apv-admin"><button type="button" class="apv-del" data-act="削除">' +
+        '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 6h12M8 6V4h4v2M6 6l1 10h6l1-10"/></svg>この申請を削除<small>（管理者）</small></button></div>' : '') +
       (ops.indexOf('apv-err') < 0 ? '<div class="apv-err" role="alert"></div>' : '') +
     '</article>';
   }
@@ -234,7 +261,8 @@
   }
   function saveComments() {
     document.querySelectorAll('.apv-item').forEach(function (el) {
-      var t = el.querySelector('.apv-cmt'); if (t) view.cmts[el.dataset.id] = t.value;
+      // 差戻しの理由はそのままの申請IDで、削除の理由は 'del:' を付けて分けて覚える
+      var t = el.querySelector('.apv-cmt'); if (t) view.cmts[(t.dataset.k || '') + el.dataset.id] = t.value;
     });
   }
 
@@ -249,6 +277,11 @@
     app.innerHTML = '<h1 class="apv-title">承認待ち一覧</h1>' +
       '<div class="apv-shell" id="apv-body" aria-busy="true">' + skeleton() + '</div>' +
       backHtml();
+    // 役割が「一般」の人（URL を直に開いたときなど）は、GAS に聞かずに「承認者・管理者だけ」の案内を出す
+    if (I.canApprove && state.me && !I.canApprove()) {
+      var b = document.getElementById('apv-body'); b.removeAttribute('aria-busy'); b.innerHTML = failHtml(true, '');
+      return;
+    }
     load();
     app.addEventListener('click', onClick);
     app.addEventListener('input', onInput);
@@ -259,25 +292,31 @@
     e.target.classList.remove('is-error');
     var err = e.target.closest('.apv-item').querySelector('.apv-err'); if (err) err.textContent = '';
   }
-  function load() {
+  // focusAfter: 「最新にする」「もう一度読み込む」を押して読み直したとき、読み終わったら同じ役目のボタンへフォーカスを戻す（キーボード・読み上げで迷わないように）
+  function load(focusAfter) {
     var gen = I.gen, body = document.getElementById('apv-body');
     if (body) body.setAttribute('aria-busy', 'true');
     api('pendingApprovals').then(function (list) {
       if (gen !== I.gen) return; // 読み込み中に別の画面へ移ったら捨てる
       view.list = list || []; view.at = new Date(); render();
       var b = document.getElementById('apv-body'); if (b) b.removeAttribute('aria-busy');
+      if (focusAfter) { var r = document.querySelector('.apv-reload'); if (r) r.focus(); }
     }).catch(function (e) {
       if (gen !== I.gen) return;
       var b = document.getElementById('apv-body'); if (!b) return;
       b.removeAttribute('aria-busy');
-      var no = e.code === 403;
-      // 印は絵文字を使わず線画（鍵／三角の注意）。自分の申請の画面と同じ形
-      b.innerHTML = '<div class="apv-fail" role="alert"><span class="apv-fail-ic" aria-hidden="true"><svg viewBox="0 0 24 24">' +
-        (no ? '<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 018 0v3"/>' : '<path d="M12 4l9 16H3z"/><path d="M12 10v4M12 17v.5"/>') + '</svg></span>' +
-        '<p class="apv-fail-title">' + (no ? '承認待ち一覧は承認者・管理者だけが開けます' : '承認待ち一覧を開けませんでした') + '</p>' +
-        '<p>' + (no ? '承認の担当になる必要があるときは、管理者へ確認してください。' : esc(e.message || '通信できませんでした。') + '<br>電波の良い所で、もう一度読み込んでください。') + '</p>' +
-        (no ? '' : '<button type="button" class="apv-btn apv-btn-ghost" data-act="再読み込み">もう一度読み込む</button>') + '</div>';
+      b.innerHTML = failHtml(e.code === 403, e.message);
+      if (focusAfter) { var r = b.querySelector('[data-act="再読み込み"]'); if (r) r.focus(); }
     });
+  }
+  // 開けなかったときの案内。no = 権限が無い（403）、msg = 通信などのエラー文
+  function failHtml(no, msg) {
+    // 印は絵文字を使わず線画（鍵／三角の注意）。自分の申請の画面と同じ形
+    return '<div class="apv-fail" role="alert"><span class="apv-fail-ic" aria-hidden="true"><svg viewBox="0 0 24 24">' +
+      (no ? '<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 018 0v3"/>' : '<path d="M12 4l9 16H3z"/><path d="M12 10v4M12 17v.5"/>') + '</svg></span>' +
+      '<p class="apv-fail-title">' + (no ? '承認待ち一覧は承認者・管理者だけが開けます' : '承認待ち一覧を開けませんでした') + '</p>' +
+      '<p>' + (no ? '承認の担当になる必要があるときは、管理者へ確認してください。' : esc(msg || '通信できませんでした。') + '<br>電波の良い所で、もう一度読み込んでください。') + '</p>' +
+      (no ? '' : '<button type="button" class="apv-btn apv-btn-ghost" data-act="再読み込み">もう一度読み込む</button>') + '</div>';
   }
 
   function onClick(e) {
@@ -289,45 +328,51 @@
       ta.dispatchEvent(new Event('input', { bubbles: true })); ta.focus(); return;
     }
     var act = t.dataset.act; if (!act) return;
-    if (act === '再読み込み') { saveComments(); document.getElementById('apv-body').innerHTML = skeleton(); load(); return; }
+    if (act === '再読み込み') { saveComments(); document.getElementById('apv-body').innerHTML = skeleton(); load(true); return; }
     if (act === '戻る') { saveComments(); view.who = null; view.confirm = null; render(); window.scrollTo(0, 0); return; }
     var card = t.closest('.apv-item'); if (!card) return;
     var id = card.dataset.id, err = card.querySelector('.apv-err');
-    if (act === '承認' || act === '差戻し') {
+    if (act === '承認' || act === '差戻し' || act === '削除') {
+      if (view.sending[id]) return;
       saveComments(); view.confirm = { id: id, act: act }; render();
-      focusIn(id, act === '差戻し' ? '.apv-cmt' : '[data-act="確定"]'); return;
+      focusIn(id, act === '承認' ? '[data-act="確定"]' : '.apv-cmt'); return;
     }
-    if (act === 'やめる') { saveComments(); view.confirm = null; render(); focusIn(id, '[data-act="承認"]'); return; }
+    if (act === 'やめる') {
+      var was = view.confirm && view.confirm.act;
+      saveComments(); view.confirm = null; render();
+      focusIn(id, was === '削除' ? '[data-act="削除"]' : '[data-act="承認"]'); return;
+    }
     if (act === '確定') {
       var c = view.confirm; if (!c || c.id !== id || view.sending[id]) return;
       var box = card.querySelector('.apv-cmt'), cmt = box ? box.value.trim() : '';
-      if (c.act === '差戻し' && !cmt) {
-        err.textContent = '差戻しの理由を書いてください。';
+      if (c.act !== '承認' && !cmt) {
+        err.textContent = c.act === '削除' ? '削除の理由を書いてください。' : '差戻しの理由を書いてください。';
         box.classList.add('is-error'); box.focus(); return;
       }
       saveComments();
       view.sending[c.id] = c.act; view.confirm = null; render(); // 送信中の形で描き直す（ほかのカードはそのまま使える）
       var gen = I.gen, who = approverOf(view.list.filter(function (r) { return r.申請ID === c.id; })[0] || {});
       if (who === '承認者未設定') who = view.who;
-      api('decide', { 申請ID: c.id, 結果: c.act, コメント: cmt }).then(function () {
+      var call = c.act === '削除' ? api('deleteRequest', { 申請ID: c.id, 理由: cmt }) : api('decide', { 申請ID: c.id, 結果: c.act, コメント: cmt });
+      call.then(function () {
         if (gen !== I.gen) return;
         delete view.sending[c.id];
         view.list = view.list.filter(function (r) { return r.申請ID !== c.id; });
-        delete view.cmts[c.id];
+        delete view.cmts[c.id]; delete view.cmts['del:' + c.id];
         var left = view.list.filter(function (r) { return approverOf(r) === who; }).length;
         // 消える前に一瞬たたむ（どのカードが片づいたか目で追えるように）。待つ間に描き直されていても、今あるカードを探してたたむ
         var el = document.querySelector('.apv-item[data-id="' + cssEsc(c.id) + '"]'); if (el) el.classList.add('is-done');
         setTimeout(function () {
           if (gen !== I.gen) return;
           render();
-          if (!left) { window.scrollTo(0, 0); toast((c.act === '承認' ? '承認しました' : '差し戻しました') + '。' + who + ' さんの分はすべて終わりました'); }
-          else toast((c.act === '承認' ? '承認しました' : '差し戻しました') + '（残り ' + left + '件）');
+          if (!left) { window.scrollTo(0, 0); toast(DONE_LABEL[c.act] + '。' + who + ' さんの分はすべて終わりました'); }
+          else toast(DONE_LABEL[c.act] + '（残り ' + left + '件）');
         }, 260);
       }).catch(function (x) {
         if (gen !== I.gen) return;
         delete view.sending[c.id];
-        // 差戻しは書いた理由を残したまま確認を開き直す（ほかのカードの確認を開いていなければ）
-        if (c.act === '差戻し' && !view.confirm) view.confirm = c;
+        // 差戻し・削除は書いた理由を残したまま確認を開き直す（ほかのカードの確認を開いていなければ）
+        if (c.act !== '承認' && !view.confirm) view.confirm = c;
         saveComments(); render();
         var el = document.querySelector('.apv-item[data-id="' + cssEsc(c.id) + '"] .apv-err');
         if (el) el.textContent = x.message || '送信できませんでした。もう一度お試しください。';
@@ -340,5 +385,7 @@
     if (el) el.focus();
   }
 
+  // 申請の中身（経費の品名・個数・金額の内訳／勤怠の項目・時間）。自分の申請（views/requests.js）も同じ部品で出す
+  I.applyLines = contentLines;
   I.views.approvals = viewApprovals;
 })();

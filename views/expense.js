@@ -1,7 +1,10 @@
 /* 経費申請の画面（#expense）
    参考アプリの並び: 申請者 → 小口先出 → 対象日 → 施設名 → 経費区分 → 物品（追加/削除） → 備考、カードの外に「送信」。
    送信の流れ: 送信 → 入力チェック（項目の下に赤字） → ページ内の確認カード → 送信中 → 完了カード。
-   GAS に送る data の形は docs/api.md のまま: {対象日, 小口先出, 経費区分, 物品: [{物品, 自由入力?, 個数, 金額}], 備考?} */
+   GAS に送る data: {対象日, 小口先出, 施設名, 経費区分, 物品: [{物品, 自由入力?, 個数, 金額}], 備考?, 送信ID}
+     施設名 = 選んだ施設（options.施設 のどれか）、送信ID = 確認カードを出すときに作る文字（同じIDの2回目は GAS が前の返事を返す＝二重登録しない）。
+   入力の決まり: 対象日は今日まで（先の日付は不可）。個数は1〜9999の整数、金額は0〜100万円の整数（1.5 や 1e3、マイナスは不可）。
+   差し戻された申請の「出し直す」（views/requests.js）から来たときは、sessionStorage の ippo.redo に入れた明細で入力を埋めて開く。 */
 (function () {
   'use strict';
   var I = window.IPPO, app = I.app, state = I.state, api = I.api, esc = I.esc, today = I.today, yen = I.yen, toast = I.toast;
@@ -28,6 +31,24 @@
     return '<div class="exp-lab"><label for="' + forId + '">' + label + '</label>' + (extra || '') +
       '<span class="' + (req ? 'exp-req">(必須)' : 'exp-opt">(任意)') + '</span></div>';
   }
+  var MAX_YEN = 1000000, MAX_QTY = 9999; // GAS の validateExpense と同じ上限
+  var isInt = function (v) { return /^\d+$/.test(String(v === undefined || v === null ? '' : v).trim()); };
+  // 差し戻された申請の出し直し: requests.js が sessionStorage に置いた中身を1回だけ取り出す（種類が違えば使わない）
+  // 送信ID: 確認カードを出すときに作るランダムな文字。GAS は同じ送信IDの2回目には前の返事を返す（二重登録しない）。
+  // 「もう一度送信する」では同じIDを使い、入力に戻って直したら次の確認で作り直す
+  function newSendId() {
+    try {
+      var a = new Uint8Array(16); crypto.getRandomValues(a);
+      return Array.prototype.map.call(a, function (x) { return ('0' + x.toString(16)).slice(-2); }).join('');
+    } catch (_) { return Date.now().toString(36) + Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2); }
+  }
+  function takeRedo(type) {
+    try {
+      var r = JSON.parse(sessionStorage.getItem('ippo.redo') || 'null');
+      if (!r || r.種類 !== type) return null;
+      sessionStorage.removeItem('ippo.redo'); return r;
+    } catch (_) { return null; }
+  }
   function field(key, inner) {
     return '<div class="exp-field" data-f="' + key + '">' + inner + '<p class="exp-err" id="exp-err-' + key + '" hidden></p></div>';
   }
@@ -38,19 +59,29 @@
     if (goods.indexOf('フリー入力') < 0) goods.unshift('フリー入力');
     var rows = [{}];
     var FACILITIES = facilities(), oneFac = FACILITIES.length === 1;
+    var redo = takeRedo('経費'), rd = redo && (redo.明細 || [])[0] || {};
+    if (redo && (redo.明細 || []).length) {
+      rows = redo.明細.map(function (x) {
+        var name = x.物品 === 'フリー入力' ? (x.自由入力 || '') : (x.物品 || ''), known = goods.indexOf(name) >= 0 && name !== 'フリー入力';
+        return { 物品: known ? name : 'フリー入力', 自由入力: known ? '' : name, 個数: x.個数, 金額: x.金額 };
+      });
+    }
 
     app.innerHTML =
       '<h1 class="exp-title">経費申請</h1>' +
+      (redo ? '<div class="exp-redo" role="note"><b>差し戻された申請を出し直します</b>' +
+        '<span>前の内容を入れてあります。理由を見て直してから送信してください。</span>' +
+        (redo.コメント ? '<span class="exp-redo-why">差戻しの理由：' + esc(redo.コメント) + '</span>' : '') + '</div>' : '') +
       '<div id="exp-stage">' +
       '<form id="exp-form" class="exp-form" novalidate>' +
         '<div class="card exp-card">' +
           field('申請者', head('exp-申請者', '申請者', true) +
             '<input id="exp-申請者" value="' + esc(state.me && state.me.氏名) + '" readonly aria-readonly="true">') +
-          field('小口先出', head('exp-小口先出', '小口先出', true) + sel('exp-小口先出', o.小口先出 || [])) +
-          // 参考アプリと同じく、小口先出を選ぶまで対象日は使えない
-          field('対象日', head('exp-対象日', '対象日', true) + '<input type="date" id="exp-対象日" value="' + today() + '" disabled>') +
+          field('小口先出', head('exp-小口先出', '小口先出', true) + sel('exp-小口先出', o.小口先出 || [], redo && (redo.小口先出 || rd.小口先出))) +
+          // 参考アプリと同じく、小口先出を選ぶまで対象日は使えない。先の日付は選べない（max）
+          field('対象日', head('exp-対象日', '対象日', true) + '<input type="date" id="exp-対象日" value="' + esc(rd.対象日 || today()) + '" max="' + today() + '" disabled>') +
           field('施設名', head('exp-施設名', '施設名', true) + (oneFac ? sel('exp-施設名', FACILITIES, FACILITIES[0], null) : sel('exp-施設名', FACILITIES, '').replace('<select', '<select class="exp-empty"'))) +
-          field('経費区分', head('exp-経費区分', '経費区分', true) + sel('exp-経費区分', o.経費区分 || [])) +
+          field('経費区分', head('exp-経費区分', '経費区分', true) + sel('exp-経費区分', o.経費区分 || [], rd.経費区分)) +
           '<div class="exp-field" data-f="物品">' +
             '<div class="exp-lab"><span class="exp-lab-name" id="exp-物品-lab">物品</span>' +
               '<button type="button" class="exp-pill exp-add" id="exp-add">追加</button>' +
@@ -59,7 +90,7 @@
             '<div id="exp-items" class="exp-items" role="group" aria-labelledby="exp-物品-lab"></div>' +
             '<p class="exp-total" id="exp-total" hidden></p>' +
           '</div>' +
-          field('備考', head('exp-備考', '備考', false) + '<textarea id="exp-備考"></textarea>') +
+          field('備考', head('exp-備考', '備考', false) + '<textarea id="exp-備考">' + esc(redo && (redo.備考 || rd.備考) || '') + '</textarea>') +
         '</div>' +
         '<p class="exp-formerr" id="exp-formerr" role="alert" hidden></p>' +
         '<button type="submit" class="exp-send">送信</button>' +
@@ -102,10 +133,11 @@
         return '<div class="exp-item" data-i="' + i + '">' +
           '<div class="exp-item-row">' +
             sel('exp-物品_' + i, goods, r.物品, '物品').replace('<select', '<select aria-label="物品 ' + (i + 1) + '行目"' + (r.物品 ? '' : ' class="exp-empty"')) +
-            '<input type="number" inputmode="numeric" min="1" step="1" id="exp-個数_' + i + '" placeholder="個数" aria-label="個数 ' + (i + 1) + '行目" value="' + esc(r.個数 || '') + '">' +
-            '<input type="number" inputmode="numeric" min="0" step="1" id="exp-金額_' + i + '" placeholder="金額" aria-label="金額（円） ' + (i + 1) + '行目" value="' + esc(r.金額 === undefined ? '' : r.金額) + '">' +
+            // 物品（と物品名）は1行全部を使い、個数と金額は次の行に並べる（幅320pxでも文字が切れないように）
+            (free ? '<input class="exp-free" id="exp-自由入力_' + i + '" placeholder="物品名を入力" aria-label="物品名 ' + (i + 1) + '行目" value="' + esc(r.自由入力 || '') + '">' : '') +
+            '<input type="number" inputmode="numeric" min="1" max="' + MAX_QTY + '" step="1" id="exp-個数_' + i + '" placeholder="個数" aria-label="個数 ' + (i + 1) + '行目" value="' + esc(r.個数 || '') + '">' +
+            '<input type="number" inputmode="numeric" min="0" max="' + MAX_YEN + '" step="1" id="exp-金額_' + i + '" placeholder="金額（円）" aria-label="金額（円） ' + (i + 1) + '行目" value="' + esc(r.金額 === undefined || r.金額 === null ? '' : r.金額) + '">' +
           '</div>' +
-          (free ? '<input class="exp-free" id="exp-自由入力_' + i + '" placeholder="物品名を入力" aria-label="物品名 ' + (i + 1) + '行目" value="' + esc(r.自由入力 || '') + '">' : '') +
           '<p class="exp-err" id="exp-err-物品_' + i + '" hidden></p>' +
         '</div>';
     }
@@ -120,10 +152,14 @@
       });
     }
     function updateTotal() {
-      var sum = 0, any = false;
-      rows.forEach(function (_, i) { var el = $('金額_' + i); if (el && el.value !== '') { any = true; sum += Number(el.value || 0); } });
+      // 合計に入れるのは正しい金額（0以上の整数）だけ。マイナスや小数が入っている行は合計から外し、そう書く
+      var sum = 0, any = false, bad = 0;
+      rows.forEach(function (_, i) {
+        var el = $('金額_' + i); if (!el || (el.value === '' && !(el.validity && el.validity.badInput))) return;
+        any = true; if (isInt(el.value) && Number(el.value) <= MAX_YEN) sum += Number(el.value); else bad++;
+      });
       $('total').hidden = !any;
-      $('total').textContent = rows.length + '件　合計 ' + yen(sum);
+      $('total').textContent = rows.length + '件　合計 ' + yen(sum) + (bad ? '（正しくない金額 ' + bad + '件を除く）' : '');
     }
     drawItems();
 
@@ -150,7 +186,7 @@
     function setFree(i, on) {
       var cur = $('自由入力_' + i);
       if (on && !cur) {
-        $('物品_' + i).closest('.exp-item-row').insertAdjacentHTML('afterend',
+        $('物品_' + i).insertAdjacentHTML('afterend',
           '<input class="exp-free" id="exp-自由入力_' + i + '" placeholder="物品名を入力" aria-label="物品名 ' + (i + 1) + '行目">');
         // エラー表示中の行なら、出てきた物品名の欄も最初からエラー扱いにする（赤字は clearErr で書き直す）
         if ($('物品_' + i).closest('.exp-item').classList.contains('exp-bad')) {
@@ -198,14 +234,18 @@
       p.parentNode.classList.add('exp-bad');
     }
     var FIELD_NAME = { 物品: '物品', 自由入力: '物品名', 個数: '個数', 金額: '金額' };
+    // 入っていない欄（need）と、入っているが決まりに合わない欄（qty=個数 / yen=金額）で文を分ける
+    var KIND_MSG = { qty: '個数は1〜' + MAX_QTY + 'の整数で入れてください', yen: '金額は0円以上・' + yen(MAX_YEN) + 'までの整数（円）で入れてください' };
     function setRowMsg(row, bads) {
-      var i = Number(row.dataset.i), need = [], intErr = false;
+      var i = Number(row.dataset.i), need = [], kinds = [];
       Array.prototype.forEach.call(bads, function (el) {
-        if (el.dataset.err === 'int') intErr = true; else need.push(FIELD_NAME[el.id.replace(/^exp-|_\d+$/g, '')]);
+        var k = el.dataset.err;
+        if (KIND_MSG[k]) { if (kinds.indexOf(k) < 0) kinds.push(k); } else need.push(FIELD_NAME[el.id.replace(/^exp-|_\d+$/g, '')]);
       });
       var ORDER = ['物品', '物品名', '個数', '金額'];
       need.sort(function (a, b) { return ORDER.indexOf(a) - ORDER.indexOf(b); });
-      var msg = (need.length ? need.join('・') + 'を入れてください' : '') + (intErr ? (need.length ? '。' : '') + '個数は1以上の整数で入れてください' : '');
+      kinds.sort();
+      var msg = (need.length ? [need.join('・') + 'を入れてください'] : []).concat(kinds.map(function (k) { return KIND_MSG[k]; })).join('。');
       showErr('物品_' + i, (rows.length > 1 ? (i + 1) + '行目：' : '') + msg);
     }
     function resetErrs() {
@@ -218,9 +258,11 @@
     function readData() {
       collect();
       return {
-        対象日: $('対象日').value, 小口先出: $('小口先出').value, 経費区分: $('経費区分').value,
+        対象日: $('対象日').value, 小口先出: $('小口先出').value, 施設名: $('施設名').value, 経費区分: $('経費区分').value,
         物品: rows.map(function (r) {
-          var it = { 物品: r.物品 || '', 個数: r.個数 === '' || r.個数 === undefined ? '' : Number(r.個数), 金額: r.金額 === '' || r.金額 === undefined ? '' : Number(r.金額) };
+          // 決まりに合わない値は文字のまま残す（validate で見分ける）。正しい値だけ数にして送る
+          var num = function (v) { return v === '' || v === undefined ? '' : isInt(v) ? Number(v) : String(v); };
+          var it = { 物品: r.物品 || '', 個数: num(r.個数), 金額: num(r.金額) };
           if (r.物品 === 'フリー入力') it.自由入力 = (r.自由入力 || '').trim();
           return it;
         }),
@@ -231,15 +273,19 @@
       var n = 0;
       if (!d.小口先出) { showErr('小口先出', '小口先出を選んでください'); n++; }
       if (d.小口先出 && !d.対象日) { showErr('対象日', '対象日を入れてください'); n++; }
+      else if (d.小口先出 && d.対象日 > today()) { showErr('対象日', '対象日は今日より後にできません（使った日を入れてください）'); n++; }
       if (!$('施設名').value) { showErr('施設名', '施設名を選んでください'); n++; }
       if (!d.経費区分) { showErr('経費区分', '経費区分を選んでください'); n++; }
       d.物品.forEach(function (it, i) {
         var bad = function (k, kind) { var el = $(k + '_' + i); if (el) { el.classList.add('exp-bad-in'); el.dataset.err = kind || 'need'; } };
         if (!it.物品) bad('物品');
         else if (it.物品 === 'フリー入力' && !it.自由入力) bad('自由入力');
-        if (it.個数 === '') bad('個数');
-        else if (!(it.個数 > 0 && Math.floor(it.個数) === it.個数)) bad('個数', 'int');
-        if (it.金額 === '' || !(it.金額 >= 0)) bad('金額');
+        // type=number の欄は、数として読めない文字だと value が空になる（badInput）。その時は「決まりに合わない」として扱う
+        var raw = function (k) { var el = $(k + '_' + i); return el && el.validity && el.validity.badInput; };
+        if (it.個数 === '' && !raw('個数')) bad('個数');
+        else if (typeof it.個数 !== 'number' || it.個数 < 1 || it.個数 > MAX_QTY) bad('個数', 'qty');
+        if (it.金額 === '' && !raw('金額')) bad('金額');
+        else if (typeof it.金額 !== 'number' || it.金額 > MAX_YEN) bad('金額', 'yen');
         var row = $('items').children[i], left = row.querySelectorAll('.exp-bad-in');
         if (left.length) { setRowMsg(row, left); n++; }
       });
@@ -268,6 +314,7 @@
         return '<li><span>' + esc(it.物品 === 'フリー入力' ? it.自由入力 : it.物品) + ' <span class="exp-qty">× ' + esc(it.個数) + '</span></span><span>' + esc(yen(it.金額)) + '</span></li>';
       }).join('');
       form.hidden = true;
+      d.送信ID = newSendId();
       try { history.pushState({ ippoStep: 'confirm' }, ''); } catch (_) {} // ブラウザの「戻る」で入力に戻れるように
       after.innerHTML =
         '<section class="card exp-card exp-confirm" aria-labelledby="exp-cf-h">' +

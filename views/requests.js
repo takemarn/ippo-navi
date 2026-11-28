@@ -10,18 +10,20 @@
   'use strict';
   var I = window.IPPO, app = I.app, api = I.api, esc = I.esc, yen = I.yen, toast = I.toast;
 
-  // 「メニューに戻る」は core の共通部品（来たメニューへ戻る）。まだ無いときは同じ見た目の文字リンクで代用
-  function backHtml(fallback) {
-    if (I.backHtml) return I.backHtml();
-    var href = (I.lastMenu && I.lastMenu()) || fallback;
-    return '<a class="ipp-back" href="' + href + '">‹ メニューに戻る</a>';
+  // 戻り先は「申請状況」メニュー（自分の申請はその中の画面）。前は来たメニューへ戻していたため、
+  // ホームの近道や完了カードから来ると「メニューに戻る」になり #status に戻れなかった
+  function backHtml(href) {
+    if (I.backHtml) return I.backHtml(href, '申請状況に戻る');
+    return '<a class="ipp-back" href="' + href + '">‹ 申請状況に戻る</a>';
   }
 
   var STATUS = ['承認待ち', '承認済み', '差戻し', '取消'];
   var CLS = { '承認待ち': 'wait', '承認済み': 'ok', '差戻し': 'back', '取消': 'cancel' };
   var TYPE_CLS = { 経費: 'exp', 勤怠: 'att', 利用者登録: 'cli', 利用者修正: 'cli', タスク: 'tsk' };
   // 差し戻された申請を出し直す画面（種類ごと）
-  var REDO = { 経費: '#expense', 勤怠: '#attendance', 利用者登録: '#users', 利用者修正: '#users', タスク: '#task' };
+  // 経費・勤怠は、前の中身を sessionStorage（ippo.redo）に入れて開き、その画面が入力を埋める（views/expense.js・attendance.js の takeRedo）
+  var REDO = { 経費: '#expense', 勤怠: '#attendance', 利用者登録: '#users', 利用者修正: '#users', タスク: '#task-office' };
+  var REFILL = { 経費: 1, 勤怠: 1 };
   // sending = 取り消しを送っている申請ID（{ id: true }）。絞り込みなどで描き直しても押せないままにする（二重送信を防ぐ）
   var view = { list: [], filter: 'すべて', confirm: null, sending: {} };
 
@@ -72,6 +74,8 @@
   }
 
   function contentLines(r) {
+    // 承認待ち一覧と同じ部品で出す（経費の品名・個数・金額の内訳、フリー入力の品名も同じ決まりで）
+    if (I.applyLines) return I.applyLines(r);
     var d = r.明細 || [];
     // 経費・勤怠以外（利用者登録・利用者修正・タスク）の中身は views/clients.js が描く
     if (r.申請種類 !== '経費' && r.申請種類 !== '勤怠' && I.bodyLines) return I.bodyLines(r);
@@ -126,7 +130,8 @@
     if (s === '差戻し') {
       note = '<div class="req-note req-note-back"><p class="req-note-h">差戻しの理由' + (r.承認者 ? '（' + esc(r.承認者) + ' さん）' : '') + '</p><p class="req-note-b">' +
         esc(r.コメント || r.差戻しコメント || '理由は承認者に確認してください。') + '</p></div>' +
-        (REDO[r.申請種類] ? '<a class="req-redo" href="' + REDO[r.申請種類] + '">' + esc(r.申請種類) + 'を出し直す<span aria-hidden="true">›</span></a>' : '');
+        (REFILL[r.申請種類] ? '<button type="button" class="req-redo" data-act="出し直す">' + esc(r.申請種類) + 'を出し直す<span aria-hidden="true">›</span></button>'
+          : REDO[r.申請種類] ? '<a class="req-redo" href="' + REDO[r.申請種類] + '">' + esc(r.申請種類) + 'を出し直す<span aria-hidden="true">›</span></a>' : '');
     } else if (s === '承認済み') note = '<p class="req-msg req-msg-ok">すべての承認が終わりました。</p>';
     else if (s === '取消') note = '<p class="req-msg">取り消した申請です。</p>';
     var ago = waitText(r.申請日時);
@@ -190,6 +195,15 @@
     if (act === '再読み込み') { document.getElementById('req-body').innerHTML = skeleton(); load(); return; }
     var card = t.closest('.apv-item'); if (!card) return;
     var id = card.dataset.id;
+    if (act === '出し直す') {
+      var r = view.list.filter(function (x) { return x.申請ID === id; })[0]; if (!r) return;
+      try {
+        sessionStorage.setItem('ippo.redo', JSON.stringify({ 種類: r.申請種類, 申請ID: r.申請ID, コメント: r.コメント || r.差戻しコメント || '',
+          小口先出: r.小口先出 || '', 備考: r.備考 || '', 明細: r.明細 || [] }));
+      } catch (_) {} // 入れられなくても、空のフォームで開く
+      location.hash = REDO[r.申請種類];
+      return;
+    }
     if (act === '取消') { view.confirm = id; render(); focus(id, '[data-act="確定"]'); return; }
     if (act === 'やめる') { view.confirm = null; render(); focus(id, '[data-act="取消"]'); return; }
     if (act === '確定') {
