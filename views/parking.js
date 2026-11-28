@@ -128,7 +128,7 @@
           x.rows.filter(function (r) { return !flt || r.s.k === flt; }).map(function (r) { return slotRow(x.l, r, me); }).join('') + '</section>';
       }).join('') : '<div class="loading">駐車場がまだ登録されていません。</div>') +
       '<ul class="pk-legend" aria-label="色の見かた"><li class="free">空き</li><li class="soon">まもなく空く（' + SOON_MIN + '分以内）</li><li class="used">使用中</li><li class="over">予定超過</li></ul>' +
-      '<p class="ptl-note">「停める」を押した時刻から、選んだ時間（ふつう8時間）後を空く予定として表示します。予定を過ぎると「予定超過」になります。</p>';
+      '<p class="ptl-note">「停める」を押した時刻から、選んだ時間（ふつう8時間）後を空く予定として表示します。予定を過ぎると「予定超過」になります。車を出したら、自分の行の「出庫」を押してください（次の人が停められます）。</p>';
   }
 
   // 区画の並び: 番号つきの駐車場は、区画を色の四角で横に並べる（ひと目で空きが分かる）。
