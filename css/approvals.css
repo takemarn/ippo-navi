@@ -1,5 +1,7 @@
 /* 承認待ち一覧（views/approvals.js）と 自分の申請（views/requests.js）専用の見た目。
-   共通部分は style.css。ここでは apv- / req- で始まるクラスだけを使う。色は参考アプリの役割に合わせる（仕様書 0-4）。 */
+   共通部分は style.css。ここでは apv- / req- で始まるクラスだけを使う。
+   色の役割: 濃紺 #12317D = 主の操作・あなた、赤 #C0283A = 差戻し・取消、橙 #B5650F = 日数がたっている／予定日が近い、
+   緑 #157A33 = 承認済み。種類の札（経費・勤怠・利用者・タスク）は淡い色で見分ける。 */
 .apv-title { text-align: center; font-size: 18px; font-weight: 700; color: #111; margin: 0; line-height: 1.4; }
 
 /* 外枠のすりガラスカード */
@@ -10,84 +12,157 @@
   -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
 }
 
-/* 読み込み中（白い角丸バー） */
-.apv-loading {
-  display: flex; align-items: center; justify-content: center; gap: 8px; background: #fff; border-radius: 12px;
-  padding: 14px; font-size: 13px; color: #555;
+/* ---------- 読み込み中（形だけの仮の行） ---------- */
+.apv-skel { display: flex; flex-direction: column; gap: 12px; }
+.apv-sk { display: block; border-radius: 6px; background: #E6ECF4; }
+@media (prefers-reduced-motion: no-preference) {
+  .apv-sk { background: linear-gradient(90deg, #E6ECF4 0%, #F3F7FD 50%, #E6ECF4 100%); background-size: 200% 100%; animation: apv-shine 1.2s ease-in-out infinite; }
 }
+@keyframes apv-shine { from { background-position: 100% 0; } to { background-position: -100% 0; } }
+.apv-sk-l { width: 62%; height: 18px; }
+.apv-sk-s { width: 40%; height: 12px; }
+.apv-sk-m { width: 38%; height: 16px; }
+.apv-sk-n { width: 36px; height: 14px; }
+.apv-sk-chips { width: 90%; height: 32px; border-radius: 999px; margin-top: 6px; }
+.apv-sk-box { width: 100%; height: 64px; border-radius: 10px; }
+.apv-sk-row { display: flex; justify-content: space-between; align-items: center; padding: 16px 14px; min-height: 58px; box-sizing: border-box; }
+.apv-sk-row + .apv-sk-row { border-top: 1px solid #E6ECF4; }
+.apv-sk-card { display: flex; flex-direction: column; gap: 8px; padding: 12px 0; }
+.apv-sk-card + .apv-sk-card { border-top: 1px solid #E6ECF4; }
+.apv-sk-text { margin: 0; text-align: center; font-size: 12px; color: #6B7480; display: flex; align-items: center; justify-content: center; gap: 6px; }
+.apv-sk-text .apv-spin { margin: 0; }
+
 .apv-spin {
   display: inline-block; width: 14px; height: 14px; border-radius: 50%; flex: none;
   border: 2px solid #C9DBF5; border-top-color: #12317D; vertical-align: -2px; margin-right: 6px;
 }
-.apv-loading .apv-spin { margin-right: 0; }
 @media (prefers-reduced-motion: no-preference) { .apv-spin { animation: apv-rot .8s linear infinite; } }
 @keyframes apv-rot { to { transform: rotate(360deg); } }
 
-/* 1段目: サマリー */
-.apv-sum { background: #fff; border-radius: 12px; padding: 12px 14px; display: flex; flex-direction: column; gap: 4px; }
+/* ---------- 1段目: 件数のまとめ ---------- */
+.apv-sum { background: #fff; border-radius: 12px; padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; }
+.apv-sum-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .apv-sum-main { font-size: 15px; font-weight: 700; margin: 0; }
-.apv-sum-sub { font-size: 12px; color: #555; margin: 0; }
-.apv-sum-sub strong { color: #12317D; }
+.apv-reload {
+  flex: none; display: inline-flex; align-items: center; gap: 4px; min-height: 40px; padding: 0 10px; margin: -6px -6px -6px 0;
+  font: inherit; font-size: 11px; color: #2F7BD6; background: transparent; border: 0; border-radius: 999px; cursor: pointer; font-variant-numeric: tabular-nums;
+}
+.apv-reload svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.apv-reload:active { background: #E4E8EE; }
+/* あなたの分（いちばん大事な数） */
+.apv-mine { background: #EEF4FD; border: 1px solid #D3E1F6; border-radius: 10px; padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; }
+.apv-mine p { margin: 0; }
+.apv-mine-n { display: flex; align-items: baseline; gap: 4px; font-size: 13px; color: #12317D; font-weight: 700; }
+.apv-mine-n span { margin-right: auto; color: #333; font-weight: 700; }
+.apv-mine-n strong { font-size: 24px; line-height: 1; font-variant-numeric: tabular-nums; }
+.apv-mine.is-zero .apv-mine-n { color: #6B7480; }
+.apv-mine-old { font-size: 12px; font-weight: 700; color: #A2560B; display: flex; align-items: center; gap: 6px; }
+.apv-mine-types { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 4px; }
+.apv-mine-t { display: inline-flex; align-items: center; gap: 4px; margin-right: 8px; white-space: nowrap; }
+.apv-mine-tn { font-size: 12px; font-weight: 700; color: #333; font-variant-numeric: tabular-nums; }
+.apv-mine-go { width: 100%; margin-top: 2px; }
+.apv-mine-none { font-size: 12px; color: #6B7480; }
+.apv-dot { flex: none; display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #E8891C; }
 
-/* 2段目: 承認者ごとの件数 */
+/* 種類の札 */
+.apv-type {
+  display: inline-flex; align-items: center; flex: none; font-size: 11px; font-weight: 700; line-height: 1;
+  border-radius: 6px; padding: 4px 7px; white-space: nowrap; background: #EEF1F5; color: #4A5462;
+}
+.apv-type-exp { background: #E3EEFC; color: #1D4FA3; }
+.apv-type-att { background: #E1F4E7; color: #1C6B37; }
+.apv-type-cli { background: #EFE7FA; color: #5B3596; }
+.apv-type-tsk { background: #FCEEDB; color: #93520D; }
+
+/* ---------- 2段目: 承認者ごとの件数 ---------- */
 .apv-who { list-style: none; margin: 0; padding: 0; background: #fff; border-radius: 12px; overflow: hidden; }
-.apv-who li + li { border-top: 1px solid #E6ECF4; }
+.apv-who > li + li { border-top: 1px solid #E6ECF4; }
 .apv-who-row {
-  all: unset; box-sizing: border-box; width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 8px;
-  padding: 12px 14px; min-height: 46px; cursor: pointer; font-family: inherit;
+  all: unset; box-sizing: border-box; width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 10px 14px; min-height: 58px; cursor: pointer; font-family: inherit;
 }
 .apv-who-row:active { background: #E4E8EE; }
 .apv-who-row:focus-visible { outline: 3px solid #9DB8EA; outline-offset: -3px; }
-.apv-who-name { color: #2F7BD6; font-weight: 700; font-size: 14px; display: flex; align-items: center; gap: 6px; }
+.apv-who-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.apv-who-name { color: #2F7BD6; font-weight: 700; font-size: 15px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; overflow-wrap: anywhere; }
 .apv-you { font-size: 10px; font-weight: 700; color: #fff; background: #12317D; border-radius: 999px; padding: 1px 7px; }
-.apv-who-count { color: #6B7480; font-size: 12px; display: flex; align-items: center; gap: 6px; font-variant-numeric: tabular-nums; }
-.apv-chev { font-size: 16px; line-height: 1; color: #8A93A0; }
+.apv-who-sub { font-size: 11px; color: #6B7480; display: flex; flex-wrap: wrap; gap: 0 8px; }
+.apv-who-age { display: inline-flex; align-items: center; gap: 4px; }
+.apv-who-age.is-old { color: #A2560B; font-weight: 700; }
+.apv-who-count { flex: none; color: #6B7480; font-size: 12px; display: flex; align-items: center; gap: 2px; font-variant-numeric: tabular-nums; }
+.apv-who-count b { font-size: 16px; color: #111; }
+.apv-chev { font-size: 18px; line-height: 1; color: #8A93A0; margin-left: 4px; }
 
-/* 3段目: 明細 */
-.apv-backpill, .req-chip, .req-cancelbtn { min-height: 36px; gap: 4px; }
+/* ---------- 3段目: 申請カード ---------- */
+.apv-backpill, .req-chip, .req-cancelbtn { min-height: 40px; gap: 4px; }
 .apv-backpill {
   align-self: flex-start; font: inherit; font-size: 12px; font-weight: 400; color: #2F6FD0; background: #fff;
-  border: 1px solid #A9C3EE; border-radius: 999px; padding: 4px 16px; cursor: pointer; margin-bottom: 2px;
+  border: 1px solid #A9C3EE; border-radius: 999px; padding: 4px 16px; cursor: pointer; margin-bottom: -2px;
 }
 .apv-backpill:active, .req-chip:active { background: #E4E8EE; }
 .req-cancelbtn:active { background: #F7C9CF; }
 .apv-detail { background: #fff; border-radius: 12px; padding: 12px 14px 4px; }
-.apv-detail > h2 { font-size: 15px; font-weight: 700; margin: 0 0 4px; padding-bottom: 8px; border-bottom: 1px solid #E6ECF4; }
-.apv-item { padding: 12px 0; display: flex; flex-direction: column; gap: 8px; }
+.apv-detail > h2 { font-size: 16px; font-weight: 700; margin: 0; }
+.apv-detail-sub { margin: 2px 0 0; padding-bottom: 8px; border-bottom: 1px solid #E6ECF4; font-size: 11px; color: #6B7480; }
+.apv-item { padding: 14px 0; display: flex; flex-direction: column; gap: 8px; }
 .apv-item + .apv-item { border-top: 1px solid #E6ECF4; }
 .apv-detail > .apv-item:first-child { padding-top: 4px; }
 .apv-item-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
-.apv-item-head h3 { font-size: 15px; font-weight: 700; margin: 0; }
+.apv-item-head h3 { font-size: 15px; font-weight: 700; margin: 0; display: flex; align-items: center; gap: 8px; min-width: 0; overflow-wrap: anywhere; }
+.apv-who-big { font-size: 16px; }
+.apv-who-big small { font-size: 12px; font-weight: 400; color: #6B7480; }
 .apv-meta { font-size: 11px; color: #6B7480; margin: 0; line-height: 1.5; overflow-wrap: anywhere; }
 .apv-nw { white-space: nowrap; }
-.apv-tag { font-size: 10px; color: #6B7480; border: 1px solid #D5DAE1; background: #F4F5F7; border-radius: 999px; padding: 1px 8px; white-space: nowrap; }
+.apv-tag { flex: none; font-size: 10px; color: #6B7480; border: 1px solid #D5DAE1; background: #F4F5F7; border-radius: 999px; padding: 2px 8px; white-space: nowrap; }
 .apv-tag-mine { color: #12317D; border-color: #A9C3EE; background: #EAF1FB; font-weight: 700; }
+.apv-item.is-done { opacity: 0; transform: translateX(24px); }
+@media (prefers-reduced-motion: no-preference) { .apv-item { transition: opacity .25s, transform .25s; } }
+
+/* 何日前の申請か・予定日の札 */
+.apv-flags { margin: -2px 0 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.apv-flag { font-size: 11px; font-weight: 700; color: #4A5462; background: #F1F4F8; border-radius: 999px; padding: 2px 9px; white-space: nowrap; }
+.apv-flag.is-old { color: #8F4A06; background: #FDEBD3; }
+.apv-flag-due { color: #1D4FA3; background: #E8F0FC; }
+.apv-flag-due.is-soon { color: #fff; background: #D9771A; }
 
 .apv-dl {
-  margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 2px 0; font-size: 13px;
+  margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 3px 0; font-size: 13px;
   background: #F3F7FD; border-radius: 10px; padding: 8px 10px;
 }
 .apv-dl dt { color: #6B7480; padding-right: 12px; }
-.apv-dl dd { margin: 0; text-align: right; }
+.apv-dl dd { margin: 0; text-align: right; overflow-wrap: anywhere; min-width: 0; }
+.apv-dl .apv-line { color: #333; }
+.apv-qty { color: #6B7480; font-variant-numeric: tabular-nums; }
 .apv-num { font-variant-numeric: tabular-nums; }
 .apv-dl .apv-total { font-weight: 700; color: #111; border-top: 1px solid #DCE5F2; padding-top: 3px; margin-top: 2px; }
+/* 長くなりがちな備考は1行まるごと使い、左寄せで読みやすく */
+.apv-dl dt.apv-wide { grid-column: 1 / -1; margin-top: 2px; }
+.apv-dl dd.apv-wide { grid-column: 1 / -1; text-align: left; background: #fff; border-radius: 6px; padding: 4px 8px; white-space: pre-wrap; }
 
 .apv-field { display: flex; flex-direction: column; gap: 6px; }
 .apv-label { display: flex; justify-content: space-between; font-size: 12px; font-weight: 700; color: #333; }
 .apv-opt { font-weight: 400; font-size: 11px; color: #C0283A; }
 .apv-cmt {
   font: inherit; font-size: 14px; color: #111; background: #fff; border: 1px solid #C9DBF5; border-radius: 10px;
-  padding: 8px 10px; width: 100%; min-height: 56px; resize: vertical; box-sizing: border-box;
+  padding: 8px 10px; width: 100%; min-height: 72px; resize: vertical; box-sizing: border-box;
 }
 .apv-cmt:focus { outline: 3px solid #C9DBF5; border-color: #12317D; }
 .apv-cmt.is-error { border-color: #C0283A; background: #FFF6F7; }
-.apv-err { font-size: 12px; color: #C0283A; }
+.apv-err { font-size: 12px; color: #C0283A; font-weight: 700; }
 .apv-err:empty { display: none; }
+
+/* 差戻しの理由のひとことボタン */
+.apv-phrases { display: flex; flex-wrap: wrap; gap: 6px; }
+.apv-phrase {
+  font: inherit; font-size: 12px; color: #8E1C2A; background: #fff; border: 1px solid #EDB3BA; border-radius: 999px;
+  padding: 0 12px; min-height: 40px; cursor: pointer; text-align: left;
+}
+.apv-phrase:active { background: #FCE1E4; }
 
 .apv-btns { display: flex; gap: 8px; }
 .apv-btns > * { flex: 1; }
 .apv-btn {
-  font: inherit; font-size: 13px; font-weight: 700; height: 40px; min-height: 40px; border-radius: 10px; cursor: pointer; padding: 0 12px;
+  font: inherit; font-size: 14px; font-weight: 700; height: 44px; min-height: 44px; border-radius: 10px; cursor: pointer; padding: 0 12px;
   border: 1px solid transparent; display: inline-flex; align-items: center; justify-content: center;
 }
 .apv-btn:disabled { opacity: .55; cursor: default; }
@@ -100,45 +175,97 @@
 .apv-btn-ghost { background: #fff; border-color: #C9DBF5; color: #2F7BD6; }
 .apv-btn-ghost:active { background: #E4E8EE; }
 .apv-btn .apv-spin { border-color: rgba(255,255,255,.45); border-top-color: #fff; }
+.apv-btn-ghost .apv-spin { border-color: #C9DBF5; border-top-color: #12317D; }
 
 /* ページ内の確認 */
 .apv-confirm { background: #EAF1FB; border: 1px solid #A9C3EE; border-radius: 10px; padding: 10px; display: flex; flex-direction: column; gap: 8px; }
 .apv-confirm.is-back { background: #FFF3F4; border-color: #EDB3BA; }
-.apv-confirm p { margin: 0; font-size: 13px; font-weight: 700; }
+.apv-confirm > p { margin: 0; font-size: 13px; font-weight: 700; line-height: 1.5; }
 .apv-confirm .apv-label label { display: inline; font-size: 12px; color: #333; }
-.apv-quote { margin: 0; font-size: 13px; background: #fff; border-left: 3px solid #C0283A; border-radius: 6px; padding: 6px 10px; white-space: pre-wrap; }
 
 .apv-item.is-view .apv-item-head h3 { color: #444; }
-.apv-note { margin: 0; font-size: 12px; color: #6B7480; background: #F4F5F7; border-radius: 8px; padding: 6px 10px; }
+.apv-note { margin: 0; font-size: 12px; color: #6B7480; background: #F4F5F7; border-radius: 8px; padding: 8px 10px; }
 
-.apv-empty { background: #fff; border-radius: 12px; padding: 20px 14px; text-align: center; font-size: 13px; color: #6B7480; }
-.apv-fail { background: #fff; border-radius: 12px; padding: 16px 14px; display: flex; flex-direction: column; gap: 8px; font-size: 13px; color: #444; }
+/* 空のとき・エラーのとき */
+.apv-empty {
+  background: #fff; border-radius: 12px; padding: 22px 16px; text-align: center; font-size: 12px; color: #6B7480;
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+}
+.apv-detail .apv-empty { padding: 16px 0; }
+.apv-empty p { margin: 0; text-wrap: balance; }
+.apv-empty .apv-btn { margin-top: 6px; min-width: 60%; }
+.apv-empty-h { font-size: 14px; font-weight: 700; color: #333; }
+.apv-empty-ic, .apv-fail-ic {
+  width: 44px; height: 44px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: #E1F4E7; color: #1C6B37;
+}
+.apv-empty-ic svg, .apv-fail-ic svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.apv-fail { background: #fff; border-radius: 12px; padding: 18px 16px; display: flex; flex-direction: column; align-items: center; text-align: center; gap: 8px; font-size: 13px; color: #444; }
 .apv-fail p { margin: 0; }
+.apv-fail .apv-btn { min-width: 60%; }
+.apv-fail-ic { background: #FCE1E4; color: #B0202F; }
 .apv-fail-title { font-weight: 700; color: #111; font-size: 14px; }
 
 
 /* ---------- 自分の申請 ---------- */
-.req-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.req-chips { display: flex; flex-wrap: wrap; gap: 8px; }
 .req-chip {
   flex: none; font: inherit; font-size: 12px; font-weight: 400; color: #444; background: #fff; border: 1px solid #D5DAE1;
-  border-radius: 999px; padding: 4px 14px; cursor: pointer; white-space: nowrap;
+  border-radius: 999px; padding: 4px 14px; cursor: pointer; white-space: nowrap; display: inline-flex; align-items: center;
 }
+.req-chip[data-zero] { color: #9AA5B1; }
 .req-chip.is-on { background: #EAF1FB; border-color: #2F6FD0; color: #12317D; font-weight: 700; }
+.req-chip-back:not([data-zero]) .req-chip-n { color: #C0283A; font-weight: 700; opacity: 1; }
 .req-chip-n { font-variant-numeric: tabular-nums; color: inherit; opacity: .75; }
 
+/* 差し戻された申請があるときの案内 */
+.req-alert {
+  all: unset; box-sizing: border-box; display: flex; align-items: center; gap: 10px; width: 100%; min-height: 52px; cursor: pointer;
+  background: #FFF3F4; border: 1px solid #EDB3BA; border-radius: 10px; padding: 8px 12px; font-family: inherit;
+}
+.req-alert:active { background: #FCE1E4; }
+.req-alert:focus-visible { outline: 3px solid #EDB3BA; }
+.req-alert > span:nth-child(2) { flex: 1; display: flex; flex-direction: column; }
+.req-alert b { font-size: 13px; color: #8E1C2A; }
+.req-alert small { font-size: 11px; color: #8E1C2A; opacity: .85; }
+.req-alert-ic { flex: none; width: 24px; height: 24px; border-radius: 50%; background: #C0283A; color: #fff; font-weight: 700; font-size: 14px; display: flex; align-items: center; justify-content: center; }
 
 .req-item { position: relative; padding-left: 12px; }
-.req-item::before { content: ""; position: absolute; left: 0; top: 12px; bottom: 12px; width: 4px; border-radius: 4px; background: #D5DAE1; }
+.req-item::before { content: ""; position: absolute; left: 0; top: 14px; bottom: 14px; width: 4px; border-radius: 4px; background: #D5DAE1; }
 .apv-detail > .req-item:first-child::before { top: 4px; }
 .req-is-wait::before { background: #F0A54A; }
 .req-is-ok::before { background: #2FA352; }
 .req-is-back::before { background: #C0283A; }
-.req-is-cancel h3, .req-is-cancel .apv-dl { opacity: .6; }
+.req-is-cancel h3, .req-is-cancel .apv-dl, .req-is-cancel .req-steps { opacity: .6; }
+
+/* 進み具合（申請 → 承認 → 完了） */
+.req-steps { list-style: none; margin: 0; padding: 0; display: flex; }
+.req-step { flex: 1; position: relative; display: flex; flex-direction: column; align-items: center; gap: 3px; text-align: center; min-width: 0; }
+.req-step::before { content: ""; position: absolute; top: 6px; right: 50%; width: 100%; height: 2px; background: #DCE3EC; }
+.req-step:first-child::before { display: none; }
+.req-step.is-done::before, .req-step.is-now::before, .req-step.is-back::before, .req-step.is-cancel::before { background: #9FB6DA; }
+.req-step-dot { position: relative; width: 14px; height: 14px; border-radius: 50%; background: #fff; border: 2px solid #CBD3DE; box-sizing: border-box; }
+.req-step-l { font-size: 11px; color: #8A93A0; line-height: 1.3; overflow-wrap: anywhere; }
+.req-step-l small { display: block; font-size: 10px; }
+.req-step.is-done .req-step-dot { background: #12317D; border-color: #12317D; }
+.req-step.is-done .req-step-l { color: #333; }
+.req-step.is-now .req-step-dot { background: #fff; border: 4px solid #E8891C; }
+.req-step.is-now .req-step-l { color: #8F4A06; font-weight: 700; }
+.req-step.is-back .req-step-dot { background: #C0283A; border-color: #C0283A; }
+.req-step.is-back .req-step-l { color: #B0202F; font-weight: 700; }
+.req-step.is-cancel .req-step-dot { background: #8A93A0; border-color: #8A93A0; }
+.req-is-ok .req-step.is-done .req-step-dot { background: #2FA352; border-color: #2FA352; }
+.req-is-ok .req-step::before { background: #9AD3AA; }
 
 .req-note { border-radius: 10px; padding: 8px 10px; font-size: 13px; }
 .req-note p { margin: 0; }
 .req-note-back { background: #FFF3F4; border: 1px solid #EDB3BA; color: #5A1A22; }
 .req-note-h { font-weight: 700; font-size: 12px; color: #B0202F; }
+.req-note-b { white-space: pre-wrap; overflow-wrap: anywhere; }
+.req-redo {
+  display: flex; align-items: center; justify-content: center; gap: 6px; min-height: 44px; border-radius: 10px;
+  background: #12317D; color: #fff; font-size: 14px; font-weight: 700; text-decoration: none;
+}
+.req-redo:active { background: #0D2560; }
 .req-msg { margin: 0; font-size: 12px; color: #6B7480; }
 .req-msg-ok { color: #157A33; }
 .req-ops { display: flex; justify-content: flex-end; }
@@ -147,7 +274,7 @@
   border-radius: 999px; padding: 6px 18px; cursor: pointer;
 }
 .req-new {
-  display: flex; align-items: center; justify-content: center; height: 40px; background: #fff; color: #2F7BD6;
-  border-radius: 10px; font-size: 13px; text-decoration: none; box-shadow: 0 1px 4px rgba(80, 110, 170, .18);
+  display: flex; align-items: center; justify-content: center; gap: 4px; min-height: 44px; background: #fff; color: #2F7BD6; font-weight: 700;
+  border-radius: 10px; font-size: 14px; text-decoration: none; box-shadow: 0 1px 4px rgba(80, 110, 170, .18);
 }
 .req-new:active { background: #E4E8EE; }
