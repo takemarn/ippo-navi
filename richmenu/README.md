@@ -5,7 +5,7 @@
 | `richmenu.jpg` | メニュー画像（2500×1686、LINE の「大」サイズ、1MB 未満）。白いカード 3 列×2 段に立体風イラスト・名前・英語・＞ボタン |
 | `richmenu.json` | タップ先の設定（Messaging API のリッチメニュー定義） |
 | `tiles.js` | 6 タイルのラベル・色・アイコン。画面の入口（`#menu`）もこれを使う |
-| `art.js` | メニュー画像用の立体風イラスト（自作 SVG）。`make.js` だけが使う |
+| `art.js` | メニュー画像用の立体風イラスト（自作 SVG）。`make.js` と画面のホーム・各メニュー見出し（views/menu.js、window.IPPO_ART）が使う。直すと両方に効く |
 | `register.sh` | 定義と画像を LINE に登録して既定メニューにする（`LINE_TOKEN=… sh richmenu/register.sh`） |
 | `make.js` | 画像を作り直す道具（`FONT_DIR=<フォント置き場> node richmenu/make.js`、playwright と ImageMagick が必要。フォントは Noto Sans JP の 500/800 を `noto500.woff2` / `noto800.woff2` という名前で置く。npm の `@fontsource/noto-sans-jp` の `files/noto-sans-jp-japanese-{500,800}-normal.woff2` が使える） |
 
