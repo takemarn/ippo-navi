@@ -119,8 +119,9 @@
 .tk-form .tk-row { display: flex; align-items: center; gap: 8px; }
 .tk-form .tk-dates input { flex: 1 1 0; width: auto; min-width: 0; padding: 0 8px; }
 .tk-form .tk-times input { flex: 0 0 34%; width: 34%; min-width: 104px; padding: 0 8px; }
-.tk-form .tk-tilde { flex: none; font-size: 18px; line-height: 1; color: #333; }
-.tk-form .exp-off .tk-tilde { color: #9AA5B1; }
+.tk-form .tk-tilde { flex: none; font-size: 20px; line-height: 1; color: #4A5563; }
+/* 参考アプリは入れられない間も「～」ははっきり見える（欄だけ淡くする） */
+.tk-form .exp-off .tk-tilde { color: #7C8794; }
 .tk-form .exp-off .exp-lab .exp-lab-name { color: #9AA5B1; font-weight: 400; }
 .tk-form input[type=time]::-webkit-calendar-picker-indicator { opacity: .45; }
 .tk-form input[type=date]:disabled::-webkit-calendar-picker-indicator,

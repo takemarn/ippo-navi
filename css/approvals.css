@@ -111,7 +111,10 @@
 .apv-item-head h3 { font-size: 15px; font-weight: 700; margin: 0; display: flex; align-items: center; gap: 8px; min-width: 0; overflow-wrap: anywhere; }
 .apv-who-big { font-size: 16px; }
 .apv-who-big small { font-size: 12px; font-weight: 400; color: #6B7480; }
-.apv-meta { font-size: 11px; color: #6B7480; margin: 0; line-height: 1.5; overflow-wrap: anywhere; }
+/* 申請日時・承認段階・申請ID: かたまりごとに折り返す（「/」で区切らず、すき間で区切る） */
+.apv-meta { font-size: 11px; color: #6B7480; margin: 0; line-height: 1.5; display: flex; flex-wrap: wrap; column-gap: 12px; }
+.apv-meta > span { white-space: nowrap; }
+.apv-meta > span:last-child { white-space: normal; overflow-wrap: anywhere; }
 .apv-nw { white-space: nowrap; }
 .apv-tag { flex: none; font-size: 10px; color: #6B7480; border: 1px solid #D5DAE1; background: #F4F5F7; border-radius: 999px; padding: 2px 8px; white-space: nowrap; }
 .apv-tag-mine { color: #12317D; border-color: #A9C3EE; background: #EAF1FB; font-weight: 700; }

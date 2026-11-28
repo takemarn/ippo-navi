@@ -203,8 +203,9 @@
       '<div class="apv-item-head"><h3>' + typeBadge(r.申請種類) + '<span class="apv-who-big">' + esc(r.申請者 || '—') + '<small> さん</small></span></h3>' +
         (can ? '<span class="apv-tag apv-tag-mine">あなたが承認</span>' : '<span class="apv-tag">閲覧のみ</span>') + '</div>' +
       flags(r) +
-      '<p class="apv-meta">申請日時：' + esc(md(r.申請日時)) + ' ' + esc(hm(r.申請日時)) +
-        ' / <span class="apv-nw">承認段階：' + esc(r.現在段階 || '—') + '</span> / <span class="apv-nw">申請ID：' + id + '</span></p>' +
+      // 申請日時・承認段階・申請ID は区切りの「/」を使わず、ひとかたまりずつ折り返す（行末に「/」だけ残らないように）
+      '<p class="apv-meta"><span>申請日時：' + esc(md(r.申請日時)) + ' ' + esc(hm(r.申請日時)) + '</span>' +
+        '<span>承認段階：' + esc(r.現在段階 || '—') + '</span><span>申請ID：' + id + '</span></p>' +
       contentLines(r) + ops +
       (ops.indexOf('apv-err') < 0 ? '<div class="apv-err" role="alert"></div>' : '') +
     '</article>';

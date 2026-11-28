@@ -87,8 +87,8 @@
 .att-off .att-lab .att-lab-name { color: #9AA5B1; font-weight: 400; }
 .att-range { display: flex; align-items: center; gap: 8px; }
 .att-form .att-range input { width: 34%; flex: 0 0 34%; min-width: 104px; padding: 0 8px; }
-.att-tilde { font-size: 18px; color: #333; line-height: 1; }
-.att-off .att-tilde { color: #9AA5B1; }
+.att-tilde { font-size: 20px; color: #4A5563; line-height: 1; }
+.att-off .att-tilde { color: #7C8794; }
 .att-form input[type=time]::-webkit-calendar-picker-indicator { opacity: .45; }
 .att-form input[type=time]:disabled::-webkit-calendar-picker-indicator { display: none; }
 

@@ -129,7 +129,7 @@
     var ago = waitText(r.申請日時);
     return '<article class="apv-item req-item req-is-' + (CLS[s] || 'cancel') + '" data-id="' + id + '">' +
       '<div class="apv-item-head"><h3>' + typeBadge(r.申請種類) + '<span>' + esc(r.申請種類) + '申請</span></h3>' + I.pill(s) + '</div>' +
-      '<p class="apv-meta">申請日時：' + esc(when(r.申請日時)) + (ago ? '（' + ago + '）' : '') + ' / <span class="apv-nw">申請ID：' + id + '</span></p>' +
+      '<p class="apv-meta"><span>申請日時：' + esc(when(r.申請日時)) + (ago ? '（' + ago + '）' : '') + '</span><span>申請ID：' + id + '</span></p>' +
       steps(r) + contentLines(r) + note + ops +
       '<div class="apv-err" role="alert"></div>' +
     '</article>';
