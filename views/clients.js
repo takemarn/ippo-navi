@@ -88,21 +88,39 @@
   }
   // 写真は一覧を先に出してから、同時に3人までずつ読む（一度にたくさん頼むとサーバーが詰まるため）。読めなかったら「画像登録なし」
   var photoQueue = [], photoBusy = 0;
+  // 利用者IDに " などが入っていても壊れないよう、属性セレクタの値は CSS.escape する
+  function photoSel(id) { return '[data-photo="' + (window.CSS && CSS.escape ? CSS.escape(id) : String(id).replace(/["\\]/g, '\\$&')) + '"]'; }
+  // 一覧が長いとき（数百人）に全員の写真を一度に頼まないよう、画面に近づいたカードの分だけ順に読む（IntersectionObserver）
+  var photoIO = window.IntersectionObserver ? new IntersectionObserver(function (ents) {
+    ents.forEach(function (en) {
+      if (!en.isIntersecting) return;
+      photoIO.unobserve(en.target);
+      var id = en.target.dataset.photo;
+      if (!photoCache[id] && photoQueue.indexOf(id) < 0) photoQueue.push(id);
+    });
+    pumpPhotos();
+  }, { rootMargin: '400px 0px' }) : null;
   function fillPhotos() {
     // 前の画面の読み残しは捨てる（いまの画面の写真を先に読む）
-    photoQueue = photoQueue.filter(function (id) { return document.querySelector('[data-photo="' + id + '"]'); });
+    if (photoIO) photoIO.disconnect();
+    photoQueue = photoQueue.filter(function (id) { return document.querySelector(photoSel(id)); });
     document.querySelectorAll('[data-photo]').forEach(function (el) {
       var id = el.dataset.photo;
-      if (!photoCache[id] && photoQueue.indexOf(id) < 0) photoQueue.push(id);
+      if (photoCache[id] || photoQueue.indexOf(id) >= 0) return;
+      if (photoIO) photoIO.observe(el); else photoQueue.push(id);
     });
     pumpPhotos();
   }
   function pumpPhotos() {
-    while (photoBusy < 3 && photoQueue.length) loadPhoto(photoQueue.shift());
+    while (photoBusy < 3 && photoQueue.length) {
+      var id = photoQueue.shift();
+      // 頼む前に画面を離れていたら読まない（写真の無い画面へ移っても裏で読み続けないように）
+      if (document.querySelector(photoSel(id))) loadPhoto(id);
+    }
   }
   function loadPhoto(id) {
     photoBusy++;
-    function paint(html) { document.querySelectorAll('[data-photo="' + id + '"]').forEach(function (x) { x.innerHTML = html; if (!/img/.test(html)) x.classList.add('none'); }); }
+    function paint(html) { document.querySelectorAll(photoSel(id)).forEach(function (x) { x.innerHTML = html; if (!/img/.test(html)) x.classList.add('none'); }); }
     api('clientPhoto', { 利用者ID: id }).then(function (r) {
       if (!r.写真) return paint('画像登録なし');
       photoCache[id] = r.写真;
@@ -110,6 +128,14 @@
     }).catch(function () { paint('読込失敗'); })
       .then(function () { photoBusy--; pumpPhotos(); });
   }
+  // 写真のデータが壊れていて表示できないとき（img の error）は、壊れた絵の印を出さず「画像登録なし」にする。
+  // error は泡立たないので document で捕まえる（読み込み時に1回だけ付ける。.cl-photo の中の img だけ見る）
+  document.addEventListener('error', function (e) {
+    var img = e.target, box = img && img.tagName === 'IMG' && img.closest('.cl-photo');
+    if (!box) return;
+    if (box.dataset.photo) delete photoCache[box.dataset.photo];
+    box.classList.add('none'); box.textContent = box.id === 'ph-prev' ? '表示できない写真です' : '画像登録なし';
+  }, true);
   function clientCard(c, asLink) {
     var body = '<div class="cl-cc-text"><p class="cl-cc-name"><span class="cl-id">' + esc(c.利用者ID) + '</span><b>' + esc(c.氏名) + '</b></p>' +
       '<p class="cl-kana">' + esc(c.ふりがな) + '</p><p>' + esc(c.施設名) + (c.部屋番号 ? ' <span class="cl-room">' + esc(c.部屋番号) + '</span>' : '') + '</p><p>' + stPill(c.ステータス) + '</p>' +
@@ -121,7 +147,8 @@
   }
   function needClient() {
     if (cur.id && cur.card) return true;
-    location.hash = '#users';
+    // replace にする（hash に入れると、ブラウザの「戻る」でこの画面に戻ってまた飛ばされ、抜け出せなくなる）
+    location.replace('#users');
     return false;
   }
   // 画面の切り替え中に出す「記録を読み込み中・・・」（参考アプリの文言）
@@ -146,7 +173,8 @@
   function showFail(el, e, fn) {
     if (!el) return;
     el.innerHTML = '<div class="cl-fail" role="alert"><p class="cl-fail-h">読み込めませんでした</p><p>' + esc(e && e.message || 'エラーが起きました') + '</p>' +
-      '<p class="cl-fail-n">電波の良い所で、もう一度お試しください。</p>' +
+      // 通信エラーの文にはすでに「電波の良い所で…」が入っているので、同じ文を2回出さない
+      (/電波/.test(e && e.message || '') ? '' : '<p class="cl-fail-n">電波の良い所で、もう一度お試しください。</p>') +
       (fn ? '<button type="button" class="cl-clear cl-retry">もう一度読み込む</button>' : '') + '</div>';
     var b = el.querySelector('.cl-retry');
     if (b) b.addEventListener('click', fn);
@@ -170,6 +198,13 @@
       html += recCard(r, withName);
     });
     return html;
+  }
+  // Enter で検索する欄: 日本語入力の変換を確定する Enter では検索しない（isComposing / keyCode 229）
+  function onEnter(el, fn) {
+    el.addEventListener('keydown', function (e) {
+      if (e.key !== 'Enter' || e.isComposing || e.keyCode === 229) return;
+      e.preventDefault(); fn();
+    });
   }
   function trackClicks(fn) { app.addEventListener('click', fn); I.cleanup.push(function () { app.removeEventListener('click', fn); }); }
 
@@ -237,7 +272,7 @@
         cur.rq = rq; save(); location.hash = '#records-result';
       }
     });
-    document.getElementById('cl-name').addEventListener('keydown', function (e) { if (e.key === 'Enter') document.getElementById('cl-search').click(); });
+    onEnter(document.getElementById('cl-name'), function () { document.getElementById('cl-search').click(); });
   }
   function dateRange(q) {
     return '<div class="cl-dates"><label>開始日<input type="date" id="cl-from" class="cl-input" value="' + esc(q.開始日 || '') + '"></label>' +
@@ -322,7 +357,8 @@
 
   // データ修正の前に「置換」か「削除」かを選ぶ（参考アプリは文字で入力させるが、押し間違えないようボタンにした）
   function askEditKind() {
-    var wrap = document.createElement('div');
+    if (document.getElementById('cl-modal')) return; // 二度押しで小窓が2枚重ならないように
+    var opened = Date.now(), wrap = document.createElement('div');
     wrap.className = 'cl-modal-wrap'; wrap.id = 'cl-modal';
     wrap.innerHTML = '<div class="cl-modal" role="dialog" aria-modal="true" aria-labelledby="cl-modal-h"><h2 id="cl-modal-h">データ修正</h2>' +
       '<p>書き換えは「置換」、利用者の登録をやめるときは「削除」を選んでください。どちらも申請になり、承認されると反映されます。</p>' +
@@ -346,6 +382,8 @@
     I.cleanup.push(close);
     wrap.addEventListener('click', function (e) {
       var b = e.target.closest('[data-k]');
+      // 開いた直後（二度押しの2回目）は無視する。外側をすぐ押して閉じたり、下のボタンを押し間違えたりしないように
+      if (Date.now() - opened < 400) return;
       if (e.target === wrap) return close();
       if (!b) return;
       close();
@@ -425,7 +463,7 @@
       '<button type="submit" class="cl-go">登録する</button>' +
       '</form>');
     fillPhotos();
-    var memo = document.getElementById('w-memo'), saveT = 0;
+    var memo = document.getElementById('w-memo'), saveT = 0, sending = false;
     memo.addEventListener('input', function () {
       document.getElementById('w-len').textContent = memo.value.length + '文字';
       clearTimeout(saveT);
@@ -447,19 +485,21 @@
       e.preventDefault();
       var data = { 利用者ID: cur.id, 種別: kind, 記録日: document.getElementById('w-day').value, 記録担当者: document.getElementById('w-who').value.trim(), メモ: document.getElementById('w-memo').value };
       var errs = [];
+      if (sending) return; // 送信中にもう一度押されても二重に登録しない
       if (!data.記録日) errs.push('記録日を入れてください');
+      else if (data.記録日 > I.today()) errs.push('記録日は今日までの日付にしてください');
       if (!data.記録担当者) errs.push('記録担当者を入れてください');
       if (!data.メモ.trim()) errs.push('メモを入れてください');
       var err = document.getElementById('err'), btn = e.target.querySelector('button[type=submit]');
       if (errs.length) { err.innerHTML = I.errorsBox(errs); return; }
-      err.innerHTML = ''; btn.disabled = true; btn.textContent = '登録中…'; overlay('読み込み中・・・');
+      err.innerHTML = ''; btn.disabled = true; btn.textContent = '登録中…'; overlay('読み込み中・・・'); sending = true;
       var g = I.gen;
       api('addRecord', data).then(function () {
         I.busy(false); toast(kind + 'を登録しました');
         clearTimeout(saveT); try { sessionStorage.removeItem(dkey); } catch (_) {}
         if (g === I.gen) location.hash = '#user'; // 参考アプリと同じく利用者操作へ戻る（もう別の画面にいたら動かさない）
       }).catch(function (x) {
-        I.busy(false); btn.disabled = false; btn.textContent = '登録する';
+        I.busy(false); btn.disabled = false; btn.textContent = '登録する'; sending = false;
         err.innerHTML = x.details && x.details.length ? I.errorsBox(x.details) : failHtml(x);
       });
     });
@@ -496,14 +536,18 @@
       var d = e.target.closest('[data-del]');
       if (d) delRecord(d);
     });
-    document.getElementById('cl-text').addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); document.getElementById('cl-find').click(); } });
+    onEnter(document.getElementById('cl-text'), function () { document.getElementById('cl-find').click(); });
     loadRecs();
   }
+  var recSeq = 0;
   function loadRecs() {
-    var el = document.getElementById('cl-recs');
+    var el = document.getElementById('cl-recs'); if (!el) return;
+    // 検索を続けて押したとき、遅れて届いた古い返事で新しい結果を上書きしないよう、最後に頼んだ分だけ使う
+    var my = ++recSeq;
     el.innerHTML = skel('記録を読み込み中...', 3, 'rec');
     overlay('記録を読み込み中・・・'); // 参考アプリと同じく、読み込むあいだは画面全体をぼかす
     api('clientRecords', Object.assign({ 利用者ID: cur.id }, recQ)).then(keep(function (r) {
+      if (my !== recSeq) return;
       I.busy(false);
       if (!document.getElementById('cl-recs')) return;
       var filtered = recQ.開始日 || recQ.終了日 || recQ.単日 || recQ.文字;
@@ -511,7 +555,7 @@
       el.innerHTML = r.一覧.length ? (state.me && state.me.役割 === '管理者' ? '' : '<p class="cl-note">削除できるのは自分が書いた記録だけです。</p>') + recList(r.一覧, false)
         : filtered ? emptyHtml('条件に合う記録はありません', '条件を変えて、もう一度検索してください。', '<button type="button" class="cl-clear cl-reset">条件をクリア</button>')
           : emptyHtml('まだ記録はありません', '利用者操作の「看護記録」「介護記録」などから書けます。', '<a class="cl-clear" href="#user">利用者操作へ</a>');
-    })).catch(keep(function (e) { I.busy(false); showFail(document.getElementById('cl-recs'), e, loadRecs); }));
+    })).catch(keep(function (e) { if (my !== recSeq) return; I.busy(false); showFail(document.getElementById('cl-recs'), e, loadRecs); }));
   }
   function recCard(r, withName) {
     var mine = state.me && (r.記録者職員ID === state.me.職員ID || state.me.役割 === '管理者');
@@ -525,15 +569,20 @@
     var box = btn.parentNode;
     if (!btn.dataset.sure) {
       btn.dataset.sure = '1'; btn.textContent = 'もう一度押すと削除';
-      setTimeout(function () { if (btn.isConnected) { delete btn.dataset.sure; btn.textContent = '削除'; } }, 4000);
+      setTimeout(function () { if (btn.isConnected && !btn.disabled) { delete btn.dataset.sure; btn.textContent = '削除'; } }, 4000);
       return;
     }
-    btn.disabled = true;
+    if (btn.disabled) return;
+    btn.disabled = true; btn.textContent = '削除中…';
+    var old = box.querySelector('.errors'); if (old) old.remove(); // 前の失敗の知らせは消す（失敗のたびに積み重ならないように）
     var reload = keep(loadRecs); // 削除中に画面を離れたら一覧は読み直さない
     api('deleteRecord', { 記録ID: btn.dataset.del }).then(function () {
       toast('記録を削除しました');
       reload();
-    }).catch(keep(function (e) { btn.disabled = false; box.insertAdjacentHTML('beforeend', failHtml(e)); }));
+    }).catch(keep(function (e) {
+      btn.disabled = false; delete btn.dataset.sure; btn.textContent = '削除';
+      box.insertAdjacentHTML('beforeend', failHtml(e));
+    }));
   }
 
   // ---------- 記録検索の結果（利用者横断） ----------
@@ -561,7 +610,7 @@
     var ed = cur.edit || { 種類: '新規' };
     if (ed.種類 !== '新規' && !needClient()) return;
     // 修正の申請は、いま選んでいる利用者の分だけ（戻る操作などで別の人に変わっていたら操作画面からやり直す）
-    if (ed.種類 !== '新規' && String(ed.利用者ID) !== String(cur.id)) { location.hash = '#user'; return; }
+    if (ed.種類 !== '新規' && String(ed.利用者ID) !== String(cur.id)) { location.replace('#user'); return; }
     var isNew = ed.種類 === '新規';
     var title = isNew ? '利用者の新規登録' : '利用者データ修正';
     app.innerHTML = shell(title, isNew ? '利用者マスタへの新規登録を申請します。承認されると一覧に出ます。'
@@ -680,11 +729,17 @@
     fillPhotos();
     document.getElementById('ph-file').addEventListener('change', function () {
       var f = this.files && this.files[0]; if (!f) return;
-      shrink(f, 600).then(function (url) {
+      // 縮めている間に画面を離れたら何もしない（keep）。読めなかったら前に選んだ写真も取り消す
+      document.getElementById('err').innerHTML = '';
+      shrink(f, 600).then(keep(function (url) {
         picked = url;
-        document.getElementById('ph-prev').innerHTML = '<img alt="選んだ写真" src="' + url + '">';
+        document.getElementById('ph-prev').innerHTML = '<img alt="選んだ写真" src="' + esc(url) + '">';
         document.getElementById('ph-send').disabled = false;
-      }).catch(function () { document.getElementById('err').innerHTML = failHtml({ message: '写真を読み込めませんでした。別の写真を選んでください' }); });
+      }), keep(function () {
+        picked = null; document.getElementById('ph-send').disabled = true;
+        document.getElementById('ph-prev').innerHTML = '<i>まだ選んでいません</i>';
+        document.getElementById('err').innerHTML = failHtml({ message: '写真を読み込めませんでした。別の写真を選んでください' });
+      }));
     });
     document.getElementById('ph-send').addEventListener('click', function () {
       if (!picked) return;
@@ -694,7 +749,7 @@
         I.busy(false); photoCache[id] = picked; toast('写真を登録しました');
         if (cur.id === id && cur.card) { cur.card.写真 = true; save(); }
         if (g === I.gen) location.hash = '#user';
-      }).catch(function (x) { I.busy(false); btn.disabled = false; document.getElementById('err').innerHTML = failHtml(x); });
+      }).catch(keep(function (x) { I.busy(false); btn.disabled = false; document.getElementById('err').innerHTML = failHtml(x); }));
     });
   }
   // 長い辺を max px にして JPEG にする（通信量と保存容量を抑える）
