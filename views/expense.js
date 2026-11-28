@@ -9,8 +9,8 @@
   'use strict';
   var I = window.IPPO, app = I.app, state = I.state, api = I.api, esc = I.esc, today = I.today, yen = I.yen, toast = I.toast;
 
-  // 施設名は options.施設 から（無ければ モア一津屋）。選んだ施設名を data.施設名 として送る（GAS側にも要る）。
-  // 1つだけなら最初から選んでおく。2つ以上なら参考アプリと同じく空から選ぶ
+  // 施設名は options.施設 から（無ければ モア一津屋）。送るデータの 施設名 に入れる（GAS が選択肢か確かめて経費明細に残す）。
+  // 1つだけなら最初から選んでおく。2つ以上なら参考アプリと同じく空から選ぶ（出し直しのときは前の申請の施設名）
   function facilities() { var f = state.options && state.options.施設; return f && f.length ? f : ['モア一津屋']; }
   // 'YYYY-MM-DD' → '2026年11月28日（土）'。確認カードで日付の読み間違いを防ぐ
   function fmtDate(v) {
@@ -88,7 +88,7 @@
           // 参考アプリと同じく、小口先出を選ぶまで対象日は使えない。先の日付は選べない（max）。使えない間は理由を下に出す
           field('対象日', head('exp-対象日', '対象日', true) + '<input type="date" id="exp-対象日" value="' + esc(rd.対象日 || today()) + '" max="' + today() + '" disabled aria-describedby="exp-対象日-hint">' +
             '<p class="exp-hint" id="exp-対象日-hint">買った日（お金を払った日）を入れます。先に「小口先出」を選ぶと入れられます。</p>') +
-          field('施設名', head('exp-施設名', '施設名', true) + (oneFac ? sel('exp-施設名', FACILITIES, FACILITIES[0], null) : sel('exp-施設名', FACILITIES, '').replace('<select', '<select class="exp-empty"'))) +
+          field('施設名', head('exp-施設名', '施設名', true) + (oneFac ? sel('exp-施設名', FACILITIES, FACILITIES[0], null) : (FACILITIES.indexOf(rd.施設名) >= 0 ? sel('exp-施設名', FACILITIES, rd.施設名) : sel('exp-施設名', FACILITIES, '').replace('<select', '<select class="exp-empty"')))) +
           field('経費区分', head('exp-経費区分', '経費区分', true) + sel('exp-経費区分', o.経費区分 || [], rd.経費区分, '選んでください')) +
           '<div class="exp-field" data-f="物品">' +
             '<div class="exp-lab"><span class="exp-lab-name" id="exp-物品-lab">物品</span>' +

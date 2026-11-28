@@ -8,7 +8,8 @@
                     日ごとに「日中（日勤・早出・遅出）」「夜勤」の人数を必要人数と比べ、足りない日を赤で示す。
                     マスを押すと下からシートが出て、勤務を選ぶと次の日へ進む（続けて入れられる）
    GAS とのやりとり: shiftForm / submitShiftWishes / dayOffs / myShifts / shiftBoard / saveShifts / fixShifts / unfixShifts（kiroku-app の docs/api.md）
-   ・shiftForm の「状態」「提出可」: 提出可=false の月は提出画面で入力を止める
+   ・shiftForm の「状態」（{状態, 確定日時} の形）「提出可」: 提出可=false の月（確定済み・過ぎた月）は提出画面で入力を止める
+   ・今日より前の日の希望は GAS が 400（1日でも混ざると全部失敗）なので、過ぎた日は変えられなくし、送信からも外す
    ・shiftBoard の職員の「所属施設」（配列）: 施設が2つ以上なら作成画面に施設タブ。saveShifts はタブの施設名を付けて送る
    ・fixShifts は1マスも無い月だと 400（画面でも先に止める）。unfixShifts で確定を取り消す
    ※ shiftBoard の返事に「必要人数」（{ 日中: 数, 夜勤: 数 }、または { 'YYYY-MM-DD': { 日中, 夜勤 } } の日ごと）を足すと、
@@ -154,6 +155,8 @@
     return sub.saved[date] || { 希望: '', メモ: '' };
   }
   function dirtyDates() { return Object.keys(sub.edits).sort(); }
+  // 今日より前の日（希望は出せない。GAS も 400 を返す）
+  function isPast(date) { return date < I.today(); }
 
   function viewSubmit() {
     sub.ym = nextYm(); // 開くたびに翌月から（前に見た月のままだと、出す月をまちがえやすい）。未送信の変更は月をまたいで残る
@@ -234,13 +237,15 @@
       if (stale(gen) || sub.ym !== ym) return;
       sub.info = r.職員 || {};
       // 確定した月（提出可=false）は見るだけにする。前に打った未送信の変更があっても送れないので捨てる
-      sub.locked = r.提出可 === false; sub.state = r.状態 || '';
-      if (sub.locked) Object.keys(sub.edits).forEach(function (d) { if (d.slice(0, 7) === ym) delete sub.edits[d]; });
+      // 状態は {状態, 確定日時} の形で届く（文字のまま入れると「[object Object]済み」になる）
+      sub.locked = r.提出可 === false; sub.state = (r.状態 && r.状態.状態) || '';
+      // 今日より前の日は GAS が受け付けない（1日でも混ざると400で全部失敗）ので、未送信の変更からも外す
+      Object.keys(sub.edits).forEach(function (d) { if ((sub.locked && d.slice(0, 7) === ym) || isPast(d)) delete sub.edits[d]; });
       sub.saved = {};
       (r.希望 || []).forEach(function (w) { sub.saved[w.対象日] = { 希望: w.希望 || '', メモ: w.メモ || '' }; });
       sub.loading = false;
       // 初めて開いた月は、未設定の最初の日を選んでおく（すぐ押せるように）
-      if (!sub.sel) sub.sel = monthDays(ym).filter(function (d) { return !wishOf(d).希望; })[0] || null;
+      if (!sub.sel) sub.sel = monthDays(ym).filter(function (d) { return !wishOf(d).希望 && !isPast(d); })[0] || null;
       drawInfo(); drawDays(); drawPlan(); drawTally();
     }).catch(function (e) {
       if (stale(gen) || sub.ym !== ym) return;
@@ -284,27 +289,28 @@
     var el = document.getElementById('sft-tally');
     var lock = document.getElementById('sft-lock');
     lock.hidden = !(sub.locked && !sub.loading);
-    lock.innerHTML = lock.hidden ? '' : '<b>' + esc(ymLabel(sub.ym)) + 'のシフトは' + esc(sub.state || '確定') + '済みです</b>' +
+    lock.innerHTML = lock.hidden ? '' : '<b>' + esc(ymLabel(sub.ym)) + (sub.state === '確定' || sub.ym >= I.today().slice(0, 7) ? 'のシフトは確定済みです' : 'は過ぎた月です') + '</b>' + // 提出可=false は確定済みか過ぎた月
       '<p>この月の希望は変えられません。変更したいときは管理者（シフトを作る人）へ連絡してください。</p><a href="#shift-view">シフト確認で勤務を見る ›</a>';
     if (sub.loading || sub.failed) { el.innerHTML = ''; return; }
-    var n = { 出勤可: 0, 出勤不可: 0, 休み希望: 0, '': 0 };
-    monthDays(sub.ym).forEach(function (d) { n[wishOf(d).希望 || ''] += 1; });
+    var n = { 出勤可: 0, 出勤不可: 0, 休み希望: 0, '': 0 }, open = 0; // open = まとめて埋められる日（未設定で今日以降）
+    monthDays(sub.ym).forEach(function (d) { var w = wishOf(d).希望 || ''; n[w] += 1; if (!w && !isPast(d)) open += 1; });
     el.innerHTML = '<div class="sft-tally-n">' + WISHES.map(function (w) {
       return '<span class="' + WISH_CLS[w] + '"><i aria-hidden="true"></i>' + w + '<b>' + n[w] + '</b></span>';
     }).join('') + '<span class="none"><i aria-hidden="true"></i>未設定<b>' + n[''] + '</b></span></div>' +
-      (n[''] && !sub.locked ? '<button type="button" id="sft-fill" class="sft-fill">未設定の' + n[''] + '日をまとめて「出勤可」にする</button>' : '');
+      (open && !sub.locked ? '<button type="button" id="sft-fill" class="sft-fill">未設定の' + open + '日をまとめて「出勤可」にする</button>' : '');
   }
 
   function drawPlan() {
     var on = !!sub.sel && !sub.loading && !sub.failed, w = on ? wishOf(sub.sel) : { 希望: '', メモ: '' };
-    var can = on && !sub.locked; // 確定した月は日を選んで見られるが、変えられない
+    var can = on && !sub.locked && !isPast(sub.sel); // 確定した月・過ぎた日は日を選んで見られるが、変えられない
     document.getElementById('sft-plan').classList.toggle('idle', !on);
     document.getElementById('sft-seldate').innerHTML = on
       ? '<strong>' + esc(dayLabel(sub.sel)) + '</strong>'
       : (sub.loading ? '読み込み中...' : 'カレンダーの日付を押してください');
     document.getElementById('sft-cur').innerHTML = on
       ? (w.希望 ? '<span class="sft-chip ' + WISH_CLS[w.希望] + '">' + esc(w.希望) + '</span>' : '<span class="sft-chip none">未設定</span>') +
-        (sub.edits[sub.sel] ? '<em class="sft-cur-dirty">未送信</em>' : '')
+        (sub.edits[sub.sel] ? '<em class="sft-cur-dirty">未送信</em>' : '') +
+        (isPast(sub.sel) && !sub.locked ? '<small>過ぎた日は変えられません</small>' : '')
       : '';
     app.querySelectorAll('.sft-segbtn').forEach(function (b) {
       var p = on && b.dataset.w === (w.希望 || '');
@@ -348,13 +354,13 @@
     else sub.edits[date] = next;
   }
   function edit(change) {
-    if (!sub.sel || sub.locked) return;
+    if (!sub.sel || sub.locked || isPast(sub.sel)) return;
     setWish(sub.sel, change);
     drawDays(); drawPlan(); drawTally();
   }
   function fillUnset() {
     if (sub.locked) return;
-    var list = monthDays(sub.ym).filter(function (d) { return !wishOf(d).希望; });
+    var list = monthDays(sub.ym).filter(function (d) { return !wishOf(d).希望 && !isPast(d); });
     list.forEach(function (d) { setWish(d, { 希望: '出勤可' }); });
     drawDays(); drawPlan(); drawTally();
     toast(list.length + '日を「出勤可」にしました。送信すると届きます');
@@ -363,6 +369,8 @@
   function send() {
     if (sub.sending) return; // 送信中の二度押し・Enter の連打
     var err = document.getElementById('sft-err');
+    // 開いたまま日付が変わったときのため、送る直前にも過ぎた日を外す
+    dirtyDates().forEach(function (d) { if (isPast(d)) delete sub.edits[d]; });
     var dates = dirtyDates();
     if (!dates.length) { toast('まだ変更がありません。日付を押して希望を選んでから送信してください'); return; } // 送信は画面の下にあり、上のエラー欄は見えないので知らせで出す
     err.innerHTML = '';

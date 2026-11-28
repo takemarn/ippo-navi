@@ -17,8 +17,8 @@
   'use strict';
   var I = window.IPPO, app = I.app, state = I.state, api = I.api, esc = I.esc, today = I.today, toast = I.toast;
 
-  // 施設名は options.施設 から（無ければ モア一津屋）。選んだ施設名を data.施設名 として送る（GAS側にも要る）。
-  // 1つだけなら最初から選んでおく。2つ以上なら参考アプリと同じく空から選ぶ
+  // 施設名は options.施設 から（無ければ モア一津屋）。送るデータの 施設名 に入れる（GAS が選択肢か確かめて明細に残す）。
+  // 1つだけなら最初から選んでおく。2つ以上なら参考アプリと同じく空から選ぶ（出し直しのときは前の申請の施設名）
   function facilities() { var f = state.options && state.options.施設; return f && f.length ? f : ['モア一津屋']; }
   // 'YYYY-MM-DD' → '2026年11月28日（土）'。確認カードで日付の読み間違いを防ぐ
   function fmtDate(v) {
@@ -147,7 +147,7 @@
         '<div class="card att-card">' +
           field('申請者', head('att-申請者', '申請者' + overtimeLabel(), true) +
             '<input id="att-申請者" value="' + esc(state.me && state.me.氏名) + '" readonly aria-readonly="true">') +
-          field('施設名', head('att-施設名', '施設名', true) + (oneFac ? sel('att-施設名', FACILITIES, FACILITIES[0], false) : sel('att-施設名', FACILITIES, '', true).replace('<select', '<select class="att-empty"'))) +
+          field('施設名', head('att-施設名', '施設名', true) + (oneFac ? sel('att-施設名', FACILITIES, FACILITIES[0], false) : (FACILITIES.indexOf(rd.施設名) >= 0 ? sel('att-施設名', FACILITIES, rd.施設名, true) : sel('att-施設名', FACILITIES, '', true).replace('<select', '<select class="att-empty"')))) +
           field('項目', head('att-項目', '項目', true) + sel('att-項目', kinds, rd.項目 || '', true).replace('<select', '<select class="att-empty" aria-describedby="att-項目-hint"').replace('<option value=""></option>', '<option value="">選んでください</option>') +
             '<p class="att-hint" id="att-項目-hint" aria-live="polite"></p>') +
           field('対象日', head('att-対象日', '対象日', true) + '<input type="date" id="att-対象日" value="' + esc(rd.対象日 || today()) + '">') +
@@ -369,7 +369,11 @@
       var up = !a || a.id ? Promise.resolve() : api('uploadAttachment', { ファイル: a.url }).then(function (r) {
         if (!r || !r.添付ファイルID) throw new Error('遅延証明書を送れませんでした');
         a.id = r.添付ファイルID;
-      }, function (e) { var x = new Error('遅延証明書を送れませんでした：' + ((e && e.message) || '通信できませんでした')); x.details = e && e.details; throw x; });
+      }, function (e) {
+        // 包み直しても code・reason（401 の作り直しなど）・details は元のまま渡す
+        var x = new Error('遅延証明書を送れませんでした：' + ((e && e.message) || '通信できませんでした'));
+        x.details = e && e.details; x.code = e && e.code; x.reason = e && e.reason; throw x;
+      });
       up.then(function () {
         if (a) d.添付ファイルID = a.id; else delete d.添付ファイルID;
         return api('submitAttendance', d);

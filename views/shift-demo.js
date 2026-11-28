@@ -65,17 +65,26 @@
 
   I.demo.shiftForm = function (data, me) {
     var ym = needYm(data.年月), mine = wishes[me.職員ID] || {}, s = staffOf(me.職員ID) || me;
-    var st = stateOf(ym).状態;
+    var st = stateOf(ym);
     return {
-      状態: st, 提出可: st !== '確定', // 確定した月は提出画面で入力を止める
+      // 状態は GAS と同じく {状態, 確定日時} の形。確定した月・過ぎた月は提出不可
+      状態: st, 提出可: st.状態 !== '確定' && ym >= I.today().slice(0, 7),
       職員: { 氏名: me.氏名, 職種: s.職種, 雇用形態: s.雇用形態, 可能勤務: s.可能勤務, 資格: s.資格 },
       年月: ym,
       希望: Object.keys(mine).filter(function (d) { return d.slice(0, 7) === ym; }).sort()
         .map(function (d) { return { 対象日: d, 希望: mine[d].希望, メモ: mine[d].メモ }; })
     };
   };
+  function bad(msg) { var e = new Error(msg); e.code = 400; throw e; }
   I.demo.submitShiftWishes = function (data, me) {
-    if (stateOf(data.年月).状態 === '確定') { var e = new Error(data.年月 + ' は確定済みのため、希望は出せません。変更は管理者へ連絡してください'); e.code = 400; throw e; }
+    var ym = needYm(data.年月), td = I.today();
+    if (stateOf(ym).状態 === '確定') bad(ym + ' は確定済みのため、希望は出せません。変更は管理者へ連絡してください');
+    if (ym < td.slice(0, 7)) bad(ym + ' は過ぎた月のため、希望は出せません');
+    // GAS と同じく、今日より前の日・ほかの月の日が1つでもあれば全部を受け付けない（400）
+    (data.日 || []).forEach(function (d) {
+      if (String(d.対象日 || '').slice(0, 7) !== ym) bad(d.対象日 + ' は ' + ym + ' の日ではありません');
+      if (d.対象日 < td) bad(d.対象日 + ' は過ぎた日のため、希望は出せません');
+    });
     (data.日 || []).forEach(function (d) {
       if (d.希望 || d.メモ) put(wishes, me.職員ID, d.対象日, { 希望: d.希望 || '', メモ: d.メモ || '' });
       else if (wishes[me.職員ID]) delete wishes[me.職員ID][d.対象日];
@@ -88,10 +97,11 @@
       if (s.職員ID === me.職員ID) return;
       var w = (wishes[s.職員ID] || {})[date], sh = fixed ? (shifts[s.職員ID] || {})[date] : null;
       var wishOff = w && (w.希望 === '出勤不可' || w.希望 === '休み希望') ? w.希望 : '';
-      var off = sh && sh.勤務 === '公休' ? '公休' : (wishOff || (sh && sh.勤務 === '明け' ? '明け' : ''));
-      if (off) list.push({ 氏名: s.氏名, 施設名: (sh && sh.施設名) || FAC, 休み: off, 明け: !!(sh && sh.勤務 === '明け') });
+      // GAS と同じく、確定月で勤務が入っている日は勤務を優先（公休・明けだけ休みに数え、希望は見ない）
+      var off = sh && sh.勤務 ? (sh.勤務 === '公休' || sh.勤務 === '明け' ? sh.勤務 : '') : wishOff;
+      if (off) list.push({ 氏名: s.氏名, 施設名: (sh && sh.施設名) || facsOf(s)[0], 休み: off, 明け: !!(sh && sh.勤務 === '明け') });
     });
-    return { 対象日: date, 施設: [FAC], 一覧: list };
+    return { 対象日: date, 施設: [FAC, FAC2], 一覧: list };
   };
   I.demo.myShifts = function (data, me) {
     var ym = needYm(data.年月), fixed = stateOf(ym).状態 === '確定';

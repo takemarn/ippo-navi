@@ -5,6 +5,8 @@
    選んでいる利用者や検索条件は画面をまたぐので、この中の cur に持ち、sessionStorage にも置く（再読み込みしても続きから）
    ほかの画面へ: 申請内容を行に直す I.bodyLines を置く（views/approvals.js と views/requests.js が使う）
    GAS: searchClients / clientInfo / clientPhoto / uploadClientPhoto / addRecord / clientRecords / searchRecords / deleteRecord / requestClientChange
+   二重登録を防ぐ: addRecord・requestClientChange には 送信ID を付ける。送れなかったあと同じ中身でもう一度押したときは同じIDを使う
+     （GAS は同じIDの2回目に前の返事を返すだけ。通信が切れて実は届いていた、でも2件にならない）。中身を変えたら新しいID（sendIdFor）
    見た目の約束: 見出しの上に小さな英字（EN）、ステータスは色つき札（stPill）、記録の種別は色（KIND_CLASS → css の --kc）。
    読み込み中は skel()、空は emptyHtml()、読めなかったら showFail()（もう一度読み込むボタン付き）。GAS とのやりとりの形は変えていない
    見直し4周目（使う人の目）: 言葉を日常語に（マスタ・ステータス・置換・単日指定など）、入口は「名前で探す」を先頭・新規登録は下、
@@ -32,6 +34,18 @@
       if (!out.card) out.id = null;
       return out;
     } catch (_) { return null; }
+  }
+  // 送信ID: 中身（送る data の JSON）が前回と同じなら前回のIDを使い、違えば作り直す。送れたら呼ぶ側で捨てる
+  var lastSend = null;
+  function sendIdFor(data) {
+    var key = JSON.stringify(data);
+    if (!lastSend || lastSend.key !== key) {
+      var id;
+      try { var a = new Uint8Array(16); crypto.getRandomValues(a); id = Array.prototype.map.call(a, function (x) { return ('0' + x.toString(16)).slice(-2); }).join(''); }
+      catch (_) { id = Date.now().toString(36) + Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2); }
+      lastSend = { key: key, id: id };
+    }
+    return lastSend.id;
   }
   // 画面を離れたあとに届いた返事は使わない（core.js の route が IPPO.gen を進める）
   function keep(fn) { var g = I.gen; return function () { if (g === I.gen) return fn.apply(this, arguments); }; }
@@ -514,7 +528,9 @@
       if (errs.length) { err.innerHTML = I.errorsBox(errs); return; }
       err.innerHTML = ''; btn.disabled = true; btn.textContent = '登録中…'; overlay('読み込み中・・・'); sending = true;
       var g = I.gen;
+      data.送信ID = sendIdFor(data); // 送れなかったあと同じ中身で押し直したら同じID（2件にしない）
       api('addRecord', data).then(function () {
+        lastSend = null;
         I.busy(false); toast(kind + 'を登録しました');
         clearTimeout(saveT); try { sessionStorage.removeItem(dkey); } catch (_) {}
         if (g === I.gen) location.hash = '#user'; // 参考アプリと同じく利用者操作へ戻る（もう別の画面にいたら動かさない）
@@ -739,12 +755,12 @@
     });
     document.getElementById('f').addEventListener('submit', function (e) {
       e.preventDefault();
-      var fields = {}, before = {};
+      var fields = {};
       el.querySelectorAll('[data-key]').forEach(function (lab) {
         var input = document.getElementById(lab.dataset.id), v = input.value.trim();
         // フリガナはカタカナにそろえる（ひらがなで入れてもよい。今ある値には手を付けない）
         if (/ふりがな$/.test(lab.dataset.key) && v !== lab.dataset.orig) { v = toKata(v); input.value = v; } // 直したときだけ
-        if (ed.種類 === '新規' ? v : v !== lab.dataset.orig) { fields[lab.dataset.key] = v; before[lab.dataset.key] = lab.dataset.orig; }
+        if (ed.種類 === '新規' ? v : v !== lab.dataset.orig) fields[lab.dataset.key] = v;
       });
       var why = document.getElementById('e-why').value.trim(), errs = [];
       if (ed.種類 === '新規') {
@@ -756,7 +772,11 @@
       if (errs.length) { err.innerHTML = I.errorsBox(errs); err.scrollIntoView({ block: 'center' }); return; }
       btn.disabled = true; btn.textContent = '送信中…'; I.busy(true);
       var g = I.gen;
-      api('requestClientChange', { 種類: ed.種類, 利用者ID: ed.種類 === '新規' ? '' : cur.id, 項目: fields, 変更前: ed.種類 === '置換' ? before : {}, 理由: why }).then(function () {
+      // 変更前 は送らない（GAS がシートのいまの値から作って申請に入れる。画面から送っても捨てられる）
+      var req = { 種類: ed.種類, 利用者ID: ed.種類 === '新規' ? '' : cur.id, 項目: fields, 理由: why };
+      req.送信ID = sendIdFor(req);
+      api('requestClientChange', req).then(function () {
+        lastSend = null;
         I.busy(false); toast('申請しました。承認されると反映されます。進み具合は「申請状況」で見られます'); if (g === I.gen) location.hash = '#requests';
       }).catch(function (x) {
         I.busy(false); btn.disabled = false; btn.textContent = ed.種類 === '新規' ? '新規登録を申請する' : del ? '削除を申請する' : '申請する';
