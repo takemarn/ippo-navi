@@ -117,13 +117,13 @@
 
   // ---------- 駐車場 ----------
   var LOTS = [
-    { 駐車場ID: 'P1', 名前: '第1駐車場（見本）', 説明: '施設の裏・番号つき', 地図: 'https://www.google.com/maps/search/?api=1&query=%E6%91%82%E6%B4%A5%E5%B8%82', 区画: ['1番', '2番', '3番'] },
-    { 駐車場ID: 'P2', 名前: '第2駐車場（見本）', 説明: '道路をはさんだ向かい・番号なし・最大2台', 地図: 'https://www.google.com/maps/search/?api=1&query=%E6%91%82%E6%B4%A5%E5%B8%82', 区画: ['A', 'B'] }
+    { 駐車場ID: 'P1', 名前: '第1駐車場（見本）', 説明: '施設の裏・番号つき', 目安: '番号つき・3台', 地図: 'https://www.google.com/maps/search/?api=1&query=%E6%91%82%E6%B4%A5%E5%B8%82', 区画: ['1番', '2番', '3番'] },
+    { 駐車場ID: 'P2', 名前: '第2駐車場（見本）', 説明: '道路をはさんだ向かい・番号なし', 目安: '平地・最大3台目安', 地図: 'https://www.google.com/maps/search/?api=1&query=%E6%91%82%E6%B4%A5%E5%B8%82', 区画: [], 台数: 3 }
   ];
   var parked = [
     { 記録ID: 'PK-DEMO01', 駐車場ID: 'P1', 区画: '2番', 氏名: '見本 花子', 車: '白い軽（見本）', 停めた: hoursAgo(3), 予定: hoursAgo(-5) },
     { 記録ID: 'PK-DEMO02', 駐車場ID: 'P1', 区画: '3番', 氏名: '関係事業者の方', 車: '訪問入浴の車（見本）', 停めた: hoursAgo(7.5), 予定: hoursAgo(-0.5) },
-    { 記録ID: 'PK-DEMO03', 駐車場ID: 'P2', 区画: 'A', 氏名: '見本 次郎', 車: '青いワゴン（見本）', 停めた: hoursAgo(10), 予定: hoursAgo(2) }
+    { 記録ID: 'PK-DEMO03', 駐車場ID: 'P2', 区画: '空きスペース', 氏名: '見本 次郎', 車: '青いワゴン（見本）', 停めた: hoursAgo(10), 予定: hoursAgo(2) }
   ];
   var pseq = 3;
 
@@ -131,6 +131,21 @@
     return { 駐車場: LOTS.map(function (l) {
       return Object.assign({}, l, { 駐車中: parked.filter(function (p) { return p.駐車場ID === l.駐車場ID; }).map(function (p) { return Object.assign({}, p); }) });
     }), 現在: stamp(new Date()) };
+  }
+
+  // 駐車の入力チェック（gas/src/util.js の validateParkIn と同じ決まり）
+  function validateParkIn(input, lot, used) {
+    var errors = [];
+    if (!lot) errors.push('停める場所を選んでください');
+    else if ((lot.区画 || []).length) {
+      if (lot.区画.indexOf(input.区画) < 0) errors.push('停める場所を選んでください');
+      else if (used.indexOf(input.区画) >= 0) errors.push('その場所はいま使われています');
+    } else if (input.区画 !== '空きスペース') errors.push('停める場所を選んでください');
+    else if (used.length >= Number(lot.台数 || 0)) errors.push('この駐車場はいま満車です');
+    var h = Number(input.時間);
+    if (!(h >= 0.5 && h <= 24)) errors.push('停める時間は0.5〜24時間で選んでください');
+    if (String(input.車 || '').length > 40) errors.push('車の目印は40文字までにしてください');
+    return errors;
   }
 
   // ---------- 検索（gas/src/util.js の searchDocs と同じ決まり） ----------
@@ -203,12 +218,8 @@
   D.parking = function () { return parkingState(); };
   D.parkIn = function (data, me) {
     var lot = LOTS.filter(function (l) { return l.駐車場ID === data.駐車場ID; })[0];
-    var errs = [];
-    if (!lot || lot.区画.indexOf(data.区画) < 0) errs.push('停める場所を選んでください');
-    else if (parked.some(function (p) { return p.駐車場ID === data.駐車場ID && p.区画 === data.区画; })) errs.push('その場所はいま使われています');
-    var h = Number(data.時間);
-    if (!(h >= 0.5 && h <= 24)) errs.push('停める時間は0.5〜24時間で選んでください');
-    if (String(data.車 || '').length > 40) errs.push('車の目印は40文字までにしてください');
+    var used = parked.filter(function (p) { return lot && p.駐車場ID === lot.駐車場ID; }).map(function (p) { return p.区画; });
+    var errs = validateParkIn(data, lot, used);
     if (errs.length) { var e = new Error('入力を確認してください'); e.details = errs; throw e; }
     parked.push({ 記録ID: 'PK-DEMO' + pad(++pseq), 駐車場ID: data.駐車場ID, 区画: data.区画, 氏名: data.代理 ? '関係事業者の方' : me.氏名,
       停めた職員ID: me.職員ID, 車: data.車 || '', 停めた: stamp(new Date()), 予定: stamp(new Date(Date.now() + h * 3600000)) });

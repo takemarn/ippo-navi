@@ -1,96 +1,130 @@
 /* 駐車場ナビ（第4段階）。参考動画 5:20〜
-   #parking … 上に 空き／使用中／まもなく／予定超過 の台数 → 「今すぐ停めるなら○番が空いています」→ 駐車場ごとのカード
-              カードには 名前・説明・地図で開く・区画ごとの状態。空きは「停める」、自分（と関係事業者）の車は「出庫」
+   #parking … 上に固定の 空き／使用中／まもなく／予定超過 の台数 → 「今すぐ停めるなら○が空いています」→ 駐車場ごとのカード
+              カード: 写真（あれば）・名前・説明・目安の札・地図で開く・区画ごとの状態。空きは「停める」、自分の車は「出庫」
+              番号の無い駐車場（区画が空で 台数 だけある）は、停まっている車と「空きスペースあり あと約N台」の行を出す
    「停める」を押した時刻から、選んだ時間（ふつう8時間）後を空き予定にする。予定を過ぎた車は「予定超過」
+   開いている間は1分ごとに表示をし直す（「まもなく」「予定超過」が時間で変わるため）
    GAS とのやりとり: parking / parkIn / parkOut（kiroku-app の docs/api.md「相談AI」） */
 (function () {
   'use strict';
   var I = window.IPPO, app = I.app, api = I.api, esc = I.esc;
   var T = function () { return I.portalTools; };
-  var SOON_MIN = 60; // 空き予定まで これ以内なら「まもなく」
-  var st = null;
+  var SOON_MIN = 60;   // 空き予定まで これ以内なら「まもなく」
+  var FREE = '空きスペース'; // 番号の無い駐車場に停めるときの区画名
+  var st = null, skew = 0; // skew: サーバーの時刻 − 端末の時刻（ミリ秒）。端末の時計がずれていても正しく数える
 
-  function toDate(s) { return new Date(String(s).replace(' ', 'T')); }
+  // 'yyyy-MM-dd HH:mm(:ss)' を日本時間として読む（Safari でも同じ結果になるよう、自分で分けて読む）
+  function toDate(s) {
+    var m = /^(\d{4})-(\d{1,2})-(\d{1,2})[ T](\d{1,2}):(\d{2})(?::(\d{2}))?/.exec(String(s || ''));
+    if (!m) return new Date(s);
+    return new Date(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +(m[6] || 0));
+  }
   function hm(s) { var d = toDate(s); return (d.getMonth() + 1) + '/' + d.getDate() + ' ' + d.getHours() + ':' + ('0' + d.getMinutes()).slice(-2); }
   function mins(a, b) { return Math.round((b - a) / 60000); }
   function dur(m) { m = Math.abs(m); return (m >= 60 ? Math.floor(m / 60) + '時間' : '') + (m % 60) + '分'; }
+  function now() { return new Date(Date.now() + skew); }
 
   // 区画の状態: 空き / まもなく / 使用中 / 予定超過
-  function slotState(p, now) {
+  function slotState(p, at) {
     if (!p) return { k: 'free', label: '空き' };
-    var left = mins(now, toDate(p.予定));
+    var left = mins(at, toDate(p.予定));
     if (left < 0) return { k: 'over', label: '予定超過', left: left };
     if (left <= SOON_MIN) return { k: 'soon', label: 'まもなく', left: left };
     return { k: 'used', label: '使用中', left: left };
   }
 
   function viewParking() {
-    app.innerHTML = '<div id="pk">' + skeleton() + '</div>' + I.backHtml();
+    app.innerHTML = '<div id="pk" class="ptl-stack">' + skeleton() + '</div>' + I.backHtml();
     app.addEventListener('click', onClick);
-    I.cleanup.push(function () { app.removeEventListener('click', onClick); });
+    var timer = setInterval(function () { if (st && !document.querySelector('.pk-form')) render(); }, 60000);
+    I.cleanup.push(function () { app.removeEventListener('click', onClick); clearInterval(timer); document.getElementById('toast').hidden = true; });
     load('parking');
   }
   function skeleton() {
     return '<section class="pk-head"><h1>駐車場ナビ</h1><p>— 読み込み中 —</p><div class="pk-counts">' +
       ['空き', '使用中', 'まもなく', '予定超過'].map(function (l) { return '<div><b>–</b><small>' + l + '</small></div>'; }).join('') + '</div></section>' +
-      T().loading('読み込み中...');
+      '<div class="pk-loading" role="status"><span class="spin" aria-hidden="true"></span>読み込み中...</div>';
+  }
+  function take(res) {
+    st = res;
+    if (res && res.現在) skew = toDate(res.現在).getTime() - Date.now();
   }
   function load(action, d) {
-    return api(action, d).then(function (res) { st = res; render(); })
-      .catch(function (e) { var box = document.getElementById('pk'); if (box) box.innerHTML = T().failBox(e); throw e; });
+    var ok = T().alive();
+    return api(action, d).then(function (res) { if (!ok()) return; take(res); render(); })
+      .catch(function (e) { var box = document.getElementById('pk'); if (box && ok()) box.innerHTML = T().failBox(e, true); });
+  }
+
+  // 1つの駐車場の行（区画ごと、または番号なしの駐車場は 停まっている車＋空きスペース）
+  function lotRows(l, at, c, best) {
+    var parked = l.駐車中 || [];
+    var rows = [];
+    if ((l.区画 || []).length) {
+      l.区画.forEach(function (name) {
+        var p = parked.filter(function (x) { return x.区画 === name; })[0];
+        var s = slotState(p, at);
+        c[s.k]++;
+        if (s.k === 'free' && !best.name) best.name = l.名前 + ' の ' + name;
+        rows.push({ name: name, p: p, s: s });
+      });
+    } else {
+      parked.forEach(function (p) { var s = slotState(p, at); c[s.k]++; rows.push({ name: '', p: p, s: s }); });
+      var left = Math.max(0, Number(l.台数 || 0) - parked.length);
+      c.free += left;
+      if (left && !best.name) best.name = l.名前;
+      if (left) rows.push({ name: '', p: null, s: { k: 'free', label: '空き' }, space: left });
+    }
+    return rows;
   }
 
   function render() {
     var box = document.getElementById('pk');
     if (!box || !st) return;
-    var now = st.現在 ? toDate(st.現在) : new Date();
+    var at = now();
     var me = I.state.me || {};
-    var c = { free: 0, used: 0, soon: 0, over: 0 }, firstFree = null;
-    var lots = (st.駐車場 || []).map(function (l) {
-      var slots = (l.区画 || []).map(function (name) {
-        var p = (l.駐車中 || []).filter(function (x) { return x.区画 === name; })[0];
-        var s = slotState(p, now);
-        c[s.k]++;
-        if (s.k === 'free' && !firstFree) firstFree = l.名前 + ' の ' + name;
-        return { name: name, p: p, s: s };
-      });
-      return { l: l, slots: slots };
-    });
-    var d = now;
+    var c = { free: 0, used: 0, soon: 0, over: 0 }, best = {};
+    var lots = (st.駐車場 || []).map(function (l) { return { l: l, rows: lotRows(l, at, c, best) }; });
     box.innerHTML =
-      '<section class="pk-head"><h1>駐車場ナビ</h1><p>' + (d.getMonth() + 1) + '月' + d.getDate() + '日 ' + d.getHours() + ':' + ('0' + d.getMinutes()).slice(-2) + ' 現在</p>' +
+      '<section class="pk-head"><h1>駐車場ナビ</h1><p>' + (at.getMonth() + 1) + '月' + at.getDate() + '日 ' + at.getHours() + ':' + ('0' + at.getMinutes()).slice(-2) + ' 現在</p>' +
         '<div class="pk-counts">' +
           '<div class="free"><b>' + c.free + '</b><small>空き</small></div><div class="used"><b>' + c.used + '</b><small>使用中</small></div>' +
           '<div class="soon"><b>' + c.soon + '</b><small>まもなく</small></div><div class="over"><b>' + c.over + '</b><small>予定超過</small></div></div></section>' +
-      '<p class="pk-best' + (firstFree ? '' : ' none') + '" role="status">' + (firstFree
-        ? '✓ 今すぐ停めるなら <b>' + esc(firstFree) + '</b> が空いています。'
-        : 'いま空いている場所はありません。「まもなく」の場所を見てください。') + '</p>' +
-      '<div class="row pk-listhead"><h2 class="ptl-sec">駐車場一覧（どこに停めて・だれが・いつから）</h2><button type="button" class="small sub" data-reload="1">更新</button></div>' +
-      lots.map(function (x) {
-        return '<section class="pk-lot"><div class="pk-lot-h"><div><b>' + esc(x.l.名前) + '</b><small>' + esc(x.l.説明 || '') + '</small></div>' +
-          (x.l.地図 ? '<a class="pk-map" href="' + esc(x.l.地図) + '" target="_blank" rel="noopener">地図で開く</a>' : '') + '</div>' +
-          x.slots.map(function (sl) { return slotRow(x.l, sl, me); }).join('') + '</section>';
-      }).join('') +
+      '<div class="pk-best' + (best.name ? '' : ' none') + '" role="status">' + (best.name
+        ? '<p>✓ 今すぐ停めるなら <b>' + esc(best.name) + '</b> が空いています。</p><small>空き ' + c.free + ' 台 ／ 場所は各カードの「地図で開く」から</small>'
+        : '<p>いま空いている場所はありません。「まもなく」の場所を見てください。</p>') + '</div>' +
+      '<div class="row pk-listhead"><h2 class="ptl-sec">駐車場一覧（どこに停めて・だれが・いつから）</h2><button type="button" class="sub pk-reload" data-reload="1">更新</button></div>' +
+      (lots.length ? lots.map(function (x) {
+        var map = T().safeUrl(x.l.地図), photo = T().safeUrl(x.l.写真);
+        return '<section class="pk-lot">' +
+          (photo ? '<div class="pk-photo"><img src="' + esc(photo) + '" alt="' + esc(x.l.名前) + 'の写真" loading="lazy">' +
+            (x.l.目安 ? '<span class="pk-cap">' + esc(x.l.目安) + '</span>' : '') + '</div>' : '') +
+          '<div class="pk-lot-h"><div><b>' + esc(x.l.名前) + '</b><small>' + esc(x.l.説明 || '') + '</small>' +
+            (!photo && x.l.目安 ? '<span class="pk-cap inline">' + esc(x.l.目安) + '</span>' : '') + '</div>' +
+          (map ? '<a class="pk-map" href="' + esc(map) + '" target="_blank" rel="noopener">📍 地図で開く</a>' : '') + '</div>' +
+          x.rows.map(function (r) { return slotRow(x.l, r, me); }).join('') + '</section>';
+      }).join('') : '<div class="loading">駐車場がまだ登録されていません。</div>') +
       '<ul class="pk-legend" aria-label="色の見かた"><li class="free">空き</li><li class="soon">まもなく空く（' + SOON_MIN + '分以内）</li><li class="used">使用中</li><li class="over">予定超過</li></ul>' +
       '<p class="ptl-note">「停める」を押した時刻から、選んだ時間（ふつう8時間）後を空く予定として表示します。予定を過ぎると「予定超過」になります。</p>';
   }
 
-  function slotRow(l, sl, me) {
-    var p = sl.p, s = sl.s;
+  function slotRow(l, r, me) {
+    var p = r.p, s = r.s;
+    var no = r.name ? '<span class="pk-no">' + esc(r.name) + '</span>' : '<span class="pk-no" aria-hidden="true">' + (p ? '🚗' : '＋') + '</span>';
     if (!p) {
-      return '<div class="pk-slot free"><span class="pk-no">' + esc(sl.name) + '</span><div class="pk-who"><b>空き</b><small>すぐ停められます</small></div>' +
-        '<button type="button" class="small pk-in" data-lot="' + esc(l.駐車場ID) + '" data-slot="' + esc(sl.name) + '">停める</button></div>';
+      return '<div class="pk-slot free">' + no + '<div class="pk-who"><b>' + (r.space ? '空きスペースあり' : '空き') + '</b>' +
+        '<small>' + (r.space ? 'あと約' + r.space + '台（番号なし）' : 'すぐ停められます') + '</small></div>' +
+        '<button type="button" class="pk-in" data-lot="' + esc(l.駐車場ID) + '" data-slot="' + esc(r.name || FREE) + '">停める</button></div>';
     }
     var mine = p.停めた職員ID ? p.停めた職員ID === me.職員ID : p.氏名 === me.氏名;
     var when = s.k === 'over' ? '予定 ' + hm(p.予定) + ' を ' + dur(s.left) + ' 超過' : '空き予定 ' + hm(p.予定) + '（あと ' + dur(s.left) + '）';
-    return '<div class="pk-slot ' + s.k + '"><span class="pk-no">' + esc(sl.name) + '</span>' +
+    return '<div class="pk-slot ' + s.k + '">' + no +
       '<div class="pk-who"><span class="pk-st">' + esc(s.label) + '</span><b>' + esc(p.氏名) + '</b>' +
         '<small>' + (p.車 ? esc(p.車) + ' ／ ' : '') + '停めた ' + hm(p.停めた) + '</small><small>' + esc(when) + '</small></div>' +
-      // 出庫は本人のほか、運営（承認者・管理者）が代わりに押せる（関係事業者の車や押し忘れのため）
-      (mine || I.canApprove() ? '<button type="button" class="small sub pk-out" data-out="' + esc(p.記録ID) + '">出庫</button>' : '') + '</div>';
+      // 出庫は本人のほか、運営（承認者・管理者）が代わりに押せる（関係事業者の車や押し忘れのため）。押しまちがい防止で2回押す
+      (mine || I.canApprove() ? '<button type="button" class="sub pk-out" data-out="' + esc(p.記録ID) + '">出庫</button>' : '') + '</div>';
   }
 
-  // 「停める」: 下に小さなフォームを開く（時間・車の目印・関係事業者の代わりに）
+  // 「停める」: 行の下に小さなフォームを開く（時間・車の目印・関係事業者の代わりに）
   function openIn(btn) {
     var row = btn.closest('.pk-slot');
     var open = document.querySelector('.pk-form');
@@ -99,35 +133,45 @@
     f.className = 'pk-form'; f.setAttribute('novalidate', '');
     f.innerHTML = '<label>停める時間<select id="pk-h">' + [1, 2, 3, 4, 6, 8, 10, 12, 16, 24].map(function (h) {
         return '<option value="' + h + '"' + (h === 8 ? ' selected' : '') + '>' + h + '時間</option>'; }).join('') + '</select></label>' +
-      '<label>車の目印 <span class="opt">任意</span><input id="pk-car" maxlength="40" placeholder="例）白い軽"></label>' +
+      '<label><span>車の目印 <span class="opt">任意</span></span><input id="pk-car" maxlength="40" placeholder="例）白い軽"></label>' +
       (I.canApprove() ? '<label class="ptl-check"><input type="checkbox" id="pk-proxy"> 関係事業者の方の車として登録する</label>' : '') +
-      '<div id="pk-err"></div><div class="actions"><button type="button" class="sub" data-cancel="1">やめる</button><button type="submit">ここに停める</button></div>';
+      '<div class="pk-err"></div><div class="actions"><button type="button" class="sub" data-cancel="1">やめる</button><button type="submit">ここに停める</button></div>';
     row.after(f);
+    f.querySelector('select').focus();
     f.addEventListener('submit', function (e) {
       e.preventDefault();
       var go = f.querySelector('button[type=submit]');
+      if (go.disabled) return;
       go.disabled = true; go.textContent = '送信中…';
-      var px = document.getElementById('pk-proxy');
-      api('parkIn', { 駐車場ID: btn.dataset.lot, 区画: btn.dataset.slot, 時間: Number(document.getElementById('pk-h').value),
-        車: document.getElementById('pk-car').value.trim(), 代理: !!(px && px.checked) })
-        .then(function (res) { st = res; render(); I.toast(btn.dataset.slot + ' に停めました'); })
+      var px = f.querySelector('#pk-proxy'), ok = T().alive();
+      api('parkIn', { 駐車場ID: btn.dataset.lot, 区画: btn.dataset.slot, 時間: Number(f.querySelector('#pk-h').value),
+        車: f.querySelector('#pk-car').value.trim(), 代理: !!(px && px.checked) })
+        .then(function (res) { if (!ok()) return; take(res); render(); I.toast((btn.dataset.slot === FREE ? '' : btn.dataset.slot + ' に') + '停めました'); })
         .catch(function (e2) {
+          if (!f.isConnected) { I.toast(e2.message); return; }
           go.disabled = false; go.textContent = 'ここに停める';
-          document.getElementById('pk-err').innerHTML = e2.details && e2.details.length ? I.errorsBox(e2.details) : T().failBox(e2);
+          f.querySelector('.pk-err').innerHTML = e2.details && e2.details.length ? I.errorsBox(e2.details) : T().failBox(e2);
         });
     });
   }
 
   function onClick(e) {
     var b = e.target.closest('button');
-    if (!b || !app.contains(b)) return;
-    if (b.dataset.reload) { b.disabled = true; return load('parking').catch(function () {}); }
+    if (!b || !app.contains(b) || b.disabled) return;
+    if (b.dataset.reload) { b.disabled = true; b.textContent = '更新中…'; return load('parking'); }
     if (b.dataset.cancel) { var f = b.closest('.pk-form'); if (f) f.remove(); return; }
     if (b.classList.contains('pk-in')) return openIn(b);
     if (b.dataset.out) {
+      // 1回目は「もう一度押すと出庫」に変わるだけ。4秒以内にもう一度押すと出庫する
+      if (!b.dataset.armed) {
+        b.dataset.armed = '1'; b.textContent = 'もう一度押すと出庫'; b.classList.add('armed');
+        setTimeout(function () { if (b.isConnected && b.dataset.armed) { delete b.dataset.armed; b.textContent = '出庫'; b.classList.remove('armed'); } }, 4000);
+        return;
+      }
       b.disabled = true; b.textContent = '出庫中…';
-      api('parkOut', { 記録ID: b.dataset.out }).then(function (res) { st = res; render(); I.toast('出庫しました'); })
-        .catch(function (e2) { b.disabled = false; b.textContent = '出庫'; I.toast(e2.message); });
+      var ok = T().alive();
+      api('parkOut', { 記録ID: b.dataset.out }).then(function (res) { if (!ok()) return; take(res); render(); I.toast('出庫しました'); })
+        .catch(function (e2) { if (!b.isConnected) return; b.disabled = false; delete b.dataset.armed; b.textContent = '出庫'; b.classList.remove('armed'); I.toast(e2.message); });
     }
   }
 

@@ -7,9 +7,11 @@
   'use strict';
   var I = window.IPPO, app = I.app, api = I.api, esc = I.esc;
   var EXAMPLES = ['有給休暇は何日もらえる？', '残業の申請はどうする？', '夜間に急変したら？', '転倒したときは？', '給料日はいつ？'];
-  var log = []; // この画面を開いている間の やりとり（保存はしない）
+  var log = []; // この画面を開いている間の やりとり（保存はしない）。{n, q, a}。a が null なら返事待ち
+  var seq = 0, waiting = false;
 
   function bubbleQ(q) { return '<div class="ai-q"><p>' + esc(q) + '</p></div>'; }
+  function bubbleWait(n) { return '<div class="ai-a ai-wait" id="ai-wait-' + n + '"><span class="spin" aria-hidden="true"></span>探しています…</div>'; }
   function bubbleA(a) {
     var rows = (a.根拠 || []).map(function (h, i) {
       var open = h.種類 === '規程'
@@ -20,7 +22,9 @@
         (h.抜粋 ? '<q>' + esc(h.抜粋) + '</q>' : (h.種類 === '規程' ? '<small class="ai-lock">本文は「閲覧前のご確認」のあとで読めます</small>' : '')) +
         open + '</li>';
     }).join('');
-    return '<div class="ai-a"><p>' + esc(a.回答) + '</p>' + (rows ? '<ol class="ai-hits">' + rows + '</ol>' : '') +
+    var none = !(a.根拠 || []).length
+      ? '<a class="ai-help" href="#org">困ったときの窓口を見る（組織図）</a>' : '';
+    return '<div class="ai-a"><p>' + esc(a.回答) + '</p>' + (rows ? '<ol class="ai-hits">' + rows + '</ol>' : '') + none +
       '<p class="ai-small">答えは規程・マニュアルの文章が正しいものです。迷ったら上長に確認してください。</p></div>';
   }
 
@@ -30,51 +34,61 @@
         '<p class="muted">いまは「近いところを探して見せる」しくみです（無料）。文章で答える AI は準備中です。</p>' +
         '<p class="muted">利用者さんの名前など、個人の情報は入れないでください。</p></section>' +
       '<div id="ai-log" class="ai-log" aria-live="polite"></div>' +
-      '<div class="ai-ex" id="ai-ex">' + EXAMPLES.map(function (q) { return '<button type="button" data-ex="' + esc(q) + '">' + esc(q) + '</button>'; }).join('') + '</div>' +
+      '<div class="ai-ex" id="ai-ex"' + (log.length ? ' hidden' : '') + '>' + EXAMPLES.map(function (q) { return '<button type="button" data-ex="' + esc(q) + '">' + esc(q) + '</button>'; }).join('') + '</div>' +
       '<form id="ai-f" class="ai-form"><label><span class="sr">質問</span><textarea id="ai-in" rows="2" maxlength="200" placeholder="例）有給休暇は何日もらえる？"></textarea></label>' +
         '<button type="submit">聞く</button></form>' +
       '<div id="err"></div>' + I.backHtml();
     var box = document.getElementById('ai-log');
-    box.innerHTML = log.map(function (x) { return bubbleQ(x.q) + (x.a ? bubbleA(x.a) : ''); }).join('');
+    box.innerHTML = log.map(function (x) { return bubbleQ(x.q) + (x.a ? bubbleA(x.a) : bubbleWait(x.n)); }).join('');
+    syncBtn();
     document.getElementById('ai-f').addEventListener('submit', function (e) { e.preventDefault(); ask(document.getElementById('ai-in').value); });
     document.getElementById('ai-in').addEventListener('keydown', function (e) {
-      if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); ask(this.value); }
+      // 日本語の変換を確定する Enter では送らない（Safari は isComposing が false のまま keyCode 229 を送る）
+      if (e.key === 'Enter' && !e.shiftKey && !e.isComposing && e.keyCode !== 229) { e.preventDefault(); ask(this.value); }
     });
     app.addEventListener('click', onClick);
     I.cleanup.push(function () { app.removeEventListener('click', onClick); });
   }
 
+  function syncBtn() {
+    var btn = document.querySelector('#ai-f button');
+    if (btn) { btn.disabled = waiting; btn.textContent = waiting ? '探しています…' : '聞く'; }
+  }
+
   function ask(q) {
+    if (waiting) return; // 返事を待っている間は次を送らない
     q = String(q || '').trim();
     var err = document.getElementById('err');
     if (!q) { err.innerHTML = I.errorsBox(['質問を入れてください']); return; }
     err.innerHTML = '';
-    var input = document.getElementById('ai-in'), btn = document.querySelector('#ai-f button');
-    input.value = ''; btn.disabled = true; btn.textContent = '探しています…';
-    var item = { q: q, a: null };
-    log.push(item);
+    var input = document.getElementById('ai-in');
+    input.value = '';
+    var item = { n: ++seq, q: q, a: null };
+    log.push(item); waiting = true; syncBtn();
+    var ex = document.getElementById('ai-ex'); if (ex) ex.hidden = true;
     var box = document.getElementById('ai-log');
-    box.insertAdjacentHTML('beforeend', bubbleQ(q) + '<div class="ai-a ai-wait" id="ai-wait"><span class="spin" aria-hidden="true"></span>探しています…</div>');
+    box.insertAdjacentHTML('beforeend', bubbleQ(q) + bubbleWait(item.n));
     box.lastElementChild.scrollIntoView({ block: 'end', behavior: 'smooth' });
     api('askAi', { 質問: q }).then(function (a) {
       item.a = a;
-      var w = document.getElementById('ai-wait');
+      var w = document.getElementById('ai-wait-' + item.n);
       if (w) w.outerHTML = bubbleA(a);
     }).catch(function (e) {
-      log.pop();
-      var w = document.getElementById('ai-wait');
-      if (w) { w.previousElementSibling && w.previousElementSibling.remove(); w.remove(); }
-      if (input) input.value = q;
-      err.innerHTML = e.details && e.details.length ? I.errorsBox(e.details) : '<div class="errors" role="alert">' + esc(e.message) + '</div>';
-    }).then(function () { if (btn) { btn.disabled = false; btn.textContent = '聞く'; } });
+      log.splice(log.indexOf(item), 1);
+      var w = document.getElementById('ai-wait-' + item.n);
+      if (w) { if (w.previousElementSibling) w.previousElementSibling.remove(); w.remove(); }
+      var inp = document.getElementById('ai-in'), er = document.getElementById('err');
+      if (inp && !inp.value) inp.value = q;
+      if (er) er.innerHTML = e.details && e.details.length ? I.errorsBox(e.details) : '<div class="errors" role="alert">' + esc(e.message) + '</div>';
+    }).then(function () { waiting = false; syncBtn(); });
   }
 
   function onClick(e) {
     var b = e.target.closest('button');
     if (!b || !app.contains(b)) return;
     if (b.dataset.ex) return ask(b.dataset.ex);
-    if (b.dataset.rule) { I.pickRule(b.dataset.rule); location.hash = '#rule-read'; return; }
-    if (b.dataset.guide) I.openGuide(b.dataset.guide);
+    if (b.dataset.rule) { I.pickRule(b.dataset.rule); I.setPortalFrom('#ai'); location.hash = '#rule-read'; return; }
+    if (b.dataset.guide) { I.setPortalFrom('#ai'); I.openGuide(b.dataset.guide); }
   }
 
   I.views.ai = viewAi;
