@@ -173,3 +173,10 @@ button:disabled { opacity: .5; cursor: default; }
 .fail h2 { font-size: 15px; }
 .fail-msg { font-size: 12px; color: var(--label); }
 .fail button { align-self: stretch; }
+
+/* はじめての登録（core.js showRegister） */
+.register { margin-top: 16px; display: flex; flex-direction: column; gap: 12px; }
+.register h2 { margin: 0; }
+.register p { margin: 0; line-height: 1.7; }
+.register form { display: flex; flex-direction: column; gap: 12px; }
+.register input { font-size: 22px; letter-spacing: .25em; text-align: center; }

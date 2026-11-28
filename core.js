@@ -43,7 +43,7 @@
       body: JSON.stringify({ action: action, idToken: state.idToken, data: data || {} })
     }).then(function (r) { return r.json(); }).then(function (res) {
       if (res.ok) return res.data;
-      var e = new Error(res.message || 'エラーが起きました'); e.code = res.code; e.details = res.details || [];
+      var e = new Error(res.message || 'エラーが起きました'); e.code = res.code; e.details = res.details || []; e.reason = res.reason || '';
       throw e;
     });
   }
@@ -108,6 +108,7 @@
       }
       switch (action) {
         case 'me': return this.me;
+        case 'linkLine': return this.me;
         case 'options': return this.options;
         case 'submitExpense': return newReq('経費', 'EXP', data);
         case 'submitAttendance': return newReq('勤怠', 'ATT', data);
@@ -149,9 +150,36 @@
   // 開けなかったときのカード（参考アプリの「日報を開けませんでした」と同じ形: 理由＋再読み込み）
   function showError(e) {
     busy(false);
+    if (e && e.reason === 'unregistered') return showRegister();
     app.innerHTML = '<div class="card fail" role="alert"><h2>画面を開けませんでした</h2>' +
       '<p class="fail-msg">' + esc(e && e.message || 'エラーが起きました') + '</p>' +
       (e && e.code === 401 ? '<p class="muted">LINE からもう一度開き直してください。</p>' : '<button onclick="location.reload()">再読み込み</button>') + '</div>';
+  }
+
+  // ---------- はじめての登録（LINE と職員名簿の紐づけ） ----------
+  // 職員名簿にまだ LINE がつながっていない人が開いたときに出る。運営からもらった6けたの登録コードを入れる
+  function showRegister() {
+    busy(false);
+    app.innerHTML = '<div class="card register"><h2>はじめての登録</h2>' +
+      '<p>IPPO管理ナビを使うには、はじめに1回だけ登録が必要です。運営からもらった<b>6けたの登録コード</b>を入れてください。</p>' +
+      '<form id="regForm" novalidate><label>登録コード' +
+      '<input id="regCode" inputmode="numeric" autocomplete="one-time-code" maxlength="8" placeholder="例 482913"></label>' +
+      '<div id="regErr" aria-live="polite"></div>' +
+      '<button type="submit" class="primary" id="regBtn">登録する</button></form>' +
+      '<p class="muted">コードがわからないときは、運営に「IPPO管理ナビの登録コード」を聞いてください。</p></div>';
+    document.getElementById('regForm').addEventListener('submit', function (ev) {
+      ev.preventDefault();
+      var code = document.getElementById('regCode').value.replace(/[０-９]/g, function (c) { return String.fromCharCode(c.charCodeAt(0) - 0xFEE0); }).replace(/\s/g, '');
+      var err = document.getElementById('regErr'), btn = document.getElementById('regBtn');
+      if (!/^[1-9][0-9]{5}$/.test(code)) { err.innerHTML = '<div class="errors" role="alert">登録コードは6けたの数字です</div>'; return; }
+      btn.disabled = true; btn.textContent = '登録中…'; busy(true);
+      api('linkLine', { 登録コード: code }).then(function () {
+        toast('登録しました'); boot();
+      }).catch(function (e) {
+        busy(false); btn.disabled = false; btn.textContent = '登録する';
+        err.innerHTML = '<div class="errors" role="alert">' + esc(e.message) + '</div>';
+      });
+    });
   }
 
   // ---------- 読み込み中の表示（参考 0-6） ----------
@@ -256,10 +284,17 @@
       if (!liff.isLoggedIn()) { liff.login({ redirectUri: location.href }); return new Promise(function () {}); }
       state.idToken = liff.getIDToken();
     });
-    ready.then(function () { return Promise.all([api('me'), api('options')]); })
+    ready.then(boot, showError);
+  }
+  // 本人の情報と選択肢を読んでから画面を出す（はじめての登録のあとにも呼ぶ）
+  function boot() {
+    // 見本モードで「はじめての登録」の見た目を確かめる: index.html?register
+    if (DEMO && /(^|[?&])register\b/.test(location.search) && !boot.done) { boot.done = true; return showRegister(); }
+    return Promise.all([api('me'), api('options')])
       .then(function (r) {
         state.me = r[0]; state.options = r[1];
         document.getElementById('who').textContent = state.me.氏名;
+        window.removeEventListener('hashchange', route);
         window.addEventListener('hashchange', route);
         route();
       })
