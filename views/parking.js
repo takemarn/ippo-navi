@@ -12,7 +12,10 @@
   var T = function () { return I.portalTools; };
   var SOON_MIN = 60;   // 空き予定まで これ以内なら「まもなく」
   var FREE = '空きスペース'; // 番号の無い駐車場に停めるときの区画名
-  var st = null, skew = 0; // skew: サーバーの時刻 − 端末の時刻（ミリ秒）。端末の時計がずれていても正しく数える
+  var st = null, skew = 0;
+  var flt = ''; // 上の台数を押したときの絞り込み（free / used / soon / over）。もう一度押すと解除
+  var LABEL = { free: '空き', used: '使用中', soon: 'まもなく', over: '予定超過' };
+  var WD = ['日', '月', '火', '水', '木', '金', '土']; // skew: サーバーの時刻 − 端末の時刻（ミリ秒）。端末の時計がずれていても正しく数える
 
   // 'yyyy-MM-dd HH:mm(:ss)' を日本時間として読む（Safari でも同じ結果になるよう、自分で分けて読む）
   function toDate(s) {
@@ -53,9 +56,10 @@
     load('parking');
   }
   function skeleton() {
-    return '<section class="pk-head"><h1>駐車場ナビ</h1><p>— 読み込み中 —</p><div class="pk-counts">' +
+    return '<section class="pk-head" aria-busy="true"><h1><span class="pk-p" aria-hidden="true">P</span>駐車場ナビ</h1><p>— 読み込み中 —</p><div class="pk-counts">' +
       ['空き', '使用中', 'まもなく', '予定超過'].map(function (l) { return '<div><b>–</b><small>' + l + '</small></div>'; }).join('') + '</div></section>' +
-      T().loading();
+      // 読み込み中は、カードの形だけ先に見せる（参考アプリも同じ形で待つ）
+      '<div class="pk-skel" aria-hidden="true"><i></i><i></i><i></i></div>' + T().loading('駐車場の空きを確かめています…');
   }
   function take(res) {
     st = res;
@@ -96,16 +100,18 @@
     var me = I.state.me || {};
     var c = { free: 0, used: 0, soon: 0, over: 0 }, best = {};
     var lots = (st.駐車場 || []).map(function (l) { return { l: l, rows: lotRows(l, at, c, best) }; });
+    if (flt && !c[flt]) flt = ''; // 絞り込んだ状態の車がいなくなったら解除
     box.innerHTML =
-      '<section class="pk-head"><h1>駐車場ナビ</h1><p>' + (at.getMonth() + 1) + '月' + at.getDate() + '日 ' + at.getHours() + ':' + ('0' + at.getMinutes()).slice(-2) + ' 現在</p>' +
-        '<div class="pk-counts">' +
-          '<div class="free"><b>' + c.free + '</b><small>空き</small></div><div class="used"><b>' + c.used + '</b><small>使用中</small></div>' +
-          '<div class="soon"><b>' + c.soon + '</b><small>まもなく</small></div><div class="over"><b>' + c.over + '</b><small>予定超過</small></div></div></section>' +
+      '<section class="pk-head"><h1><span class="pk-p" aria-hidden="true">P</span>駐車場ナビ</h1><p>' + (at.getMonth() + 1) + '月' + at.getDate() + '日（' + WD[at.getDay()] + '） ' + at.getHours() + ':' + ('0' + at.getMinutes()).slice(-2) + ' 現在</p>' +
+        '<div class="pk-counts" role="group" aria-label="台数（押すと、その状態だけ出します）">' + ['free', 'used', 'soon', 'over'].map(function (k) {
+          return '<button type="button" class="' + k + (flt === k ? ' on' : '') + '" data-flt="' + k + '" aria-pressed="' + (flt === k) + '"' + (c[k] ? '' : ' disabled') + '><b>' + c[k] + '</b><small>' + LABEL[k] + '</small></button>';
+        }).join('') + '</div></section>' +
       '<div class="pk-best' + (best.name ? '' : ' none') + '" role="status">' + (best.name
-        ? '<p>✓ 今すぐ停めるなら <b>' + esc(best.name) + '</b> が空いています。</p><small>空き ' + c.free + ' 台 ／ 場所は各カードの「地図で開く」から</small>'
+        ? '<p><span class="pk-okic" aria-hidden="true">✓</span>今すぐ停めるなら <b>' + esc(best.name) + '</b> が空いています。</p><small>空き ' + c.free + ' 台 ／ 場所は各カードの「地図で開く」から</small>'
         : '<p>いま空いている場所はありません。「まもなく」の場所を見てください。</p>') + '</div>' +
-      '<div class="pk-listhead"><h2 class="ptl-sec">駐車場一覧 <small>どこに・だれが・いつから</small></h2><button type="button" class="sub pk-reload" data-reload="1">更新</button></div>' +
-      (lots.length ? lots.map(function (x) {
+      '<div class="pk-listhead"><h2 class="ptl-sec">駐車場一覧 <small>どこに・だれが・いつから</small></h2><button type="button" class="sub pk-reload" data-reload="1">↻ 更新</button></div>' +
+      (flt ? '<div class="pk-flt" role="status"><span>「' + LABEL[flt] + '」だけ表示中（' + c[flt] + '台）</span><button type="button" class="small sub" data-flt="' + flt + '">すべて表示</button></div>' : '') +
+      (lots.length ? lots.filter(function (x) { return !flt || x.rows.some(function (r) { return r.s.k === flt; }); }).map(function (x) {
         var map = T().safeUrl(x.l.地図), photo = T().safeUrl(x.l.写真);
         return '<section class="pk-lot">' +
           (photo ? '<div class="pk-photo"><img src="' + esc(photo) + '" alt="' + esc(x.l.名前) + 'の写真" loading="lazy">' +
@@ -113,10 +119,26 @@
           '<div class="pk-lot-h"><div><b>' + esc(x.l.名前) + '</b><small>' + esc(x.l.説明 || '') + '</small>' +
             (!photo && x.l.目安 ? '<span class="pk-cap inline">' + esc(x.l.目安) + '</span>' : '') + '</div>' +
           (map ? '<a class="pk-map" href="' + esc(map) + '" target="_blank" rel="noopener">📍 地図で開く</a>' : '') + '</div>' +
-          x.rows.map(function (r) { return slotRow(x.l, r, me); }).join('') + '</section>';
+          strip(x.l, x.rows) +
+          x.rows.filter(function (r) { return !flt || r.s.k === flt; }).map(function (r) { return slotRow(x.l, r, me); }).join('') + '</section>';
       }).join('') : '<div class="loading">駐車場がまだ登録されていません。</div>') +
       '<ul class="pk-legend" aria-label="色の見かた"><li class="free">空き</li><li class="soon">まもなく空く（' + SOON_MIN + '分以内）</li><li class="used">使用中</li><li class="over">予定超過</li></ul>' +
       '<p class="ptl-note">「停める」を押した時刻から、選んだ時間（ふつう8時間）後を空く予定として表示します。予定を過ぎると「予定超過」になります。</p>';
+  }
+
+  // 区画の並び: 番号つきの駐車場は、区画を色の四角で横に並べる（ひと目で空きが分かる）。
+  // 番号なしの駐車場は「N台中 M台」の棒で見せる
+  function strip(l, rows) {
+    if ((l.区画 || []).length) {
+      return '<div class="pk-strip" aria-label="区画の並び">' + rows.map(function (r) {
+        return '<span class="' + r.s.k + '" title="' + esc(r.name + ' ' + r.s.label) + '">' + esc(String(r.name).replace(/番$/, '')) + '</span>';
+      }).join('') + '</div>';
+    }
+    var cap = Number(l.台数 || 0), used = (l.駐車中 || []).length;
+    if (!cap) return '';
+    var pct = Math.min(100, Math.round(used / cap * 100));
+    return '<div class="pk-bar" role="img" aria-label="' + cap + '台中 ' + used + '台 使用中"><i style="width:' + pct + '%"></i></div>' +
+      '<p class="pk-barl">' + cap + '台中 <b>' + used + '台</b> 使用中' + (used >= cap ? '（満車）' : '') + '</p>';
   }
 
   function slotRow(l, r, me) {
@@ -175,6 +197,7 @@
   function onClick(e) {
     var b = e.target.closest('button');
     if (!b || !app.contains(b) || b.disabled) return;
+    if (b.dataset.flt) { flt = flt === b.dataset.flt ? '' : b.dataset.flt; render(); return; }
     if (b.dataset.reload) { b.disabled = true; b.textContent = '更新中…'; return load('parking'); }
     if (b.dataset.cancel) { var f = b.closest('.pk-form'); if (f) f.remove(); return; }
     if (b.classList.contains('pk-in')) return openIn(b);
