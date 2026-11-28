@@ -41,7 +41,12 @@
       method: 'POST',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
       body: JSON.stringify({ action: action, idToken: state.idToken, data: data || {} })
-    }).then(function (r) { return r.json(); }).then(function (res) {
+    }).then(function (r) { return r.json(); }, function () {
+      throw new Error('通信できませんでした。電波の良い所でもう一度お試しください');
+    }).catch(function (e) {
+      if (e instanceof SyntaxError) throw new Error('サーバーの返事を読めませんでした。少し待ってからやり直してください');
+      throw e;
+    }).then(function (res) {
       if (res.ok) return res.data;
       var e = new Error(res.message || 'エラーが起きました'); e.code = res.code; e.details = res.details || [];
       throw e;
@@ -56,7 +61,9 @@
       経費区分: ['看護', '介護', '施設', '利用者立替', 'その他', '救急搬送', '本部', '交通'],
       小口先出: ['小口', '先出'],
       物品: ['フリー入力', '滅菌ガーゼ', '絆創膏', 'アルコール綿', 'サージカルテープ', 'フィルムドレッシング', 'ワセリン', 'オリーブ油', '吸引チューブ'],
-      勤怠項目: ['欠勤', '残業・前残業', '遅刻', '早退', '有給', '休日出勤', '冬期休暇', '夏季休暇', '特別休暇', '打刻修正出勤', '打刻修正退勤']
+      勤怠項目: ['欠勤', '残業・前残業', '遅刻', '早退', '有給', '休日出勤', '冬期休暇', '夏季休暇', '特別休暇', '打刻修正出勤', '打刻修正退勤'],
+      施設: ['モア一津屋'],
+      タスク種類: ['初診', '退院', '新入居 施設', '新入居 自宅', '新入居 病院', '特指示月1回目', '特指示月2回目', '点滴', '訪問スケジュール入力', 'その他']
     },
     requests: [
       { 申請ID: 'EXP-20261127-DEMO01', 申請種類: '経費', 申請者職員ID: 'STF-0001', 申請日時: '2026-11-27 10:12:00', 状態: '承認済み', 現在段階: '', コメント: '', 承認者: '',
@@ -230,6 +237,8 @@
   }
   function route() {
     busy(false);
+    // 画面が変わるたびに番号を進める。遅れて届いた返事は、番号が変わっていたら捨てる（views/clients.js など）
+    IPPO.gen = (IPPO.gen || 0) + 1;
     IPPO.cleanup.splice(0).forEach(function (fn) { try { fn(); } catch (_) {} });
     var name = (location.hash || '#menu').slice(1);
     if (!IPPO.views[name]) name = 'menu';
@@ -242,7 +251,9 @@
     app: app, state: state, DEMO: DEMO, api: api, route: route, showError: showError, submit: submit, selectHtml: selectHtml,
     esc: esc, today: today, yen: yen, toast: toast, errorsBox: errorsBox, pill: pill, backLink: backLink,
     busy: busy, bootLoading: bootLoading, menuLoading: menuLoading, subMenu: subMenu, canApprove: canApprove,
-    MENUS: MENUS, lastMenu: lastMenu, backHtml: backHtml, views: {}, cleanup: [], demo: {}
+    MENUS: MENUS, lastMenu: lastMenu, backHtml: backHtml, views: {}, cleanup: [], demo: {},
+    demoCore: DEMO ? Demo : null, // 見本の申請・承認待ちの入れ物（views/clients-demo.js が利用者申請・タスクの見本を足す）
+    demoRequests: DEMO ? Demo.requests : null // 見本の「自分の申請」。第3段階の申請（利用者登録・タスクなど）もここに足す
   };
 
   // ---------- 起動 ----------
