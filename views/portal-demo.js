@@ -167,7 +167,7 @@
     });
     return out.filter(function (w, i) { return out.indexOf(w) === i && STOP.indexOf(w) < 0; });
   }
-  function isUrgent(q) { return /転|倒れ|急変|意識|呼吸|息が|けいれん|痙攣|出血|吐血|spo2|119|救急/.test(norm(q)); }
+  function isUrgent(q) { return /転|倒れ|急変|意識|呼吸|息が|けいれん|痙攣|出血|吐血|吐い|嘔吐|spo2|119|救急|おかしい|様子が|熱|ぐったり|反応が|顔色|苦し|痛が/.test(norm(q)); }
   function searchDocs(q, docs, limit) {
     var keys = keywords(q);
     if (!keys.length) return [];
@@ -197,7 +197,7 @@
     var docs = [];
     RULES.forEach(function (r) {
       (BODY[r.規程ID] || []).forEach(function (sec, i) {
-        docs.push({ 種類: '規程', ID: r.規程ID, 題: r.題, 見出し: sec[0], 本文: sec[1], 番号: i });
+        docs.push({ 種類: '規程', ID: r.規程ID, 題: r.題, 対象: r.対象 || '', 見出し: sec[0], 本文: sec[1], 番号: i });
       });
     });
     guidesFor(nurse).forEach(function (g) {
@@ -228,7 +228,7 @@
   D.orgChart = function () { return ORG; };
   D.manual = function (data, me) {
     var nurse = nurseOk(me);
-    return { 急変: MANUAL.急変, キーワード: MANUAL.キーワード, 看護職: nurse, 連絡先: [{ 名前: 'オンコール当番（見本）', 電話: '000-0000-0000' }], ガイド: guidesFor(nurse) };
+    return { 急変: MANUAL.急変, キーワード: MANUAL.キーワード, 看護職: nurse, 連絡先: [{ 名前: 'オンコール当番（見本）', 電話: '000-0000-0000' }, { 名前: '看護主任（見本）', 電話: '000-0000-0001' }, { 名前: '施設長（見本）', 電話: '000-0000-0002' }], ガイド: guidesFor(nurse) };
   };
   D.parking = function () { return parkingState(); };
   D.parkIn = function (data, me) {
@@ -259,7 +259,7 @@
     var docs = docsForSearch(nurseOk(me));
     var hits = searchDocs(q, docs, 3).map(function (h) {
       // 規程は閲覧前の確認が必要なので、本文の抜粋は返さず題と見出しだけにする
-      return { 種類: h.種類, ID: h.ID, 題: h.題, 見出し: h.見出し, 抜粋: h.種類 === '規程' ? '' : h.抜粋 };
+      return { 種類: h.種類, ID: h.ID, 題: h.題, 見出し: h.見出し, 抜粋: h.種類 === '規程' ? '' : h.抜粋, 対象: h.対象 || '' };
     });
     return { 質問: q, 方式: '検索', 急ぎ: isUrgent(q), 回答: hits.length ? '関係がありそうなところが ' + hits.length + ' 件ありました。' : '関係がありそうなところが見つかりませんでした。言葉を変えて聞いてみてください。', 根拠: hits };
   };

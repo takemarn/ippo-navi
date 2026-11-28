@@ -62,7 +62,7 @@
   -webkit-user-select: none; user-select: none; }
 .ptl-toc { display: flex; flex-wrap: wrap; gap: 6px; }
 .ptl-toc a { font-size: 12px; color: var(--navy); background: var(--accent-soft); border-radius: 999px; padding: 4px 12px; text-decoration: none; min-height: 40px; display: inline-flex; align-items: center; }
-.ptl-body { position: relative; overflow: hidden; display: flex; flex-direction: column; gap: 14px; }
+.ptl-body { position: relative; overflow: hidden; overflow: clip; display: flex; flex-direction: column; gap: 14px; }
 .ptl-body section { position: relative; z-index: 1; display: flex; flex-direction: column; gap: 6px; scroll-margin-top: 12px; }
 .ptl-body h2 { font-size: 14px; border-left: 4px solid var(--navy); padding-left: 8px; }
 .ptl-body p { font-size: 14px; line-height: 1.8; }
@@ -237,3 +237,5 @@ body.mnl-big .mnl-scene b, body.mnl-big .mnl-row b { font-size: 16px; }
 .pk-slot.mine { box-shadow: inset 4px 0 0 var(--danger); }
 .ptl-hit h2 { background: #fff6d6; border-radius: 6px; padding: 2px 6px; margin-left: -6px; }
 .pk-form .actions button, .pk-in, .pk-out { white-space: nowrap; }
+.ptl-urgent-top { margin-bottom: 12px; }
+.ai-tag { display: inline-block; font-size: 10px; border: 1px solid var(--line, #ccd); border-radius: 999px; padding: 0 6px; margin-left: 6px; color: var(--label); vertical-align: 1px; font-weight: 400; }

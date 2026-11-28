@@ -7,10 +7,7 @@
 (function () {
   'use strict';
   var I = window.IPPO, app = I.app, api = I.api, esc = I.esc;
-  var EXAMPLES = ['有給休暇は何日もらえる？', '残業の申請はどうする？', '給料日はいつ？', '育児休業はとれる？'];
-  var NURSE_EXAMPLES = ['夜間に急変したら？', '転倒したときは？'];
-  // 看護マニュアルを見られる人（GAS の「マニュアル閲覧職種」と同じ初期値）。見られない人には看護の例を出さない
-  function nurse() { var me = I.state.me || {}; return ['看護師', '准看護師'].indexOf(me.職種) >= 0 || I.canApprove(); }
+  var EXAMPLES = ['夜間に急変したら？', '有給休暇は何日もらえる？', '残業の申請はどうする？', '給料日はいつ？', '転倒したときは？', '育児休業はとれる？'];
   var log = []; // この画面を開いている間の やりとり（保存はしない）。{n, q, a}。a が null なら返事待ち
   var seq = 0, waiting = false;
   var retryQ = ''; // ほかの画面に移っている間に失敗した質問。戻ってきたら入力欄に戻す
@@ -24,12 +21,12 @@
         ? '<button type="button" class="small sub" data-rule="' + esc(h.ID) + '" data-sec="' + esc(h.見出し || '') + '">この規程を開く</button>'
         : '<button type="button" class="small sub" data-guide="' + esc(h.ID) + '">マニュアルを開く</button>';
       return '<li><span class="ai-kind ' + (h.種類 === '規程' ? 'r' : h.種類 === '窓口' ? 'h' : 'm') + '">' + esc(h.種類) + '</span>' +
-        '<b>' + esc(h.題) + '</b>' + (h.見出し ? '<small>' + esc(h.見出し) + '</small>' : '') +
+        '<b>' + esc(h.題) + (h.対象 ? '<span class="ai-tag">' + esc(h.対象) + '</span>' : '') + '</b>' + (h.見出し ? '<small>' + esc(h.見出し) + '</small>' : '') +
         (h.抜粋 ? '<q>' + esc(h.抜粋) + '</q>' : (h.種類 === '規程' ? '<small class="ai-lock">本文は「閲覧前のご確認」のあとで読めます</small>' : '')) +
         open + '</li>';
     }).join('');
     var none = !(a.根拠 || []).length
-      ? (!nurse() ? '<p class="ai-small">急変・看護のことは看護マニュアル（看護職向け）にあります。急ぐときは、まず看護師・オンコール当番へ。</p>' : '') +
+      ? '<a class="ai-help" href="#manual-urgent">急ぐときは「様子がおかしい・急変」のページへ</a>' +
         '<a class="ai-help" href="#org">困ったときの窓口を見る（組織図）</a>' : '';
     var urgent = a.急ぎ ? '<div class="ai-urgent"><b>急ぐときは、まず看護師・オンコール当番へ。</b>命に関わるときは迷わず119番。' +
       '<div class="ai-urgent-btns"><a class="btn" href="tel:119">119番に電話</a><a class="btn sub-link" href="#manual-urgent">急変のときの流れ</a></div></div>' : '';
@@ -43,7 +40,7 @@
         '<p class="muted">いまは、規程とマニュアルの中から関係がありそうなところを探して見せます。文章で答える AI は準備中です。</p>' +
         '<p class="muted">利用者さんの名前など、個人の情報は入れないでください。</p></section>' +
       '<div id="ai-log" class="ai-log" aria-live="polite"></div>' +
-      '<div class="ai-ex" id="ai-ex"' + (log.length ? ' hidden' : '') + '>' + (nurse() ? NURSE_EXAMPLES.concat(EXAMPLES) : EXAMPLES).map(function (q) { return '<button type="button" data-ex="' + esc(q) + '">' + esc(q) + '</button>'; }).join('') + '</div>' +
+      '<div class="ai-ex" id="ai-ex"' + (log.length ? ' hidden' : '') + '>' + EXAMPLES.map(function (q) { return '<button type="button" data-ex="' + esc(q) + '">' + esc(q) + '</button>'; }).join('') + '</div>' +
       '<form id="ai-f" class="ai-form"><label><span class="ptl-sr">質問</span><textarea id="ai-in" rows="2" maxlength="200" placeholder="例）有給休暇は何日もらえる？"></textarea></label>' +
         '<button type="submit">聞く</button></form>' +
       '<div id="err"></div>' + I.backHtml();

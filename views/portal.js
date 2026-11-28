@@ -48,6 +48,11 @@
       { label: '日報' },
       { label: '経営資料' }
     ]);
+    // 夜勤中の介護職でも迷わないよう、急変のページへの近道をいちばん上に置く（看護マニュアルの中と同じ行き先）
+    var h1 = app.querySelector('h1');
+    if (h1) h1.insertAdjacentHTML('afterend', '<a class="mnl-urgent ptl-urgent-top" href="#manual-urgent"><span class="mnl-urgent-ic" aria-hidden="true">!</span>' +
+      '<span><b>様子がおかしい・急変</b><small>119番・オンコール当番への電話 → すぐ見る</small></span></a>');
+    app.querySelector('.ptl-urgent-top').addEventListener('click', function () { setPortalFrom('#portal'); });
   };
 
   // ---------- 社内ポータルの入口 ----------
@@ -58,6 +63,7 @@
   }
 
   function viewRules() {
+    setPortalFrom('#rules'); // ここから組織図・規程を開いたときは、AIに聞く画面ではなく ここへ戻す
     app.innerHTML = '<h1>就業規則・組織図・福利厚生</h1><div id="ptl" class="ptl-stack">' + loading() + '</div>' + I.backHtml();
     var ok = alive();
     loadPortal().then(function (d) {
@@ -217,7 +223,7 @@
     if (want) {
       var at = secs.map(function (s) { return s.見出し; }).indexOf(want);
       var el0 = at >= 0 && document.getElementById('sec' + at);
-      if (el0) setTimeout(function () { el0.scrollIntoView({ block: 'start' }); el0.classList.add('ptl-hit'); }, 0);
+      if (el0) setTimeout(function () { window.scrollTo(0, el0.getBoundingClientRect().top + window.scrollY - 12); el0.classList.add('ptl-hit'); }, 0);
       pickRule(pickedRule(), '');
     }
     app.querySelector('.ptl-toc') && app.querySelector('.ptl-toc').addEventListener('click', function (e) {

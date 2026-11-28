@@ -130,10 +130,10 @@
     var mine = p.停めた職員ID ? p.停めた職員ID === me.職員ID : p.氏名 === me.氏名;
     var when = s.k === 'over' ? '予定 ' + hm(p.予定) + ' を ' + dur(s.left) + ' 超過' : '空く予定 ' + hm(p.予定) + '（あと ' + dur(s.left) + '）';
     return '<div class="pk-slot ' + s.k + (mine ? ' mine' : '') + '">' + no +
-      '<div class="pk-who"><span class="pk-st">' + esc(s.label) + '</span><b>' + esc(p.氏名) + (mine ? ' <span class="ptl-you">あなた</span>' : '') + '</b>' +
+      '<div class="pk-who"><span class="pk-st">' + esc(s.label) + '</span><b>' + esc(p.氏名) + (mine ? ' <span class="ptl-you">' + (p.氏名 === me.氏名 ? 'あなた' : 'あなたが登録') + '</span>' : '') + '</b>' +
         '<small>' + (p.車 ? esc(p.車) + ' ／ ' : '') + '停めた ' + hm(p.停めた) + '</small><small>' + when + '</small></div>' +
       // 出庫は本人のほか、運営（承認者・管理者）が代わりに押せる（関係事業者の車や押し忘れのため）。押しまちがい防止で2回押す
-      (mine || I.canApprove() ? '<button type="button" class="sub pk-out" data-out="' + esc(p.記録ID) + '"' + (mine ? '' : ' data-who="' + esc(p.氏名) + '"') + '>出庫</button>' : '') + '</div>';
+      (mine || I.canApprove() ? '<button type="button" class="sub pk-out" data-out="' + esc(p.記録ID) + '" data-where="' + esc(l.名前 + (r.name ? 'の' + r.name : '')) + '"' + (mine ? '' : ' data-who="' + esc(p.氏名) + '"') + '>出庫</button>' : '') + '</div>';
   }
 
   // 「停める」: 行の下に小さなフォームを開く（時間・車の目印・関係事業者の代わりに）
@@ -143,16 +143,17 @@
     if (open) { var same = open.previousElementSibling === row; open.remove(); if (same) return; }
     var f = document.createElement('form');
     f.className = 'pk-form'; f.setAttribute('novalidate', '');
-    f.innerHTML = '<label>停める時間<select id="pk-h">' + [1, 2, 3, 4, 6, 8, 10, 12, 16, 24].map(function (h) {
+    f.innerHTML = (I.canApprove() ? '<label class="ptl-check"><input type="checkbox" id="pk-proxy"> 関係事業者の方の車として登録する</label>' : '') +
+      '<label>停める時間<select id="pk-h">' + [1, 2, 3, 4, 6, 8, 10, 12, 16, 24].map(function (h) {
         return '<option value="' + h + '"' + (h === 8 ? ' selected' : '') + '>' + h + '時間</option>'; }).join('') + '</select></label>' +
       '<label><span>車の目印 <span class="opt">任意</span></span><input id="pk-car" maxlength="40" placeholder="例）白い軽"></label>' +
-      (I.canApprove() ? '<label class="ptl-check"><input type="checkbox" id="pk-proxy"> 関係事業者の方の車として登録する</label>' : '') +
       '<div class="pk-err"></div><div class="actions"><button type="button" class="sub" data-cancel="1">やめる</button><button type="submit">ここに停める</button></div>';
     row.after(f);
-    f.querySelector('select').focus();
+    f.scrollIntoView({ block: 'nearest' });
     var lotName = (row.closest('.pk-lot').querySelector('.pk-lot-h b') || {}).textContent || '';
     var pxBox = f.querySelector('#pk-proxy');
-    if (pxBox) pxBox.addEventListener('change', function () { f.querySelector('#pk-car').placeholder = pxBox.checked ? '例）訪問入浴の車・○○社' : '例）白い軽'; });
+    if (pxBox) pxBox.addEventListener('change', function () { f.querySelector('#pk-car').placeholder = pxBox.checked ? '例）訪問入浴の車・○○社' : '例）白い軽';
+      f.querySelector('#pk-h').value = pxBox.checked ? '2' : '8'; }); // 訪問の車は短いことが多いので2時間に
     f.addEventListener('submit', function (e) {
       e.preventDefault();
       var go = f.querySelector('button[type=submit]');
@@ -186,7 +187,7 @@
       }
       b.disabled = true; b.textContent = '出庫中…';
       var ok = T().alive();
-      api('parkOut', { 記録ID: b.dataset.out }).then(function (res) { if (!ok()) return; take(res); render(); I.toast('出庫しました'); })
+      api('parkOut', { 記録ID: b.dataset.out }).then(function (res) { if (!ok()) return; take(res); render(); I.toast(b.dataset.where + (b.dataset.who ? 'の ' + b.dataset.who + 'さんの車を' : 'から') + '出庫しました'); })
         .catch(function (e2) { if (!b.isConnected) return; b.disabled = false; delete b.dataset.armed; b.textContent = '出庫'; b.classList.remove('armed'); I.toast(e2.message); });
     }
   }

@@ -32,7 +32,9 @@
   function frame(kind) {
     var from = I.portalFrom && I.portalFrom() === '#ai';
     var back = kind === 'home' ? I.backHtml()
-      : (from ? I.backHtml('#ai', 'AIに聞く画面に戻る') : I.backHtml('#manual', 'マニュアルのトップに戻る'));
+      : (from ? I.backHtml('#ai', 'AIに聞く画面に戻る')
+        : I.portalFrom && I.portalFrom() === '#portal' && kind === 'urgent' ? I.backHtml('#portal') // メニューの急変の近道から来たとき
+        : I.backHtml('#manual', 'マニュアルのトップに戻る'));
     app.innerHTML = '<div class="mnl-top"><h1>看護マニュアル</h1>' +
       '<button type="button" class="mnl-size" id="mnl-size" aria-pressed="false">文字 大</button></div>' +
       '<div id="mn" class="ptl-stack">' + T().loading() + '</div>' + back;
@@ -121,9 +123,9 @@
     var list = (u.見る順 || []).map(guide).filter(Boolean);
     box.innerHTML = top() +
       '<h2 class="mnl-uh">' + esc(u.題 || '様子がおかしい・急変') + '</h2>' +
-      '<a class="mnl-119" href="tel:119"><b>命に関わるときは 119番</b><small>押すと電話をかけます。施設への連絡は、そのあとで大丈夫です</small></a>' +
+      '<a class="mnl-119" href="tel:119"><b>命に関わるときは 119番</b><small>押すと電話をかけます。オンコール当番への連絡は、そのあとで大丈夫です</small></a>' +
       (data.連絡先 || []).map(function (c) {
-        return '<a class="mnl-call" href="tel:' + esc(c.電話) + '"><b>' + esc(c.名前) + 'に電話する</b><small>' + esc(c.電話) + '</small></a>';
+        return '<a class="mnl-call" href="tel:' + esc(String(c.電話).replace(/#/g, '%23')) + '"><b>' + esc(c.名前) + 'に電話する</b><small>' + esc(c.電話) + '</small></a>';
       }).join('') +
       (!(data.連絡先 || []).length ? '<p class="ptl-note">オンコール当番の電話番号は、施設の掲示や当番表で確認してください。</p>' : '') +
       '<p class="ptl-note">この場面で見るところ（上から順に）</p>' +
