@@ -6,7 +6,9 @@
    ほかの画面へ: 申請内容を行に直す I.bodyLines を置く（views/approvals.js と views/requests.js が使う）
    GAS: searchClients / clientInfo / clientPhoto / uploadClientPhoto / addRecord / clientRecords / searchRecords / deleteRecord / requestClientChange
    見た目の約束: 見出しの上に小さな英字（EN）、ステータスは色つき札（stPill）、記録の種別は色（KIND_CLASS → css の --kc）。
-   読み込み中は skel()、空は emptyHtml()、読めなかったら showFail()（もう一度読み込むボタン付き）。GAS とのやりとりの形は変えていない */
+   読み込み中は skel()、空は emptyHtml()、読めなかったら showFail()（もう一度読み込むボタン付き）。GAS とのやりとりの形は変えていない
+   見直し4周目（使う人の目）: 言葉を日常語に（マスタ・ステータス・置換・単日指定など）、入口は「名前で探す」を先頭・新規登録は下、
+   利用者操作は「記録を書く」2列ボタン、記録一覧は種類ボタンで画面内だけ絞り込み（GAS へは送らない）・日付は「11月28日(土)」 */
 (function () {
   'use strict';
   var I = window.IPPO, app = I.app, state = I.state, api = I.api, esc = I.esc, toast = I.toast;
@@ -43,7 +45,7 @@
   var EN = {
     利用者管理: 'CLIENTS', 利用者検索結果: 'SEARCH RESULTS', 利用者操作: 'CLIENT MENU', 情報閲覧: 'OVERVIEW',
     看護記録: 'NURSING RECORD', 介護記録: 'CARE RECORD', 施設記録: 'FACILITY RECORD', 往診: 'HOME VISIT',
-    記録一覧: 'RECORDS', 記録検索結果: 'RECORD SEARCH', 利用者の新規登録: 'NEW CLIENT', 利用者データ修正: 'EDIT DATA', 写真登録: 'PHOTO'
+    記録一覧: 'RECORDS', 記録検索結果: 'RECORD SEARCH', 利用者の新規登録: 'NEW CLIENT', 利用者データ修正: 'EDIT DATA', 登録内容を直す: 'EDIT DATA', 写真登録: 'PHOTO'
   };
   // ページの外枠: 英字の小見出し・見出し・説明・右上の「戻る」
   function shell(title, sub, back, inner) {
@@ -82,9 +84,9 @@
     return '<div class="cl-card">' + lab(label, en) + (desc ? '<p class="cl-desc">' + esc(desc) + '</p>' : '') + inner + '</div>';
   }
   function photoBox(c) {
-    if (!c.写真) return '<span class="cl-photo none">画像登録なし</span>';
+    if (!c.写真) return '<span class="cl-photo none">写真なし</span>';
     var src = photoCache[c.利用者ID];
-    return '<span class="cl-photo" data-photo="' + esc(c.利用者ID) + '">' + (src ? '<img alt="" src="' + esc(src) + '">' : '<i>読み込み中・・・</i>') + '</span>';
+    return '<span class="cl-photo" data-photo="' + esc(c.利用者ID) + '">' + (src ? '<img alt="" src="' + esc(src) + '">' : '<i>読込中</i>') + '</span>';
   }
   // 写真は一覧を先に出してから、同時に3人までずつ読む（一度にたくさん頼むとサーバーが詰まるため）。読めなかったら「画像登録なし」
   var photoQueue = [], photoBusy = 0;
@@ -122,10 +124,10 @@
     photoBusy++;
     function paint(html) { document.querySelectorAll(photoSel(id)).forEach(function (x) { x.innerHTML = html; if (!/img/.test(html)) x.classList.add('none'); }); }
     api('clientPhoto', { 利用者ID: id }).then(function (r) {
-      if (!r.写真) return paint('画像登録なし');
+      if (!r.写真) return paint('写真なし');
       photoCache[id] = r.写真;
       paint('<img alt="" src="' + esc(r.写真) + '">');
-    }).catch(function () { paint('読込失敗'); })
+    }).catch(function () { paint('読めません'); })
       .then(function () { photoBusy--; pumpPhotos(); });
   }
   // 写真のデータが壊れていて表示できないとき（img の error）は、壊れた絵の印を出さず「画像登録なし」にする。
@@ -134,7 +136,7 @@
     var img = e.target, box = img && img.tagName === 'IMG' && img.closest('.cl-photo');
     if (!box) return;
     if (box.dataset.photo) delete photoCache[box.dataset.photo];
-    box.classList.add('none'); box.textContent = box.id === 'ph-prev' ? '表示できない写真です' : '画像登録なし';
+    box.classList.add('none'); box.textContent = box.id === 'ph-prev' ? '表示できない写真です' : '写真なし';
   }, true);
   function clientCard(c, asLink) {
     var body = '<div class="cl-cc-text"><p class="cl-cc-name"><span class="cl-id">' + esc(c.利用者ID) + '</span><b>' + esc(c.氏名) + '</b></p>' +
@@ -238,25 +240,28 @@
   function viewTop() {
     // 上にほかのメニューと同じ絵の見出し（views/menu.js の IPPO.menuHead）を置く
     // 見出しは上の絵の「利用者一覧」だけにする（枠の中に「利用者管理」の大見出しを重ねない）。絵が無いときだけ枠に見出しを出す
-    var lead = '新規登録と、利用者・記録の検索ができます。条件を組み合わせて探し、情報閲覧や記録入力へ進みます。';
+    // 見直し4周目（使う人の目）: いちばん多い「人を探して記録を書く」を一番上に。名前の欄を先頭にし、
+    // めったに使わない新規登録（運営・管理者向け）は一番下へ移した。専門用語・カタカナは日常の言葉に言い換えた
+    var lead = '名前で探して、記録を書いたり情報を見たりできます。何も入れずに「探す」を押すと全員が出ます。';
     var top = I.menuHead
       ? '<section class="cl-shell cl-shell-top"><p class="cl-lead">' + esc(lead) + '</p>'
       : '<section class="cl-shell"><div class="cl-head"><div class="cl-h"><small aria-hidden="true">' + EN.利用者管理 + '</small><h1>利用者管理</h1></div></div><p class="cl-sub">' + esc(lead) + '</p>';
     app.innerHTML = (I.menuHead ? I.menuHead() : '') + top + (
-      '<div class="cl-card">' + lab('新規登録', 'NEW') + '<p class="cl-desc">利用者マスタの項目を新規登録申請します。</p>' +
-        '<button type="button" class="cl-go" id="cl-new"><span aria-hidden="true" class="cl-plus">＋</span>新規登録</button></div>' +
-      lab('利用者検索', 'FIND CLIENTS', true, 'h2') + '<p class="cl-desc cl-out">何も選ばなければ、見られる利用者を全員表示します。</p>' +
-      sec('施設を選択', chips('fac', facilities(), cur.q.施設, true, '施設を選択'), '', 'FACILITY') +
-      sec('氏名から検索', '<input id="cl-name" class="cl-input" type="search" enterkeyhint="search" aria-label="氏名から検索" placeholder="名前 / ふりがなで検索" value="' + esc(cur.q.氏名) + '" autocomplete="off">', '', 'NAME') +
-      sec('ステータスを選択', chips('st', STATUS, cur.q.ステータス, true, 'ステータスを選択'), '', 'STATUS') +
-      '<button type="button" class="cl-go" id="cl-search">この条件で利用者を検索</button>' +
+      lab('利用者を探す', 'FIND CLIENTS', true, 'h2') +
+      sec('名前で探す', '<input id="cl-name" class="cl-input" type="search" enterkeyhint="search" aria-label="名前で探す" placeholder="例: みほん（名字だけ・ふりがなでも可）" value="' + esc(cur.q.氏名) + '" autocomplete="off">', '', 'NAME') +
+      sec('いまの状態', chips('st', STATUS, cur.q.ステータス, true, 'いまの状態'), '選ばなければ、すべての状態の方が出ます。', 'STATUS') +
+      sec('施設', chips('fac', facilities(), cur.q.施設, true, '施設'), '', 'FACILITY') +
+      '<button type="button" class="cl-go" id="cl-search"><svg class="cl-ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg>利用者を探す</button>' +
       '<hr class="cl-hr">' +
-      lab('記録検索', 'FIND RECORDS', true, 'h2') + '<p class="cl-desc cl-out">条件を組み合わせて、利用者横断で記録を検索します。</p>' +
-      sec('施設を選択', chips('rfac', facilities(), cur.rq.施設, true, '記録検索の施設を選択'), '', 'FACILITY') +
-      sec('記録種別を選択', chips('rkind', RECORD_KINDS, cur.rq.種別, true, '記録種別を選択'), '', 'TYPE') +
-      sec('期間・単日指定', dateRange(cur.rq), '単日指定を入れると、開始日・終了日より優先します。', 'DATE') +
+      lab('記録を探す', 'FIND RECORDS', true, 'h2') + '<p class="cl-desc cl-out">全員の記録の中から、種類や日付で探します（人を決めずに探すとき）。</p>' +
+      sec('記録の種類', chips('rkind', RECORD_KINDS, cur.rq.種別, true, '記録の種類'), '選ばなければ、すべての種類が出ます。', 'TYPE') +
+      sec('日付', dateRange(cur.rq), '1日だけ見るときは「この日だけ」に入れてください（開始日・終了日より優先）。', 'DATE') +
+      sec('施設', chips('rfac', facilities(), cur.rq.施設, true, '記録を探す施設'), '', 'FACILITY') +
       '<div id="cl-err"></div>' +
-      '<button type="button" class="cl-go" id="cl-rsearch">この条件で記録を検索</button>') + '</section>' +
+      '<button type="button" class="cl-go" id="cl-rsearch"><svg class="cl-ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg>記録を探す</button>' +
+      '<hr class="cl-hr">' +
+      '<div class="cl-card cl-newcard">' + lab('新しい利用者の登録', 'NEW') + '<p class="cl-desc">新しく入居される方を登録する申請です。承認されると、この一覧に出ます。</p>' +
+        '<button type="button" class="cl-clear" id="cl-new"><span aria-hidden="true" class="cl-plus">＋</span>新しい利用者を登録する</button></div>') + '</section>' +
       I.backHtml('#menu', 'メニュー一覧に戻る');
     trackClicks(function (e) {
       onChipTap(e);
@@ -277,7 +282,7 @@
   function dateRange(q) {
     return '<div class="cl-dates"><label>開始日<input type="date" id="cl-from" class="cl-input" value="' + esc(q.開始日 || '') + '"></label>' +
       '<label>終了日<input type="date" id="cl-to" class="cl-input" value="' + esc(q.終了日 || '') + '"></label>' +
-      '<label>単日指定<input type="date" id="cl-day" class="cl-input" value="' + esc(q.単日 || '') + '"></label></div>';
+      '<label>この日だけ<input type="date" id="cl-day" class="cl-input" value="' + esc(q.単日 || '') + '"></label></div>';
   }
   function readRange() {
     return { 開始日: document.getElementById('cl-from').value, 終了日: document.getElementById('cl-to').value, 単日: document.getElementById('cl-day').value };
@@ -292,16 +297,16 @@
     // 「指定なし」は薄い色にして、指定した条件が目に入るようにする
     function row(k, val) { return '<p><span>' + esc(k) + '</span><b' + (val === '指定なし' ? ' class="none"' : '') + '>' + esc(val) + '</b></p>'; }
     return q.種別 !== undefined
-      ? row('施設', v(q.施設)) + row('記録種別', v(q.種別)) + row('期間', when)
-      : row('施設', v(q.施設)) + row('氏名', v(q.氏名)) + row('ステータス', v(q.ステータス));
+      ? row('記録の種類', v(q.種別)) + row('日付', when) + row('施設', v(q.施設))
+      : row('名前', v(q.氏名)) + row('いまの状態', v(q.ステータス)) + row('施設', v(q.施設));
   }
 
   // ---------- 利用者検索結果 ----------
   function viewResult() {
-    app.innerHTML = shell('利用者検索結果', '指定した条件に合致する利用者を表示しています。', '#users',
+    app.innerHTML = shell('利用者検索結果', '条件に合う方の一覧です。', '#users',
       '<div class="cl-card">' + lab('検索条件', 'CONDITIONS') + '<div class="cl-cond">' + condText(cur.q) + '</div>' +
         '<a class="cl-condedit" href="#users">条件を変える</a></div>' +
-      '<div class="cl-outrow">' + lab('検索結果', 'RESULTS', true, 'h2') + '<span id="cl-n"></span></div><p class="cl-desc cl-out">利用者カードを選ぶと次の操作画面へ進みます。</p>' +
+      '<div class="cl-outrow">' + lab('検索結果', 'RESULTS', true, 'h2') + '<span id="cl-n"></span></div><p class="cl-desc cl-out">記録を書く・情報を見るときは、その方のカードを押してください。</p>' +
       '<div id="cl-list" class="cl-list">' + skel('利用者を読み込み中...', 3) + '</div>');
     trackClicks(function (e) {
       var b = e.target.closest('[data-client]');
@@ -316,7 +321,7 @@
         var el = document.getElementById('cl-list'); if (!el) return;
         cur.list = r.一覧; save();
         el.innerHTML = r.一覧.length ? r.一覧.map(function (c) { return clientCard(c, true); }).join('') :
-          emptyHtml('条件に合う利用者はいません', '条件を減らして、もう一度検索してください。', '<a class="cl-clear" href="#users">条件を変える</a>');
+          emptyHtml('条件に合う方はいません', '名前の一部だけにするか、状態の選択を外して、もう一度探してください。', '<a class="cl-clear" href="#users">条件を変える</a>');
         document.getElementById('cl-n').innerHTML = '<span class="cl-count">' + r.一覧.length + '名</span>';
         fillPhotos();
       })).catch(keep(function (e) { showFail(document.getElementById('cl-list'), e, run); }));
@@ -327,21 +332,29 @@
   // ---------- 利用者操作 ----------
   function viewOps() {
     if (!needClient()) return;
-    var ops = [
-      ['OVERVIEW', '情報閲覧', 'カテゴリごとに利用者情報を確認します。', '#user-info'],
-      ['RECORDS', '過去の記録閲覧', 'この利用者の過去の記録を一覧で確認します。', '#user-records']
-    ].concat(WRITE_KINDS.map(function (k) { return ['RECORD', k, 'この利用者に対する' + k + 'を入力します。', '#user-write', k]; }));
-    app.innerHTML = shell('利用者操作', '必要な操作を選択して、閲覧・入力・出力へ進みます。', '#users-result',
+    // 見直し4周目（使う人の目）: 「主操作・補助操作」という言い方をやめ、「記録を書く」「見る」「そのほか」に分けた。
+    // 夜勤で片手でも押しやすいよう、記録を書く4つは大きめの2列のボタンにして、スクロールせずに届く位置に置く
+    var views = [
+      ['OVERVIEW', '情報閲覧', '住所・保険・緊急連絡先などを見る', '#user-info'],
+      ['RECORDS', '過去の記録', 'これまでの記録を新しい順に見る', '#user-records']
+    ];
+    var WRITE_NOTE = { 看護記録: 'バイタル・処置など', 介護記録: '食事・入浴・排せつなど', 施設記録: '居室・設備のこと', 往診: '医師の診察のこと' };
+    app.innerHTML = shell('利用者操作', 'この方について、記録を書くか、情報を見るかを選んでください。', '#users-result',
       clientCard(cur.card) +
-      lab('主操作', 'MAIN', true, 'h2') + '<p class="cl-desc cl-out">閲覧や記録入力など、利用者に対する主要な操作です。</p>' +
-      '<div class="cl-ops">' + ops.map(function (o) {
-        return '<a class="cl-op ' + (KIND_CLASS[o[1]] || 'k-view') + '" href="' + o[3] + '"' + (o[4] ? ' data-kind="' + esc(o[4]) + '"' : '') + '><small>' + o[0] + '</small><b>' + esc(o[1]) + '</b><span>' + esc(o[2]) + '</span>' +
+      lab('記録を書く', 'WRITE', true, 'h2') +
+      '<div class="cl-wgrid">' + WRITE_KINDS.map(function (k) {
+        return '<a class="cl-wt ' + KIND_CLASS[k] + '" href="#user-write" data-kind="' + esc(k) + '"><span class="cl-wt-ico" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/></svg></span>' +
+          '<b>' + esc(k) + '</b><span>' + esc(WRITE_NOTE[k]) + '</span></a>';
+      }).join('') + '</div>' +
+      lab('見る', 'VIEW', true, 'h2') +
+      '<div class="cl-ops">' + views.map(function (o) {
+        return '<a class="cl-op k-view" href="' + o[3] + '"><small aria-hidden="true">' + o[0] + '</small><b>' + esc(o[1]) + '</b><span>' + esc(o[2]) + '</span>' +
           '<i class="cl-op-go" aria-hidden="true"></i></a>';
       }).join('') + '</div>' +
-      lab('補助操作', 'MORE', true, 'h2') +
-      '<div class="cl-subops"><button type="button" class="cl-chip" data-sub="edit">データ修正</button>' +
-      '<button type="button" class="cl-chip" data-sub="photo">写真登録</button>' +
-      '<button type="button" class="cl-chip" data-sub="sheet">フェイスシート出力</button></div>');
+      lab('そのほか', 'MORE', true, 'h2') +
+      '<div class="cl-subops"><button type="button" class="cl-chip" data-sub="edit">登録内容を直す（申請）</button>' +
+      '<button type="button" class="cl-chip" data-sub="photo">写真を登録する</button>' +
+      '<button type="button" class="cl-chip soon" data-sub="sheet" aria-disabled="true">フェイスシート印刷<small>準備中</small></button></div>');
     fillPhotos();
     trackClicks(function (e) {
       var k = e.target.closest('[data-kind]');
@@ -351,7 +364,7 @@
       if (!s) return;
       if (s.dataset.sub === 'edit') askEditKind();
       if (s.dataset.sub === 'photo') location.hash = '#user-photo';
-      if (s.dataset.sub === 'sheet') toast('フェイスシート出力は準備中です');
+      if (s.dataset.sub === 'sheet') toast('フェイスシート（利用者の情報を1枚にまとめた紙）の印刷は、まだ使えません');
     });
   }
 
@@ -360,9 +373,9 @@
     if (document.getElementById('cl-modal')) return; // 二度押しで小窓が2枚重ならないように
     var opened = Date.now(), wrap = document.createElement('div');
     wrap.className = 'cl-modal-wrap'; wrap.id = 'cl-modal';
-    wrap.innerHTML = '<div class="cl-modal" role="dialog" aria-modal="true" aria-labelledby="cl-modal-h"><h2 id="cl-modal-h">データ修正</h2>' +
-      '<p>書き換えは「置換」、利用者の登録をやめるときは「削除」を選んでください。どちらも申請になり、承認されると反映されます。</p>' +
-      '<div class="cl-modal-btns"><button type="button" data-k="置換">内容を直す（置換）</button><button type="button" class="danger" data-k="削除">登録をやめる（削除）</button>' +
+    wrap.innerHTML = '<div class="cl-modal" role="dialog" aria-modal="true" aria-labelledby="cl-modal-h"><h2 id="cl-modal-h">登録内容を直す</h2>' +
+      '<p>どちらにしますか。すぐには変わらず、申請して承認されてから反映されます。</p>' +
+      '<div class="cl-modal-btns"><button type="button" data-k="置換">書いてある内容を直す<small>部屋の移動・連絡先の変更など</small></button><button type="button" class="danger" data-k="削除">この方の登録をやめる<small>退居など。記録は消えません</small></button>' +
       '<button type="button" class="sub" data-k="">キャンセル</button></div></div>';
     document.body.appendChild(wrap);
     wrap.querySelector('[data-k="置換"]').focus();
@@ -395,7 +408,7 @@
   var infoTab = '利用者データ';
   function viewInfo() {
     if (!needClient()) return;
-    app.innerHTML = shell('情報閲覧', 'カテゴリを切り替えて、利用者情報を確認できます。', '#user',
+    app.innerHTML = shell('情報閲覧', '見たい情報（保険・連絡先など）のボタンを押すと切り替わります。', '#user',
       clientCard(cur.card) + '<div id="cl-info"></div>');
     fillPhotos();
     function run() {
@@ -425,24 +438,27 @@
     // カテゴリのチップには、入っている項目の数を小さく出す（空のカテゴリはすぐ分かるよう薄くする）
     function filled(x) { return x.項目.filter(function (f) { return f.値; }).length; }
     var n = filled(c);
-    el.innerHTML = '<div class="cl-card">' + lab('表示カテゴリ', 'CATEGORY') + '<div class="cl-chips" role="group" aria-label="表示カテゴリ">' + cats.map(function (x) {
+    el.innerHTML = '<div class="cl-card">' + lab('見たい情報を選ぶ', 'CATEGORY') + '<div class="cl-chips" role="group" aria-label="表示カテゴリ">' + cats.map(function (x) {
       var on = x.名前 === c.名前, k = filled(x);
-      return '<button type="button" class="cl-chip' + (on ? ' on' : '') + (k ? '' : ' dim') + '" aria-pressed="' + on + '" data-tab="' + esc(x.名前) + '">' + esc(x.名前) + '</button>';
+      return '<button type="button" class="cl-chip' + (on ? ' on' : '') + (k ? '' : ' dim') + '" aria-pressed="' + on + '" data-tab="' + esc(x.名前) + '">' + esc(catName(x.名前)) + '</button>';
     }).join('') + '</div></div>' +
-    '<div class="cl-outrow" id="cl-info-h">' + lab(c.名前, '', true, 'h2') + '<span class="cl-count">' + n + ' / ' + c.項目.length + '項目 入力あり</span></div>' +
+    '<div class="cl-outrow" id="cl-info-h">' + lab(catName(c.名前), '', true, 'h2') + '<span class="cl-count">' + c.項目.length + '項目中 ' + n + '項目 記入あり</span></div>' +
     '<div class="cl-fields">' + c.項目.map(function (f) {
       var v = f.値, html;
-      if (!v) html = '<span class="cl-nil">未入力</span>';
+      if (!v) html = '<span class="cl-nil">（まだ書かれていません）</span>';
       else if (/電話番号|連絡先/.test(f.項目) && /^[0-9+\-() ]{6,}$/.test(v)) html = '<a class="cl-tel" href="tel:' + esc(v.replace(/[^0-9+]/g, '')) + '">' + esc(v) + '</a>';
       else html = esc(v);
       return '<div class="cl-field' + (v ? '' : ' nil') + '"><small>' + esc(showLabel(c.名前, f.項目)) + '</small><p>' + html + '</p></div>';
     }).join('') + '</div>';
   }
 
+  // 画面に出すカテゴリ名: シートの「ケアマネマスタ」などの「マスタ」（台帳の意味の業界用語）は職員に分かりにくいので外して見せる。
+  // データのやりとり（名前）はそのまま。「利用者データ」は「基本情報」と見せる
+  function catName(n) { return n === '利用者データ' ? '基本情報' : String(n).replace(/マスタ$/, ''); }
   function toKata(t) { return String(t || '').replace(/[\u3041-\u3096]/g, function (ch) { return String.fromCharCode(ch.charCodeAt(0) + 0x60); }); }
 
   // 画面に出す項目名（参考アプリの表示に合わせる。シートの列名・送る名前は 氏名・ふりがな のまま）
-  function showLabel(cat, k) { return cat === '利用者データ' ? ({ 氏名: '名前', ふりがな: 'フリガナ' }[k] || k) : k; }
+  function showLabel(cat, k) { return cat === '利用者データ' ? ({ 氏名: '名前', ふりがな: 'フリガナ', ステータス: '状態（ステータス）' }[k] || k) : k; }
 
   // ---------- 記録入力（看護記録・介護記録・施設記録・往診。4つとも同じ形） ----------
   function viewWrite() {
@@ -451,12 +467,12 @@
     // 書きかけのメモは利用者・種別ごとにこの端末（タブを閉じるまで）に残す。登録したら消す
     var dkey = 'ippo.draft.' + cur.id + '.' + kind, draft = '';
     try { draft = sessionStorage.getItem(dkey) || ''; } catch (_) {}
-    app.innerHTML = shell(kind, '必要事項を入力して登録します。担当者名は直せます。', '#user',
+    app.innerHTML = shell(kind, '日付・書いた人・内容を入れて「登録する」を押してください。書きかけは自動で残ります。', '#user',
       clientCard(cur.card) +
-      '<form id="f" class="cl-form" novalidate><div class="cl-card cl-wcard ' + (KIND_CLASS[kind] || '') + '">' + lab('入力内容', 'INPUT') +
+      '<form id="f" class="cl-form" novalidate><div class="cl-card cl-wcard ' + (KIND_CLASS[kind] || '') + '">' + lab('書く内容', 'INPUT') +
         '<label>記録日<input type="date" id="w-day" class="cl-input" value="' + I.today() + '" max="' + I.today() + '" required></label>' +
-        '<label>記録担当者<input id="w-who" class="cl-input" value="' + esc(state.me && state.me.氏名) + '" autocomplete="off" required></label>' +
-        '<div class="cl-memo-h"><label for="w-memo">メモ</label><button type="button" class="cl-mini" id="w-now">今の時刻を入れる</button></div>' +
+        '<label>書いた人<input id="w-who" class="cl-input" value="' + esc(state.me && state.me.氏名) + '" autocomplete="off" required></label>' +
+        '<div class="cl-memo-h"><label for="w-memo">記録の内容</label><button type="button" class="cl-mini" id="w-now">今の時刻を入れる</button></div>' +
         '<textarea id="w-memo" class="cl-input" rows="8" placeholder="自由に入力してください&#10;例: 20:45 食後の服薬を確認。変わりなし。" required>' + esc(draft) + '</textarea>' +
         '<p class="cl-memo-f"><span id="w-saved">' + (draft ? '書きかけを戻しました' : '') + '</span><span id="w-len">' + draft.length + '文字</span></p>' +
       '</div><div id="err"></div>' +
@@ -488,8 +504,8 @@
       if (sending) return; // 送信中にもう一度押されても二重に登録しない
       if (!data.記録日) errs.push('記録日を入れてください');
       else if (data.記録日 > I.today()) errs.push('記録日は今日までの日付にしてください');
-      if (!data.記録担当者) errs.push('記録担当者を入れてください');
-      if (!data.メモ.trim()) errs.push('メモを入れてください');
+      if (!data.記録担当者) errs.push('書いた人の名前を入れてください');
+      if (!data.メモ.trim()) errs.push('記録の内容を入れてください');
       var err = document.getElementById('err'), btn = e.target.querySelector('button[type=submit]');
       if (errs.length) { err.innerHTML = I.errorsBox(errs); return; }
       err.innerHTML = ''; btn.disabled = true; btn.textContent = '登録中…'; overlay('読み込み中・・・'); sending = true;
@@ -507,19 +523,22 @@
 
   // ---------- 記録一覧（この利用者の過去の記録） ----------
   function emptyRecQ() { return { 開始日: '', 終了日: '', 単日: '', 文字: '' }; }
-  var recQ = emptyRecQ(), recQFor = null;
+  // recKind: 種類のボタンで選んだ記録の種類（''=すべて）。読み込んだ一覧を画面の中だけで絞る（GAS には送らない）
+  var recQ = emptyRecQ(), recQFor = null, recKind = '', recAll = [];
   function viewRecords() {
     if (!needClient()) return;
-    if (recQFor !== cur.id) { recQ = emptyRecQ(); recQFor = cur.id; } // 絞り込みは利用者ごと
-    app.innerHTML = shell('記録一覧', '日付やキーワードで絞り込み、利用者の記録を確認します。', '#user',
+    if (recQFor !== cur.id) { recQ = emptyRecQ(); recQFor = cur.id; recKind = ''; } // 絞り込みは利用者ごと
+    app.innerHTML = shell('記録一覧', 'この方の記録を新しい順に出しています。種類のボタンで、看護記録だけ・介護記録だけにもできます。', '#user',
       clientCard(cur.card) +
-      '<details class="cl-card cl-fold"' + (recQ.開始日 || recQ.終了日 || recQ.単日 || recQ.文字 ? ' open' : '') + '><summary class="cl-label">絞り込み（日付・キーワード）<small aria-hidden="true">FILTER</small></summary>' +
+      '<details class="cl-card cl-fold"' + (recQ.開始日 || recQ.終了日 || recQ.単日 || recQ.文字 ? ' open' : '') + '><summary class="cl-label">日付・言葉で絞り込む<small aria-hidden="true">FILTER</small></summary>' +
         '<div class="cl-foldin">' + dateRange(recQ) +
-        '<label class="cl-lab">部分テキスト検索<input id="cl-text" class="cl-input" type="search" enterkeyhint="search" placeholder="記録種別・担当者・メモを検索" value="' + esc(recQ.文字) + '"></label>' +
+        '<label class="cl-lab">言葉で探す<input id="cl-text" class="cl-input" type="search" enterkeyhint="search" placeholder="例: 転倒、むくみ、書いた人の名前" value="' + esc(recQ.文字) + '"></label>' +
         '<div id="cl-err"></div>' +
-        '<div class="cl-btns"><button type="button" class="cl-go" id="cl-find">検索</button><button type="button" class="cl-clear" id="cl-clear">条件をクリア</button></div></div></details>' +
+        '<div class="cl-btns"><button type="button" class="cl-go" id="cl-find">この条件で絞り込む</button><button type="button" class="cl-clear" id="cl-clear">条件を消して全部出す</button></div></div></details>' +
       '<div class="cl-outrow">' + lab('記録一覧', 'RECORDS', true, 'h2') + '<span id="cl-n"></span></div>' +
-      '<div id="cl-recs" class="cl-list">' + skel('記録を読み込み中...', 3, 'rec') + '</div>');
+      '<div id="cl-kinds"></div>' +
+      '<div id="cl-recs" class="cl-list">' + skel('記録を読み込み中...', 3, 'rec') + '</div>' +
+      '<a class="cl-clear cl-towrite" href="#user">この方の記録を書く</a>');
     fillPhotos();
     trackClicks(function (e) {
       if (e.target.closest('#cl-find')) {
@@ -533,6 +552,8 @@
         document.getElementById('cl-err').innerHTML = '';
         loadRecs();
       }
+      var kb = e.target.closest('[data-rkind]');
+      if (kb) { recKind = kb.dataset.rkind; drawRecs(); }
       var d = e.target.closest('[data-del]');
       if (d) delRecord(d);
     });
@@ -550,18 +571,43 @@
       if (my !== recSeq) return;
       I.busy(false);
       if (!document.getElementById('cl-recs')) return;
-      var filtered = recQ.開始日 || recQ.終了日 || recQ.単日 || recQ.文字;
-      document.getElementById('cl-n').innerHTML = '<span class="cl-count">' + r.一覧.length + '件</span>';
-      el.innerHTML = r.一覧.length ? (state.me && state.me.役割 === '管理者' ? '' : '<p class="cl-note">削除できるのは自分が書いた記録だけです。</p>') + recList(r.一覧, false)
-        : filtered ? emptyHtml('条件に合う記録はありません', '条件を変えて、もう一度検索してください。', '<button type="button" class="cl-clear cl-reset">条件をクリア</button>')
-          : emptyHtml('まだ記録はありません', '利用者操作の「看護記録」「介護記録」などから書けます。', '<a class="cl-clear" href="#user">利用者操作へ</a>');
+      recAll = r.一覧;
+      drawRecs();
     })).catch(keep(function (e) { if (my !== recSeq) return; I.busy(false); showFail(document.getElementById('cl-recs'), e, loadRecs); }));
+  }
+  // 種類のボタン（すべて・看護記録 3 …）と一覧を描く。種類のボタンは記録がある種類だけ出す
+  function drawRecs() {
+    var el = document.getElementById('cl-recs'), kb = document.getElementById('cl-kinds'); if (!el) return;
+    var filtered = recQ.開始日 || recQ.終了日 || recQ.単日 || recQ.文字, cnt = {};
+    recAll.forEach(function (r) { cnt[r.種別] = (cnt[r.種別] || 0) + 1; });
+    var kinds = RECORD_KINDS.filter(function (k) { return cnt[k]; });
+    Object.keys(cnt).forEach(function (k) { if (kinds.indexOf(k) < 0) kinds.push(k); });
+    if (recKind && !cnt[recKind]) recKind = '';
+    kb.innerHTML = kinds.length > 1 ? '<div class="cl-chips cl-kchips" role="group" aria-label="記録の種類で絞る">' + [''].concat(kinds).map(function (k) {
+      var on = k === recKind;
+      return '<button type="button" class="cl-chip' + (on ? ' on' : '') + (k ? ' ' + (KIND_CLASS[k] || '') : '') + '" aria-pressed="' + on + '" data-rkind="' + esc(k) + '">' +
+        esc(k || 'すべて') + '<small>' + (k ? cnt[k] : recAll.length) + '</small></button>';
+    }).join('') + '</div>' : '';
+    var list = recAll.filter(function (r) { return !recKind || r.種別 === recKind; });
+    document.getElementById('cl-n').innerHTML = '<span class="cl-count">' + list.length + '件</span>';
+    el.innerHTML = list.length ? (state.me && state.me.役割 === '管理者' ? '' : '<p class="cl-note">削除ボタンが出るのは、自分が書いた記録だけです。</p>') + recList(list, false)
+      : filtered ? emptyHtml('条件に合う記録はありません', '日付を広げるか、言葉を短くして、もう一度絞り込んでください。', '<button type="button" class="cl-clear cl-reset">条件を消して全部出す</button>')
+        : emptyHtml('まだ記録はありません', '下の「この方の記録を書く」から書けます。');
+  }
+  // 記録日を「11月28日(土)」にし、今日・昨日は札を付ける（年は月の見出しにあるので省く）。形が違う値はそのまま出す
+  function dayText(d) {
+    var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(d || ''));
+    if (!m) return esc(d || '');
+    var dt = new Date(+m[1], +m[2] - 1, +m[3]), t = I.today(), y = new Date(); y.setDate(y.getDate() - 1);
+    var ys = y.getFullYear() + '-' + ('0' + (y.getMonth() + 1)).slice(-2) + '-' + ('0' + y.getDate()).slice(-2);
+    var tag = d === t ? '<em class="cl-rel">今日</em>' : d === ys ? '<em class="cl-rel">昨日</em>' : '';
+    return tag + (+m[2]) + '月' + (+m[3]) + '日(' + '日月火水木金土'.charAt(dt.getDay()) + ')';
   }
   function recCard(r, withName) {
     var mine = state.me && (r.記録者職員ID === state.me.職員ID || state.me.役割 === '管理者');
-    return '<article class="cl-rec ' + (KIND_CLASS[r.種別] || '') + '" data-rec="' + esc(r.記録ID) + '"><div class="cl-rec-h"><b>' + esc(r.種別) + '</b><span>' + esc(r.記録日) + '</span></div>' +
+    return '<article class="cl-rec ' + (KIND_CLASS[r.種別] || '') + '" data-rec="' + esc(r.記録ID) + '"><div class="cl-rec-h"><b>' + esc(r.種別) + '</b><span>' + dayText(r.記録日) + '</span></div>' +
       (withName ? '<p class="cl-rec-who cl-rec-name">利用者: <b>' + esc(r.利用者氏名 || '') + '</b></p>' : '') +
-      '<p class="cl-rec-who">記録担当者: ' + esc(r.記録担当者) + '</p><p class="cl-rec-body">' + esc(r.メモ) + '</p>' +
+      '<p class="cl-rec-who">書いた人: ' + esc(r.記録担当者) + '</p><p class="cl-rec-body">' + esc(r.メモ) + '</p>' +
       (mine && !withName ? '<div class="cl-rec-ops"><button type="button" class="cl-del" data-del="' + esc(r.記録ID) + '">削除</button></div>' : '') + '</article>';
   }
   // 削除はカードの中で確認（ブラウザの確認ダイアログは LINE の中で止まることがあるので使わない）
@@ -587,7 +633,7 @@
 
   // ---------- 記録検索の結果（利用者横断） ----------
   function viewRecordResult() {
-    app.innerHTML = shell('記録検索結果', '条件に合う記録を新しい順に表示しています。', '#users',
+    app.innerHTML = shell('記録検索結果', '条件に合う記録を新しい順に出しています。', '#users',
       '<div class="cl-card">' + lab('検索条件', 'CONDITIONS') + '<div class="cl-cond">' + condText(cur.rq) + '</div>' +
         '<a class="cl-condedit" href="#users">条件を変える</a></div>' +
       '<div class="cl-outrow">' + lab('記録一覧', 'RECORDS', true, 'h2') + '<span id="cl-n"></span></div>' +
@@ -599,7 +645,7 @@
         var el = document.getElementById('cl-recs'); if (!el) return;
         document.getElementById('cl-n').innerHTML = '<span class="cl-count">' + r.一覧.length + '件</span>';
         el.innerHTML = r.一覧.length ? recList(r.一覧, true)
-          : emptyHtml('条件に合う記録はありません', '期間を広げるか、記録種別を減らしてもう一度検索してください。', '<a class="cl-clear" href="#users">条件を変える</a>');
+          : emptyHtml('条件に合う記録はありません', '日付を広げるか、記録の種類の選択を外して、もう一度探してください。', '<a class="cl-clear" href="#users">条件を変える</a>');
       })).catch(keep(function (e) { showFail(document.getElementById('cl-recs'), e, run); }));
     }
     run();
@@ -612,9 +658,9 @@
     // 修正の申請は、いま選んでいる利用者の分だけ（戻る操作などで別の人に変わっていたら操作画面からやり直す）
     if (ed.種類 !== '新規' && String(ed.利用者ID) !== String(cur.id)) { location.replace('#user'); return; }
     var isNew = ed.種類 === '新規';
-    var title = isNew ? '利用者の新規登録' : '利用者データ修正';
-    app.innerHTML = shell(title, isNew ? '利用者マスタへの新規登録を申請します。承認されると一覧に出ます。'
-      : (ed.種類 === '削除' ? '利用者の登録をやめる申請をします（ステータスが「登録なし」になります）。' : '利用者マスタの項目を申請・修正します。直した項目だけが申請されます。'),
+    var title = isNew ? '利用者の新規登録' : '登録内容を直す';
+    app.innerHTML = shell(title, isNew ? '名前・ふりがな・施設は必ず入れてください。ほかは分かる所だけで大丈夫です。申請して承認されると一覧に出ます。'
+      : (ed.種類 === '削除' ? 'この方の登録をやめる申請をします。承認されると、状態が「登録なし」になります。' : '直したい所だけ書き換えて、いちばん下の「申請する」を押してください。直した所には「変更」の印が付きます。'),
       isNew ? '#users' : '#user',
       (isNew ? '' : clientCard(cur.card)) + '<div id="cl-edit"></div>');
     fillPhotos();
@@ -665,12 +711,12 @@
         .concat(c.項目.filter(function (f) { return first.indexOf(f.項目) < 0 && skip.indexOf(f.項目) < 0; })) };
     });
     el.innerHTML = '<form id="f" class="cl-form" novalidate>' +
-      (del ? '<div class="cl-card cl-warn">' + lab('削除の申請', 'REMOVE') + '<p class="cl-desc">記録は消えずに残ります。利用者のステータスだけ「登録なし」になります。承認されるまでは今のままです。</p></div>'
+      (del ? '<div class="cl-card cl-warn">' + lab('登録をやめる申請', 'REMOVE') + '<p class="cl-desc">これまでの記録は消えずに残ります。状態が「登録なし」に変わるだけです。承認されるまでは今のままです。</p></div>'
         : cats.map(function (c) {
-          return '<details class="cl-card cl-fold"' + (c.名前 === '利用者データ' ? ' open' : '') + '><summary class="cl-label">' + esc(c.名前 === '利用者データ' ? '基本情報' : c.名前) + '</summary>' +
+          return '<details class="cl-card cl-fold"' + (c.名前 === '利用者データ' ? ' open' : '') + '><summary class="cl-label">' + esc(catName(c.名前)) + '</summary>' +
             c.項目.map(function (f) { return fieldInput(c.名前, f, i++); }).join('') + '</details>';
         }).join('')) +
-      '<div class="cl-card"><label class="cl-lab">' + (del ? '<span>削除の理由<span class="req">(必須)</span></span>' : '<span>申請の理由・メモ<span class="opt">(任意)</span></span>') +
+      '<div class="cl-card"><label class="cl-lab">' + (del ? '<span>やめる理由<span class="req">(必須)</span></span>' : '<span>申請の理由・メモ<span class="opt">(任意)</span></span>') +
         '<textarea id="e-why" rows="3" placeholder="' + (del ? '例: 退居して1年たったため' : '例: 部屋の移動があったため') + '"></textarea></label></div>' +
       (ed.種類 === '置換' ? '<p class="cl-chg-n" id="cl-chg-n" aria-live="polite">まだ直した項目はありません</p>' : '') +
       '<div id="err"></div><button type="submit" class="cl-go' + (del ? ' danger' : '') + '">' + (ed.種類 === '新規' ? '新規登録を申請する' : del ? '削除を申請する' : '申請する') + '</button></form>';
@@ -700,14 +746,14 @@
       if (ed.種類 === '新規') {
         if (!fields['利用者データ/氏名']) errs.push('名前を入れてください');
         if (!fields['利用者データ/ふりがな']) errs.push('ふりがなを入れてください');
-      } else if (ed.種類 === '置換' && !Object.keys(fields).length) errs.push('直した項目がありません');
-      if (del && !why) errs.push('削除の理由を入れてください');
+      } else if (ed.種類 === '置換' && !Object.keys(fields).length) errs.push('まだどこも直していません。直したい欄を書き換えてから押してください');
+      if (del && !why) errs.push('やめる理由を入れてください');
       var err = document.getElementById('err'), btn = e.target.querySelector('button[type=submit]');
       if (errs.length) { err.innerHTML = I.errorsBox(errs); err.scrollIntoView({ block: 'center' }); return; }
       btn.disabled = true; btn.textContent = '送信中…'; I.busy(true);
       var g = I.gen;
       api('requestClientChange', { 種類: ed.種類, 利用者ID: ed.種類 === '新規' ? '' : cur.id, 項目: fields, 変更前: ed.種類 === '置換' ? before : {}, 理由: why }).then(function () {
-        I.busy(false); toast('申請しました。承認されると反映されます'); if (g === I.gen) location.hash = '#requests';
+        I.busy(false); toast('申請しました。承認されると反映されます。進み具合は「申請状況」で見られます'); if (g === I.gen) location.hash = '#requests';
       }).catch(function (x) {
         I.busy(false); btn.disabled = false; btn.textContent = ed.種類 === '新規' ? '新規登録を申請する' : del ? '削除を申請する' : '申請する';
         err.innerHTML = x.details && x.details.length ? I.errorsBox(x.details) : failHtml(x);

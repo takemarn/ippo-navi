@@ -428,3 +428,123 @@ button.cl-cc-link:active { transform: scale(.985); }
 .cl-op-go { top: 50%; bottom: auto; margin-top: -14px; }
 /* 日本語の説明文が1〜2文字だけ次の行に落ちないよう、対応する端末では文節で折り返す */
 .cl-sub, .cl-desc, .cl-lead, .cl-empty span, .cl-op span { word-break: auto-phrase; text-wrap: pretty; }
+
+/* ============================================================
+   見直し4周目 r4b（使う人の目: 夜勤の介護職・看護師・運営）
+   - 暗い所でも読めるよう、薄い灰色の文字を 4.5:1 以上に濃くし、10px 以下の文字をなくす
+   - 押す所は見た目 34px 以上、::after で上下に広げて 42px 以上（隣と重ならない間隔）
+   - 文字を大きくした端末（120%）や幅 320px でも崩れないよう、折り返しを許す
+   ============================================================ */
+:root { --cl-sub-ink: #5a6270; }
+.cl-sub, .cl-desc, .cl-lead { color: #444b57; font-size: 13px; }
+.cl-h small { opacity: 1; font-size: 11px; }
+.cl-label small, .cl-fold > summary small { font-size: 10px; color: #5f5ba6; }
+.cl-label { font-size: 13px; }
+h2.cl-label { font-size: 15px; color: #2f2a7a; }
+.cl-backpill { min-height: 34px; padding: 0 14px; font-size: 13px; color: #1f2430; }
+.cl-backpill::after { inset: -4px -4px; }
+/* チップ（施設・状態・記録の種類） */
+.cl-chips { gap: 10px 8px; }
+.cl-chip { min-height: 36px; padding: 0 14px; font-size: 13px; color: #1f2430; border-color: #d9dfe8; }
+.cl-chip::after { inset: -4px 0; }
+[data-chips="st"] .cl-chip { padding: 0 12px; }
+.cl-chip.on { color: #241e78; }
+.cl-chip.on::before { box-shadow: 0 0 0 2px #fff; }
+.cl-chip.dim:not(.on) { color: #5a6270; background: #f6f7fa; border-style: dashed; }
+/* 主ボタンの虫めがね */
+.cl-go { display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 15px; }
+.cl-ico { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; flex: none; }
+.cl-clear { font-size: 14px; min-height: 46px; }
+.cl-newcard .cl-clear { color: #2f2a7a; border-color: #cfcaf3; }
+/* 検索条件・件数・空 */
+.cl-cond { font-size: 13px; }
+.cl-cond p { grid-template-columns: 6.5em 1fr; }
+.cl-cond span { color: var(--cl-sub-ink); font-size: 12px; }
+.cl-cond b.none { color: var(--cl-sub-ink); }
+.cl-count { font-size: 12px; height: 24px; }
+.cl-note { font-size: 12px; color: var(--cl-sub-ink); }
+.cl-empty span { color: var(--cl-sub-ink); font-size: 13px; }
+.cl-empty b { font-size: 15px; }
+.cl-fail .cl-fail-n { color: var(--cl-sub-ink); font-size: 12px; }
+.cl-loading-t { color: var(--cl-sub-ink); font-size: 13px; }
+/* 利用者カード: ふりがな・施設を読みやすく。写真枠の文字は「写真なし」と短くして小さすぎる字をやめる */
+.cl-cc-text { font-size: 13px; color: #1f2430; }
+.cl-cc-name b { font-size: 17px; }
+.cl-kana { color: var(--cl-sub-ink); font-size: 12px; }
+.cl-tag { font-size: 11px; padding: 2px 9px; }
+.cl-st { font-size: 12px; height: 22px; }
+.cl-photo, .cl-photo.none { font-size: 11px; letter-spacing: 0; white-space: normal; color: var(--cl-sub-ink); }
+.cl-chev { border-color: #7d8698; }
+@media (max-width: 360px) {
+  .cl-photo.none { font-size: 11px; letter-spacing: 0; }
+}
+/* 利用者操作: 記録を書く4つは2列の大きなボタン（片手の親指で届く位置） */
+.cl-wgrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.cl-wt {
+  position: relative; display: flex; flex-direction: column; gap: 3px; min-height: 92px; padding: 12px 12px 12px 14px;
+  border-radius: 16px; background: #fff; box-shadow: var(--cl-card-shadow); border: 1px solid #eef1f6; border-top: 4px solid var(--kc);
+  color: inherit; text-decoration: none; min-width: 0; transition: transform .08s;
+}
+.cl-wt:active { transform: scale(.97); background: #f6f8fd; }
+.cl-wt-ico {
+  width: 28px; height: 28px; border-radius: 9px; display: grid; place-items: center; margin-bottom: 2px;
+  background: color-mix(in srgb, var(--kc) 14%, #fff); color: var(--kc);
+}
+.cl-wt-ico svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.cl-wt b { font-size: 16px; font-weight: 800; color: #1f2430; overflow-wrap: anywhere; }
+.cl-wt span { font-size: 12px; color: var(--cl-sub-ink); line-height: 1.45; word-break: auto-phrase; }
+.cl-op { min-height: 72px; padding: 12px 56px 12px 18px; }
+.cl-op small { font-size: 10px; }
+.cl-op span { font-size: 12px; color: var(--cl-sub-ink); }
+.cl-subops { gap: 10px 8px; }
+.cl-chip.soon { color: var(--cl-sub-ink); background: #f6f7fa; border-style: dashed; }
+.cl-chip.soon small { margin-left: 6px; font-size: 11px; font-weight: 800; color: #6a5100; background: #fff3cf; border-radius: 999px; padding: 1px 7px; }
+/* 小窓: ボタンの下に何が起きるかを小さく添える */
+.cl-modal p { font-size: 13px; color: #444b57; }
+.cl-modal-btns button { min-height: 56px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; font-size: 15px; }
+.cl-modal-btns button small { font-size: 12px; font-weight: 600; opacity: .9; }
+/* 情報閲覧 */
+.cl-field small { font-size: 12px; color: var(--cl-sub-ink); }
+.cl-field p { font-size: 15px; }
+.cl-nil { font-size: 13px; color: var(--cl-sub-ink); }
+.cl-tel { min-height: 40px; text-decoration: underline; text-underline-offset: 3px; }
+/* 記録入力 */
+.cl-mini { min-height: 36px; padding: 0 14px; font-size: 13px; }
+.cl-mini::after { inset: -4px -2px; }
+.cl-memo-h label { font-size: 13px; }
+.cl-memo-f { font-size: 12px; color: var(--cl-sub-ink); margin-top: -2px; }
+.cl-lab, .cl-form label { font-size: 13px; }
+.cl-dates label { font-size: 13px; color: #1f2430; }
+/* 記録カード: 日付は「11月28日(土)」、今日・昨日は札。書いた人・本文を大きめに */
+.cl-rec-h { flex-wrap: wrap; }
+.cl-rec-h b { font-size: 15px; }
+.cl-rec-h span { font-size: 13px; display: inline-flex; align-items: center; gap: 6px; }
+.cl-rel { font-style: normal; font-size: 11px; font-weight: 800; color: #fff; background: #3f3796; border-radius: 999px; padding: 1px 8px; }
+.cl-rec-who { font-size: 12px; color: var(--cl-sub-ink); }
+.cl-rec-body { font-size: 15px; color: #1f2430; }
+.cl-month { font-size: 14px; }
+.cl-month small { font-size: 12px; color: #5f5ba6; }
+.cl-del { min-height: 34px; padding: 0 16px; font-size: 12px; }
+.cl-del::after { inset: -4px -2px; }
+.cl-rec-ops { margin-top: 8px; }
+/* 記録一覧の種類ボタン（数つき） */
+.cl-kchips .cl-chip small { margin-left: 6px; font-size: 11px; font-weight: 800; color: #5f5ba6; font-variant-numeric: tabular-nums; }
+.cl-kchips .cl-chip[class*="k-"]::before { content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--kc); margin-right: 6px; }
+.cl-towrite { text-decoration: none; color: #2f2a7a; border-color: #cfcaf3; }
+/* データ修正 */
+.cl-chg-n { font-size: 13px; color: var(--cl-sub-ink); }
+.cl-lab.chg > span:first-child::after { font-size: 11px; }
+.cl-fold > summary { font-size: 14px; }
+.cl-fold > summary::after { font-size: 18px; color: #4a5160; }
+.cl-fold > summary[data-n]:not([data-n=""])::before { font-size: 11px; }
+@media (max-width: 340px) {
+  .cl-wt { padding: 10px 10px 10px 12px; }
+  .cl-wt b { font-size: 15px; }
+}
+/* 種別名を文字で出すときの色（--kc は帯用。文字は白地で 4.5:1 以上になる濃さ --kt を使う） */
+.k-view { --kt: #4f45c4; } .k-ns { --kt: #2558c0; } .k-cr { --kt: #17803d; } .k-fc { --kt: #0a7189; }
+.k-dr { --kt: #7a3cc4; } .k-hh { --kt: #985700; } .k-ac { --kt: #b52a3a; }
+.cl-rec-h b { color: var(--kt, var(--fg)); }
+.cl-form label .opt, .cl-lab .opt { color: var(--cl-sub-ink); }
+/* 「写真なし」が「写真な／し」と1文字だけ落ちないよう、言葉の途中で折り返さない（文字を大きくした端末でも収まる幅） */
+.cl-photo.none, .cl-photo i { word-break: keep-all; padding: 2px; }
