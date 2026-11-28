@@ -35,22 +35,49 @@
   function backLink(href, label) { return backHtml(href, label); }
 
   // ---------- GAS とのやりとり ----------
-  function api(action, data) {
+  function api(action, data, retried) {
     if (DEMO) return Demo.call(action, data || {});
+    var ctl = window.AbortController ? new AbortController() : null;
+    var timer = ctl && setTimeout(function () { ctl.abort(); }, 60000); // GAS は順番待ち（最大20秒）＋処理があるので長めに
     return fetch(CFG.API_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify({ action: action, idToken: state.idToken, data: data || {} })
-    }).then(function (r) { return r.json(); }, function () {
-      throw new Error('通信できませんでした。電波の良い所でもう一度お試しください');
-    }).catch(function (e) {
-      if (e instanceof SyntaxError) throw new Error('サーバーの返事を読めませんでした。少し待ってからやり直してください');
-      throw e;
-    }).then(function (res) {
+      body: JSON.stringify({ action: action, idToken: freshToken(), data: data || {} }),
+      signal: ctl ? ctl.signal : undefined
+    }).then(function (r) { return r.text(); }, function (err) {
+      var e = new Error(err && err.name === 'AbortError' ? '時間がかかりすぎたため止めました。電波のよい所でもう一度試してください' : '通信できませんでした。電波のよい所でもう一度試してください');
+      e.code = 0; throw e;
+    }).then(function (text) {
+      if (timer) clearTimeout(timer);
+      var res;
+      try { res = JSON.parse(text); } catch (_) {
+        var e0 = new Error('サーバーから正しい返事がありませんでした。少し待ってからやり直してください'); e0.code = 500; throw e0;
+      }
       if (res.ok) return res.data;
-      var e = new Error(res.message || 'エラーが起きました'); e.code = res.code; e.details = res.details || [];
+      var e = new Error(res.message || 'エラーが起きました'); e.code = res.code; e.details = res.details || []; e.reason = res.reason || '';
+      // LINE の本人確認の期限切れは、1回だけ取り直してやり直す
+      if (e.reason === 'token' && !retried && renewToken()) return api(action, data, true);
+      if (e.reason === 'token') e.message = 'LINE の本人確認の期限が切れました。LINE を閉じて、もう一度開いてください';
       throw e;
     });
+  }
+  // LINE の IDトークン。送る前には取り直さない（入力中に画面が読み直されないように）。期限切れは GAS の 401（reason: token）で知る
+  function freshToken() {
+    if (DEMO || !window.liff) return state.idToken;
+    try { return liff.getIDToken() || state.idToken; } catch (_) { return state.idToken; }
+  }
+  // 取り直し: まだ使えるトークンがあればそれ。無ければ LINE の中は開き直し、ブラウザはログインし直す。
+  // 開き直しが2分以内に2回続いたら止めて「LINE を閉じて開き直して」と出す（読み直しが止まらなくなるのを防ぐ）
+  function renewToken() {
+    try {
+      var t = liff.getIDToken(), d = liff.getDecodedIDToken();
+      if (t && t !== state.idToken && d && d.exp * 1000 > Date.now() + 60000) { state.idToken = t; return true; }
+      var last = 0;
+      try { last = Number(sessionStorage.getItem('ippo.renewAt') || 0); sessionStorage.setItem('ippo.renewAt', String(Date.now())); } catch (_) {}
+      if (Date.now() - last < 120000) return false;
+      if (liff.isInClient()) location.reload(); else { liff.logout(); liff.login({ redirectUri: location.href }); }
+    } catch (_) {}
+    return false;
   }
 
   // ---------- 見本モード（架空のデータ） ----------
@@ -165,6 +192,7 @@
       if (window.IPPO.demo[action]) return window.IPPO.demo[action](data || {}, self.me);
       switch (action) {
         case 'me': return this.me;
+        case 'linkLine': return this.me;
         case 'options': return this.options;
         case 'submitExpense': return newReq('経費', 'EXP', data);
         case 'submitAttendance': return newReq('勤怠', 'ATT', data);
@@ -208,12 +236,39 @@
   // 画面の一部（一覧など）が読めない → 赤い枠の「! 読み込めませんでした」（clients.js の showFail・shift.js の failBox）
   function showError(e) {
     busy(false);
+    if (e && e.reason === 'unregistered') return showRegister();
     app.innerHTML = '<div class="card fail" role="alert"><h2>画面を開けませんでした</h2>' +
       '<p class="fail-msg">' + esc(e && e.message || 'エラーが起きました') + '</p>' +
       // 言い方は画面ごとのエラー表示（承認待ち一覧・自分の申請など）とそろえる:「電波の良い所で…」＋「もう一度読み込む」
       (e && e.code === 401 ? '<p class="fail-note">LINE からもう一度開き直してください。</p>'
         : (/電波/.test(e && e.message || '') ? '' : '<p class="fail-note">電波の良い所で、もう一度読み込んでください。</p>') +
           '<button type="button" onclick="location.reload()">もう一度読み込む</button>') + '</div>';
+  }
+
+  // ---------- はじめての登録（LINE と職員名簿の紐づけ） ----------
+  // 職員名簿にまだ LINE がつながっていない人が開いたときに出る。運営からもらった6けたの登録コードを入れる
+  function showRegister() {
+    busy(false);
+    app.innerHTML = '<div class="card register"><h2>はじめての登録</h2>' +
+      '<p>IPPO管理ナビを使うには、はじめに1回だけ登録が必要です。運営からもらった<b>6けたの登録コード</b>を入れてください。</p>' +
+      '<form id="regForm" novalidate><label>登録コード' +
+      '<input id="regCode" inputmode="numeric" autocomplete="one-time-code" maxlength="8" placeholder="例 482913"></label>' +
+      '<div id="regErr" aria-live="polite"></div>' +
+      '<button type="submit" class="primary" id="regBtn">登録する</button></form>' +
+      '<p class="muted">コードがわからないときは、運営に「IPPO管理ナビの登録コード」を聞いてください。</p></div>';
+    document.getElementById('regForm').addEventListener('submit', function (ev) {
+      ev.preventDefault();
+      var code = document.getElementById('regCode').value.replace(/[０-９]/g, function (c) { return String.fromCharCode(c.charCodeAt(0) - 0xFEE0); }).replace(/\s/g, '');
+      var err = document.getElementById('regErr'), btn = document.getElementById('regBtn');
+      if (!/^[1-9][0-9]{5}$/.test(code)) { err.innerHTML = '<div class="errors" role="alert">登録コードは6けたの数字です</div>'; return; }
+      btn.disabled = true; btn.textContent = '登録中…'; busy(true);
+      api('linkLine', { 登録コード: code }).then(function () {
+        toast('登録しました'); boot();
+      }).catch(function (e) {
+        busy(false); btn.disabled = false; btn.textContent = '登録する';
+        err.innerHTML = '<div class="errors" role="alert">' + esc(e.message) + '</div>';
+      });
+    });
   }
 
   // ---------- 読み込み中の表示（参考 0-6） ----------
@@ -322,10 +377,17 @@
       if (!liff.isLoggedIn()) { liff.login({ redirectUri: location.href }); return new Promise(function () {}); }
       state.idToken = liff.getIDToken();
     });
-    ready.then(function () { return Promise.all([api('me'), api('options')]); })
+    ready.then(boot, showError);
+  }
+  // 本人の情報と選択肢を読んでから画面を出す（はじめての登録のあとにも呼ぶ）
+  function boot() {
+    // 見本モードで「はじめての登録」の見た目を確かめる: index.html?register
+    if (DEMO && /(^|[?&])register\b/.test(location.search) && !boot.done) { boot.done = true; return showRegister(); }
+    return Promise.all([api('me'), api('options')])
       .then(function (r) {
         state.me = r[0]; state.options = r[1];
         document.getElementById('who').textContent = state.me.氏名;
+        window.removeEventListener('hashchange', route);
         window.addEventListener('hashchange', route);
         route();
       })

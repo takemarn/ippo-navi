@@ -180,3 +180,10 @@ button:disabled { opacity: .5; cursor: default; }
 /* 「もう一度読み込む」は白地＋濃紺の文字（承認待ち一覧・利用者一覧・シフトの同じボタンとそろえる） */
 .fail button { align-self: stretch; min-height: 44px; background: #fff; color: var(--navy); border-color: #c9d6ea; box-shadow: none; }
 .fail button:active { background: #eef2f7; }
+
+/* はじめての登録（core.js showRegister） */
+.register { margin-top: 16px; display: flex; flex-direction: column; gap: 12px; }
+.register h2 { margin: 0; }
+.register p { margin: 0; line-height: 1.7; }
+.register form { display: flex; flex-direction: column; gap: 12px; }
+.register input { font-size: 22px; letter-spacing: .25em; text-align: center; }
