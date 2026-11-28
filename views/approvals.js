@@ -143,7 +143,6 @@
       '</button></li>';
     }).join('') + '</ul>';
   }
-  function fmtDate(s) { return String(s || '').slice(0, 16); }
   function total(r) { return (r.明細 || []).reduce(function (s, x) { return s + Number(x.金額 || 0); }, 0); }
   function contentLines(r) {
     var d = r.明細 || [];

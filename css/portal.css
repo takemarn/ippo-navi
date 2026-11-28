@@ -4,9 +4,7 @@
 /* ---------- 共通 ---------- */
 .ptl-stack { display: flex; flex-direction: column; gap: 12px; }
 .ptl-hint { font-weight: 400; color: var(--muted); font-size: 11px; }
-.ptl-retry { margin-top: 8px; min-height: 40px; }
 .ptl-topback { align-self: flex-start; color: var(--navy); font-size: 12px; font-weight: 700; text-decoration: none; padding: 6px 0; min-height: 40px; display: inline-flex; align-items: center; gap: 4px; }
-.ptl-topback.as-btn { background: none; border: 0; min-height: 40px; padding: 6px 0; box-shadow: none; }
 .ptl-h1l { text-align: left; font-size: 18px; }
 .ptl-note { font-size: 12px; color: var(--label); }
 .ptl-note b { color: var(--danger); }
@@ -112,13 +110,10 @@ button.mnl-size[aria-pressed="true"] { background: var(--navy); color: #fff; }
 .mnl-keys { display: flex; flex-wrap: wrap; gap: 6px; }
 .mnl-keys button { background: #fff; color: var(--fg); border: 1px solid var(--line); min-height: 40px; padding: 4px 12px; font-weight: 400; font-size: 13px; box-shadow: none; }
 .mnl-res { display: flex; flex-direction: column; gap: 6px; }
-button.mnl-row, button.mnl-scene { background: #fff; color: var(--fg); border: 1px solid var(--line); box-shadow: 0 1px 3px rgba(60, 90, 140, .08); flex-direction: column; align-items: flex-start; gap: 2px; text-align: left; }
-.mnl-row small, .mnl-scene small { font-weight: 400; font-size: 11px; color: var(--muted); }
+button.mnl-scene { background: #fff; color: var(--fg); border: 1px solid var(--line); box-shadow: 0 1px 3px rgba(60, 90, 140, .08); flex-direction: column; align-items: flex-start; gap: 2px; text-align: left; }
+.mnl-scene small { font-weight: 400; font-size: 11px; color: var(--muted); }
 .mnl-scenes { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 button.mnl-scene { min-height: 64px; padding: 10px 12px; border-radius: 12px; }
-.mnl-more summary { cursor: pointer; text-align: center; font-weight: 700; color: #1f8a6a; border: 1px dashed #8fd0bd; border-radius: 12px; padding: 10px; background: #f2fbf8; list-style: none; }
-.mnl-more summary::-webkit-details-marker { display: none; }
-.mnl-more[open] summary { margin-bottom: 8px; }
 .mnl-uh { font-size: 17px; color: #c22035; }
 .mnl-steps { margin: 0; padding: 0; list-style: none; counter-reset: s; display: flex; flex-direction: column; gap: 6px; }
 .mnl-steps li { counter-increment: s; }
@@ -136,7 +131,7 @@ button.mnl-scene { min-height: 64px; padding: 10px 12px; border-radius: 12px; }
 body.mnl-big main { font-size: 17px; }
 body.mnl-big .mnl-points li, body.mnl-big .mnl-guide details p, body.mnl-big .mnl-steps button { font-size: 18px; }
 body.mnl-big .mnl-guide h2 { font-size: 21px; }
-body.mnl-big .mnl-scene b, body.mnl-big .mnl-row b { font-size: 16px; }
+body.mnl-big .mnl-scene b { font-size: 16px; }
 
 /* ---------- 駐車場ナビ ---------- */
 .pk-head { position: sticky; top: 0; z-index: 5; background: linear-gradient(160deg, #2050c8, #1638a0); color: #fff; border-radius: 16px; padding: 14px; display: flex; flex-direction: column; gap: 6px; box-shadow: 0 4px 14px rgba(30, 60, 160, .25); }

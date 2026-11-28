@@ -9,7 +9,7 @@
   'use strict';
   var I = window.IPPO, app = I.app, state = I.state, api = I.api, esc = I.esc, today = I.today, yen = I.yen, toast = I.toast;
 
-  // 施設名は options.施設 から（無ければ モア一津屋）。表示と確認のためだけで、送るデータには入れない（GAS の形を変えないため）。
+  // 施設名は options.施設 から（無ければ モア一津屋）。選んだ施設名を data.施設名 として送る（GAS側にも要る）。
   // 1つだけなら最初から選んでおく。2つ以上なら参考アプリと同じく空から選ぶ
   function facilities() { var f = state.options && state.options.施設; return f && f.length ? f : ['モア一津屋']; }
   // 'YYYY-MM-DD' → '2026年11月28日（土）'。確認カードで日付の読み間違いを防ぐ

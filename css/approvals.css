@@ -142,7 +142,6 @@
 .apv-dl dt.apv-wide { grid-column: 1 / -1; margin-top: 2px; }
 .apv-dl dd.apv-wide { grid-column: 1 / -1; text-align: left; background: #fff; border-radius: 6px; padding: 4px 8px; white-space: pre-wrap; }
 
-.apv-field { display: flex; flex-direction: column; gap: 6px; }
 .apv-label { display: flex; justify-content: space-between; font-size: 12px; font-weight: 700; color: #333; }
 .apv-opt { font-weight: 400; font-size: 11px; color: #C0283A; }
 .apv-cmt {
