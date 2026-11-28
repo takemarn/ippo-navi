@@ -186,3 +186,13 @@ button.cl-cc-link:active { background: #f6f8fd; border-color: #d9e0ee; }
   .tk-row { grid-template-columns: 1fr; gap: 4px; }
   .tk-row span { text-align: center; line-height: 1; }
 }
+/* 見直し2周目: 情報閲覧の中にも間をあける、日付は参考アプリと同じく縦に並べる、長い名前でも ID は1行目にそろえる */
+#cl-info { display: flex; flex-direction: column; gap: 12px; }
+.cl-dates { grid-template-columns: 1fr; }
+.cl-cc-name { align-items: flex-start; }
+.cl-cc-name b { line-height: 1.5; }
+.cl-tags { border-top: 1px solid #eef1f6; padding-top: 8px; }
+.cl-photo .fail { font-size: 9px; }
+/* 承認待ち一覧・自分の申請での利用者申請・タスクの中身（項目名が長いので値は左寄せで折り返す） */
+.apv-dl.cl-body { grid-template-columns: minmax(5em, 40%) 1fr; }
+.apv-dl.cl-body dd { text-align: left; overflow-wrap: anywhere; }

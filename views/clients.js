@@ -18,7 +18,8 @@
   function load() { try { return JSON.parse(sessionStorage.getItem('ippo.clients') || 'null'); } catch (_) { return null; } }
   var photoCache = {};
 
-  function facilities() { return (state.options && state.options.施設) || ['モア一津屋']; }
+  // 自分が見られる施設だけ（GAS の me が返す 見られる施設。無ければ選択肢の施設）
+  function facilities() { return (state.me && state.me.見られる施設) || (state.options && state.options.施設) || ['モア一津屋']; }
 
   // ---------- 共通の部品 ----------
   // ページの外枠: 見出し・説明・右上の「戻る」
@@ -27,8 +28,8 @@
       (back ? '<a class="cl-backpill" href="' + back + '">戻る</a>' : '') + '</div>' +
       (sub ? '<p class="cl-sub">' + esc(sub) + '</p>' : '') + inner + '</section>';
   }
-  function chips(name, list, selected, multi) {
-    return '<div class="cl-chips" role="group" data-chips="' + name + '"' + (multi ? ' data-multi="1"' : '') + '>' + list.map(function (v) {
+  function chips(name, list, selected, multi, label) {
+    return '<div class="cl-chips" role="group"' + (label ? ' aria-label="' + esc(label) + '"' : '') + ' data-chips="' + name + '"' + (multi ? ' data-multi="1"' : '') + '>' + list.map(function (v) {
       var on = selected.indexOf(v) >= 0;
       return '<button type="button" class="cl-chip' + (on ? ' on' : '') + '" aria-pressed="' + on + '" data-v="' + esc(v) + '">' + esc(v) + '</button>';
     }).join('') + '</div>';
@@ -50,11 +51,13 @@
   function photoBox(c) {
     if (!c.写真) return '<span class="cl-photo none">画像登録なし</span>';
     var src = photoCache[c.利用者ID];
-    return '<span class="cl-photo" data-photo="' + esc(c.利用者ID) + '">' + (src ? '<img alt="" src="' + esc(src) + '">' : '<i>読み込み中…</i>') + '</span>';
+    return '<span class="cl-photo" data-photo="' + esc(c.利用者ID) + '">' + (src ? '<img alt="" src="' + esc(src) + '">' : '<i>読み込み中・・・</i>') + '</span>';
   }
   // 写真は一覧を先に出してから、同時に3人までずつ読む（一度にたくさん頼むとサーバーが詰まるため）。読めなかったら「画像登録なし」
   var photoQueue = [], photoBusy = 0;
   function fillPhotos() {
+    // 前の画面の読み残しは捨てる（いまの画面の写真を先に読む）
+    photoQueue = photoQueue.filter(function (id) { return document.querySelector('[data-photo="' + id + '"]'); });
     document.querySelectorAll('[data-photo]').forEach(function (el) {
       var id = el.dataset.photo;
       if (!photoCache[id] && photoQueue.indexOf(id) < 0) photoQueue.push(id);
@@ -71,7 +74,7 @@
       if (!r.写真) return paint('画像登録なし');
       photoCache[id] = r.写真;
       paint('<img alt="" src="' + esc(r.写真) + '">');
-    }).catch(function () { paint('画像を読めませんでした'); })
+    }).catch(function () { paint('読込失敗'); })
       .then(function () { photoBusy--; pumpPhotos(); });
   }
   function clientCard(c, asLink) {
@@ -110,10 +113,14 @@
         ['訪問看護指示書変更', b.訪問看護指示書変更], ['期間', b.期間開始 ? b.期間開始 + '〜' + (b.期間終了 || '') : ''], ['状態', b.状態], ['備考', b.備考]];
     } else {
       rows = [['種類', { 新規: '新規登録', 置換: '置換（内容を直す）', 削除: '削除（登録なしにする）' }[b.種類] || b.種類], ['利用者', b.利用者氏名]];
-      Object.keys(b.項目 || {}).forEach(function (k) { rows.push([k.split('/').slice(1).join('/'), b.項目[k] || '（空にする）']); });
+      Object.keys(b.項目 || {}).forEach(function (k) {
+        var cat = k.split('/')[0], name = k.split('/').slice(1).join('/');
+        if (b.種類 === '新規' && k === '利用者データ/氏名') return; // 「利用者」の行と同じなので出さない
+        rows.push([cat === '利用者データ' || name.indexOf(cat) === 0 ? name : cat + ' / ' + name, b.項目[k] || '（空にする）']);
+      });
       if (b.理由) rows.push(['理由', b.理由]);
     }
-    return '<dl class="apv-dl">' + rows.filter(function (x) { return x[1]; }).map(function (x) {
+    return '<dl class="apv-dl cl-body">' + rows.filter(function (x) { return x[1]; }).map(function (x) {
       return '<dt>' + esc(x[0]) + '</dt><dd>' + esc(x[1]) + '</dd>';
     }).join('') + '</dl>';
   };
@@ -123,13 +130,13 @@
     app.innerHTML = shell('利用者管理', '条件を組み合わせて利用者を検索し、情報閲覧や記録入力へ進みます。', null,
       '<div class="cl-card"><p class="cl-label">新規登録</p><p class="cl-desc">利用者マスタの項目を新規登録申請します。</p>' +
         '<button type="button" class="cl-go" id="cl-new">新規登録</button></div>' +
-      sec('施設を選択', chips('fac', facilities(), cur.q.施設, true)) +
-      sec('氏名から検索', '<input id="cl-name" class="cl-input" placeholder="名前 / ふりがなで検索" value="' + esc(cur.q.氏名) + '" autocomplete="off">') +
-      sec('ステータスを選択', chips('st', STATUS, cur.q.ステータス, true)) +
+      sec('施設を選択', chips('fac', facilities(), cur.q.施設, true, '施設を選択')) +
+      sec('氏名から検索', '<input id="cl-name" class="cl-input" aria-label="氏名から検索" placeholder="名前 / ふりがなで検索" value="' + esc(cur.q.氏名) + '" autocomplete="off">') +
+      sec('ステータスを選択', chips('st', STATUS, cur.q.ステータス, true, 'ステータスを選択')) +
       '<button type="button" class="cl-go" id="cl-search">この条件で利用者を検索</button>' +
       '<p class="cl-label cl-out">記録検索</p><p class="cl-desc cl-out">条件を組み合わせて、利用者横断で記録を検索します。</p>' +
-      sec('施設を選択', chips('rfac', facilities(), cur.rq.施設, true)) +
-      sec('記録種別を選択', chips('rkind', RECORD_KINDS, cur.rq.種別, true)) +
+      sec('施設を選択', chips('rfac', facilities(), cur.rq.施設, true, '記録検索の施設を選択')) +
+      sec('記録種別を選択', chips('rkind', RECORD_KINDS, cur.rq.種別, true, '記録種別を選択')) +
       sec('期間・単日指定', dateRange(cur.rq)) +
       '<div id="cl-err"></div>' +
       '<button type="button" class="cl-go" id="cl-rsearch">この条件で記録を検索</button>') +
@@ -213,7 +220,6 @@
     trackClicks(function (e) {
       var k = e.target.closest('[data-kind]');
       if (k) { cur.kind = k.dataset.kind; save(); overlay('記録画面を準備中・・・'); }
-      if (e.target.closest('a[href="#user-records"]')) overlay('記録を読み込み中・・・');
       var s = e.target.closest('[data-sub]');
       if (!s) return;
       if (s.dataset.sub === 'edit') askEditKind();
@@ -232,8 +238,18 @@
       '<button type="button" class="sub" data-k="">キャンセル</button></div></div>';
     document.body.appendChild(wrap);
     wrap.querySelector('[data-k="置換"]').focus();
-    function close() { wrap.remove(); document.removeEventListener('keydown', esc_); }
-    function esc_(e) { if (e.key === 'Escape') close(); }
+    function close() {
+      wrap.remove(); document.removeEventListener('keydown', esc_);
+      var back = document.querySelector('[data-sub="edit"]'); if (back) back.focus();
+    }
+    // Esc で閉じる。Tab は小窓の3つのボタンの中だけを回る
+    function esc_(e) {
+      if (e.key === 'Escape') return close();
+      if (e.key !== 'Tab') return;
+      var bs = wrap.querySelectorAll('button'), first = bs[0], last = bs[bs.length - 1];
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    }
     document.addEventListener('keydown', esc_);
     I.cleanup.push(close);
     wrap.addEventListener('click', function (e) {
@@ -266,9 +282,9 @@
     var cats = cur.info || [], c = cats.filter(function (x) { return x.名前 === infoTab; })[0] || cats[0];
     if (!c) { el.innerHTML = ''; return; }
     infoTab = c.名前;
-    el.innerHTML = '<div class="cl-card"><p class="cl-label">表示カテゴリ</p><div class="cl-chips" role="tablist">' + cats.map(function (x) {
+    el.innerHTML = '<div class="cl-card"><p class="cl-label">表示カテゴリ</p><div class="cl-chips" role="group" aria-label="表示カテゴリ">' + cats.map(function (x) {
       var on = x.名前 === c.名前;
-      return '<button type="button" role="tab" class="cl-chip' + (on ? ' on' : '') + '" aria-selected="' + on + '" data-tab="' + esc(x.名前) + '">' + esc(x.名前) + '</button>';
+      return '<button type="button" class="cl-chip' + (on ? ' on' : '') + '" aria-pressed="' + on + '" data-tab="' + esc(x.名前) + '">' + esc(x.名前) + '</button>';
     }).join('') + '</div></div>' +
     '<p class="cl-label cl-out">' + esc(c.名前) + '</p>' +
     '<div class="cl-fields">' + c.項目.map(function (f) {
@@ -276,9 +292,12 @@
       if (!v) html = '—';
       else if (/電話番号|連絡先/.test(f.項目) && /^[0-9+\-() ]{6,}$/.test(v)) html = '<a href="tel:' + esc(v.replace(/[^0-9+]/g, '')) + '">' + esc(v) + '</a>';
       else html = esc(v);
-      return '<div class="cl-field"><small>' + esc(f.項目) + '</small><p>' + html + '</p></div>';
+      return '<div class="cl-field"><small>' + esc(showLabel(c.名前, f.項目)) + '</small><p>' + html + '</p></div>';
     }).join('') + '</div>';
   }
+
+  // 画面に出す項目名（参考アプリの表示に合わせる。シートの列名・送る名前は 氏名・ふりがな のまま）
+  function showLabel(cat, k) { return cat === '利用者データ' ? ({ 氏名: '名前', ふりがな: 'フリガナ' }[k] || k) : k; }
 
   // ---------- 記録入力（看護記録・介護記録・施設記録・往診。4つとも同じ形） ----------
   function viewWrite() {
@@ -286,12 +305,12 @@
     var kind = WRITE_KINDS.indexOf(cur.kind) >= 0 ? cur.kind : '看護記録';
     app.innerHTML = shell(kind, '必要事項を入力して登録します。担当者名は必要に応じて修正できます。', '#user',
       clientCard(cur.card) +
-      '<form id="f" class="cl-card cl-form" novalidate><p class="cl-label">入力内容</p>' +
+      '<form id="f" class="cl-form" novalidate><div class="cl-card"><p class="cl-label">入力内容</p>' +
         '<label>記録日<input type="date" id="w-day" class="cl-input" value="' + I.today() + '" required></label>' +
         '<label>記録担当者<input id="w-who" class="cl-input" value="' + esc(state.me && state.me.氏名) + '" required></label>' +
         '<label>メモ<textarea id="w-memo" class="cl-input" rows="7" placeholder="自由に入力してください" required></textarea></label>' +
-        '<div id="err"></div>' +
-        '<button type="submit" class="cl-go">登録する</button>' +
+      '</div><div id="err"></div>' +
+      '<button type="submit" class="cl-go">登録する</button>' +
       '</form>');
     fillPhotos();
     document.getElementById('f').addEventListener('submit', function (e) {
@@ -347,10 +366,14 @@
   function loadRecs() {
     var el = document.getElementById('cl-recs');
     el.innerHTML = loading('記録を読み込み中...');
+    overlay('記録を読み込み中・・・'); // 参考アプリと同じく、読み込むあいだは画面全体をぼかす
     api('clientRecords', Object.assign({ 利用者ID: cur.id }, recQ)).then(function (r) {
+      I.busy(false);
       if (!document.getElementById('cl-recs')) return;
-      el.innerHTML = r.一覧.length ? '<p class="cl-count">' + r.一覧.length + '件（削除できるのは自分が書いた記録だけ）</p>' + r.一覧.map(function (x) { return recCard(x, false); }).join('') : '<div class="cl-empty">記録はありません。</div>';
-    }).catch(function (e) { el.innerHTML = failHtml(e); });
+      var filtered = recQ.開始日 || recQ.終了日 || recQ.単日 || recQ.文字;
+      el.innerHTML = r.一覧.length ? '<p class="cl-count">' + r.一覧.length + '件（削除できるのは自分が書いた記録だけ）</p>' + r.一覧.map(function (x) { return recCard(x, false); }).join('')
+        : '<div class="cl-empty">' + (filtered ? '条件に合う記録はありません。条件を変えてもう一度検索してください。' : '記録はありません。') + '</div>';
+    }).catch(function (e) { I.busy(false); el.innerHTML = failHtml(e); });
   }
   function recCard(r, withName) {
     var mine = state.me && (r.記録者職員ID === state.me.職員ID || state.me.役割 === '管理者');
@@ -423,7 +446,7 @@
     else if (f.項目 === '既往歴') inner = '<textarea id="' + id + '" rows="2">' + esc(v) + '</textarea>';
     else inner = '<input id="' + id + '" value="' + esc(v) + '"' + (/電話番号|連絡先|郵便番号/.test(f.項目) ? ' inputmode="tel"' : '') + '>';
     var need = cat === '利用者データ' && /^(氏名|ふりがな|施設名)$/.test(f.項目);
-    return '<label class="cl-lab" data-key="' + esc(key) + '" data-orig="' + esc(v) + '" data-id="' + id + '"><span>' + esc(f.項目) +
+    return '<label class="cl-lab" data-key="' + esc(key) + '" data-orig="' + esc(v) + '" data-id="' + id + '"><span>' + esc(showLabel(cat, f.項目)) +
       (need ? '<span class="req">(必須)</span>' : '') + '</span>' + inner + '</label>';
   }
   function drawEdit(ed, cats) {
@@ -457,7 +480,7 @@
       api('requestClientChange', { 種類: ed.種類, 利用者ID: ed.種類 === '新規' ? '' : cur.id, 項目: fields, 理由: why }).then(function () {
         I.busy(false); toast('申請しました。承認されると反映されます'); location.hash = '#requests';
       }).catch(function (x) {
-        I.busy(false); btn.disabled = false; btn.textContent = '申請する';
+        I.busy(false); btn.disabled = false; btn.textContent = ed.種類 === '新規' ? '新規登録を申請する' : '申請する';
         err.innerHTML = x.details && x.details.length ? I.errorsBox(x.details) : failHtml(x);
       });
     });

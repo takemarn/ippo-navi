@@ -30,7 +30,7 @@
       list.map(function (v) { return '<option>' + esc(v) + '</option>'; }).join('') + '</select>';
   }
   function toggles(id, list) {
-    return '<div class="tk-tog" id="tk-' + id + '" role="group">' + list.map(function (v) {
+    return '<div class="tk-tog" id="tk-' + id + '" role="group" aria-labelledby="tk-' + id + '-lab">' + list.map(function (v) {
       return '<button type="button" aria-pressed="false" data-v="' + esc(v) + '">' + esc(v) + '</button>';
     }).join('') + '</div>';
   }
@@ -44,7 +44,7 @@
   }
 
   function viewOffice() {
-    var o = state.options || {}, facs = o.施設 || ['モア一津屋'];
+    var o = state.options || {}, facs = (state.me && state.me.見られる施設) || o.施設 || ['モア一津屋'];
     var clients = [];
     app.innerHTML =
       '<h1 class="exp-title">施設→本部事務</h1>' +
@@ -54,8 +54,8 @@
         field('利用者名', head('client', '利用者名', true) +
           '<div class="tk-name"><input id="tk-kana" placeholder="かな" aria-label="利用者名を かな で絞り込む" autocomplete="off">' +
           '<select id="tk-client" disabled><option value="">施設名を先に選んでください</option></select></div>') +
-        field('保険種類', '<div class="exp-lab"><span class="exp-lab-name">保険種類</span><span class="exp-req">(必須)</span></div>' + toggles('ins', ['介護保険', '医療保険'])) +
-        field('生活保護', '<div class="exp-lab"><span class="exp-lab-name">生活保護</span><span class="exp-req">(必須)</span></div>' + toggles('wel', ['有', '無', '確認中'])) +
+        field('保険種類', '<div class="exp-lab"><span class="exp-lab-name" id="tk-ins-lab">保険種類</span><span class="exp-req">(必須)</span></div>' + toggles('ins', ['介護保険', '医療保険'])) +
+        field('生活保護', '<div class="exp-lab"><span class="exp-lab-name" id="tk-wel-lab">生活保護</span><span class="exp-req">(必須)</span></div>' + toggles('wel', ['有', '無', '確認中'])) +
         field('タスク', head('kind', 'タスク', true) + sel('kind', o.タスク種類 || [])) +
         '<div class="exp-field exp-off" data-f="日程期間" data-need="span"><div class="exp-lab"><label for="tk-span-from">日程（期間）</label><span class="exp-req">(必須)</span></div>' + range('span') + '</div>' +
         '<div class="exp-field exp-off" data-f="日程" data-need="day">' + head('day', '日程', true) + '<input type="date" id="tk-day"></div>' +
@@ -88,7 +88,8 @@
     function fillClients() {
       var s = $('client'), kana = norm($('kana').value);
       var list = clients.filter(function (c) { return !kana || norm(c.ふりがな).indexOf(kana) >= 0 || norm(c.氏名).indexOf(kana) >= 0; });
-      s.innerHTML = '<option value="">' + (clients.length ? (list.length ? '選んでください' : '見つかりません') : '施設名を先に選んでください') + '</option>' +
+      var msg = !$('fac').value ? '施設名を先に選んでください' : !clients.length ? 'この施設の利用者はいません' : list.length ? '選んでください' : '見つかりません';
+      s.innerHTML = '<option value="">' + msg + '</option>' +
         list.map(function (c) { return '<option value="' + esc(c.利用者ID) + '">' + esc(c.利用者ID + ' ' + c.氏名) + '</option>'; }).join('');
       s.disabled = !list.length;
     }

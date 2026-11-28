@@ -245,6 +245,7 @@
     esc: esc, today: today, yen: yen, toast: toast, errorsBox: errorsBox, pill: pill, backLink: backLink,
     busy: busy, bootLoading: bootLoading, menuLoading: menuLoading, subMenu: subMenu, canApprove: canApprove,
     MENUS: MENUS, lastMenu: lastMenu, backHtml: backHtml, views: {}, cleanup: [], demo: {},
+    demoCore: DEMO ? Demo : null, // 見本の申請・承認待ちの入れ物（views/clients-demo.js が利用者申請・タスクの見本を足す）
     demoRequests: DEMO ? Demo.requests : null // 見本の「自分の申請」。第3段階の申請（利用者登録・タスクなど）もここに足す
   };
 
