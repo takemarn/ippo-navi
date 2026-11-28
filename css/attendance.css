@@ -109,6 +109,9 @@
   position: absolute; right: 6px; top: 50%; transform: translateY(-50%); width: 28px; height: 28px; padding: 0; border-radius: 50%;
   border: 0; background: #EEF2F8; color: #5B6572; font-size: 14px; line-height: 28px; cursor: pointer; box-shadow: none;
 }
+/* 遅延証明書の案内: 読めなかった・大きすぎたときは赤字 */
+.att-hint.att-hint-bad { color: #C0283A; }
+.att-note.att-note-ok { color: #2F7A45; }
 .att-note { display: block; font-size: 11px; color: #8A6A1E; margin-top: 2px; white-space: normal; }
 
 

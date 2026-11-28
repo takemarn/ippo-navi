@@ -90,6 +90,29 @@
 
     var form = $('form'), after = $('after');
 
+    // ---------- ブラウザ（スマホ）の「戻る」 ----------
+    // 確認カードを出すときに履歴を1つ積んである。戻るを押すと、書いた内容のまま入力に戻る（「戻って直す」も同じ動き）。
+    // 完了カードで戻ると #task へ（同じ申請をうっかり出し直さないように）。送信中の戻るは何もしない
+    var leaving = false;
+    function backToForm() { after.innerHTML = ''; form.hidden = false; window.scrollTo(0, 0); }
+    function fixTap() {
+      if (history.state && history.state.ippoStep === 'confirm') history.back(); // popstate → onPop → backToForm
+      else backToForm();
+    }
+    function onPop() {
+      if (leaving || !document.getElementById('tk-form')) return;
+      if ($('done-h')) { leaving = true; location.replace('#task'); return; }
+      if (form.hidden && $('go') && !$('go').disabled) backToForm();
+    }
+    window.addEventListener('popstate', onPop);
+    I.cleanup.push(function () { window.removeEventListener('popstate', onPop); });
+    // 「続けて…する」: 画面の切り替え（core の route）と同じく、後片付けをして番号を進めてから描き直す
+    function restart() {
+      I.cleanup.splice(0).forEach(function (f) { try { f(); } catch (_) {} });
+      I.gen = (I.gen || 0) + 1;
+      viewOffice();
+    }
+
     // ---------- タスクに応じた切り替え（選ぶまで日程から下は使えない） ----------
     function syncKind() {
       var k = $('kind').value, mode = dateMode(k), special = isSpecial(k);
@@ -257,6 +280,7 @@
 
     function showConfirm(d) {
       form.hidden = true;
+      try { history.pushState({ ippoStep: 'confirm' }, ''); } catch (_) {} // ブラウザの「戻る」で入力に戻れるように
       after.innerHTML =
         '<section class="card exp-card exp-confirm" aria-labelledby="tk-cf-h">' +
           '<h2 id="tk-cf-h" class="exp-cf-h">この内容で本部事務に依頼しますか？</h2>' +
@@ -268,7 +292,7 @@
           '<button type="button" class="exp-back" id="tk-fix">戻って直す</button>' +
         '</div>';
       window.scrollTo(0, 0);
-      $('fix').addEventListener('click', function () { after.innerHTML = ''; form.hidden = false; window.scrollTo(0, 0); });
+      $('fix').addEventListener('click', fixTap);
       $('go').addEventListener('click', function () { send(d); });
       $('go').focus({ preventScroll: true });
     }
@@ -296,6 +320,7 @@
     }
 
     function showDone(res, d) {
+      try { if (history.state && history.state.ippoStep === 'confirm') history.replaceState({ ippoStep: 'done' }, ''); } catch (_) {}
       after.innerHTML =
         '<section class="card exp-card exp-done" aria-labelledby="tk-done-h">' +
           '<svg class="exp-done-ic" viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="21"/><path d="M14 24.5l7 7 13-14"/></svg>' +
@@ -312,7 +337,7 @@
         '</div>';
       window.scrollTo(0, 0);
       $('done-h').setAttribute('tabindex', '-1'); $('done-h').focus();
-      $('again').addEventListener('click', viewOffice);
+      $('again').addEventListener('click', restart);
     }
   }
 

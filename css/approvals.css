@@ -129,14 +129,14 @@
 .apv-flag-due.is-soon { color: #fff; background: #D9771A; }
 
 .apv-dl {
-  margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 3px 0; font-size: 13px;
+  margin: 0; display: grid; grid-template-columns: fit-content(50%) minmax(0, 1fr); gap: 3px 0; font-size: 13px; /* 見出し側は半分まで（長い品名は折り返し、金額・日付の側を残す） */
   background: #F3F7FD; border-radius: 10px; padding: 8px 10px;
 }
-.apv-dl dt { color: #6B7480; padding-right: 12px; }
+.apv-dl dt { color: #6B7480; padding-right: 12px; overflow-wrap: anywhere; min-width: 0; }
 .apv-dl dd { margin: 0; text-align: right; overflow-wrap: anywhere; min-width: 0; }
 .apv-dl .apv-line { color: #333; }
 .apv-qty { color: #6B7480; font-variant-numeric: tabular-nums; }
-.apv-num { font-variant-numeric: tabular-nums; }
+.apv-num { font-variant-numeric: tabular-nums; white-space: nowrap; } /* 日付・金額を途中で折り返さない（2026-11-\n20 にならないように） */
 .apv-dl .apv-total { font-weight: 700; color: #111; border-top: 1px solid #DCE5F2; padding-top: 3px; margin-top: 2px; }
 /* 長くなりがちな備考は1行まるごと使い、左寄せで読みやすく */
 .apv-dl dt.apv-wide { grid-column: 1 / -1; margin-top: 2px; }
@@ -267,6 +267,7 @@
 .req-redo {
   display: flex; align-items: center; justify-content: center; gap: 6px; min-height: 44px; border-radius: 10px;
   background: #12317D; color: #fff; font-size: 14px; font-weight: 700; text-decoration: none;
+  width: 100%; border: 0; font-family: inherit; cursor: pointer; /* button でも a でも同じ見た目に */
 }
 .req-redo:active { background: #0D2560; }
 .req-msg { margin: 0; font-size: 12px; color: #6B7480; }
@@ -281,3 +282,14 @@
   border-radius: 10px; font-size: 14px; text-decoration: none; box-shadow: 0 1px 4px rgba(80, 110, 170, .18);
 }
 .req-new:active { background: #E4E8EE; }
+
+/* 管理者だけの「削除」: カードの下に控えめな赤い文字ボタン（押せる高さは 40px） */
+.apv-admin { display: flex; justify-content: flex-end; margin-top: 2px; }
+.apv-del {
+  display: inline-flex; align-items: center; gap: 4px; min-height: 40px; padding: 0 6px; width: auto; border: 0; background: none; box-shadow: none;
+  color: #B0202F; font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; border-radius: 8px;
+}
+.apv-del small { font-weight: 400; color: #8A5560; }
+.apv-del svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.apv-del:active { background: #FCE1E4; }
+.apv-del:focus-visible { outline: 2px solid #E0707E; outline-offset: 1px; }
