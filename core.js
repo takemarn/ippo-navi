@@ -51,7 +51,7 @@
   // ---------- 見本モード（架空のデータ） ----------
   var Demo = {
     seq: 3,
-    me: { 職員ID: 'STF-0001', 氏名: '見本 太郎', 職種: '看護師', 役割: '承認者', 当月残業合計: '3:30' },
+    me: { 職員ID: 'STF-0001', 氏名: '見本 太郎', 職種: '看護師', 役割: '承認者', 当月残業合計: '3:30', 雇用形態: '常勤', 可能勤務: '日勤、早出、遅出、夜勤', 資格: '正看護師' },
     options: {
       経費区分: ['看護', '介護', '施設', '利用者立替', 'その他', '救急搬送', '本部', '交通'],
       小口先出: ['小口', '先出'],
@@ -106,6 +106,8 @@
         }
         self.requests.unshift(r); return { 申請ID: r.申請ID, 状態: r.状態 };
       }
+      // 第2段階以降の見本データは各画面のファイル（例 views/shift-demo.js）が IPPO.demo に登録する
+      if (window.IPPO.demo[action]) return window.IPPO.demo[action](data || {}, self.me);
       switch (action) {
         case 'me': return this.me;
         case 'options': return this.options;
@@ -240,7 +242,7 @@
     app: app, state: state, DEMO: DEMO, api: api, route: route, showError: showError, submit: submit, selectHtml: selectHtml,
     esc: esc, today: today, yen: yen, toast: toast, errorsBox: errorsBox, pill: pill, backLink: backLink,
     busy: busy, bootLoading: bootLoading, menuLoading: menuLoading, subMenu: subMenu, canApprove: canApprove,
-    MENUS: MENUS, lastMenu: lastMenu, backHtml: backHtml, views: {}, cleanup: []
+    MENUS: MENUS, lastMenu: lastMenu, backHtml: backHtml, views: {}, cleanup: [], demo: {}
   };
 
   // ---------- 起動 ----------

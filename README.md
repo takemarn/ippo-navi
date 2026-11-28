@@ -22,7 +22,8 @@
 
 - `index.html` … 画面の入口
 - `core.js` … 共通の部品（GAS とのやりとり、見本データ、画面の切り替え）
-- `views/*.js` … 画面ごとの動き（menu, apply, expense, attendance, requests, approvals）
+- `views/*.js` … 画面ごとの動き（menu, apply, expense, attendance, requests, approvals, shift）
+- `views/shift-demo.js` … シフトの見本データ（見本モードのときだけ使う。第2段階からは見本データを画面ごとのファイルに分けて `IPPO.demo` に登録する）
 - `style.css` … 共通の見た目
 - `css/*.css` … 画面ごとの見た目
 - `richmenu/` … LINE のリッチメニュー画像（2500×1686）・定義・登録手順
