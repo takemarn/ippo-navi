@@ -110,8 +110,8 @@
 .mbtn {
   position: relative; display: flex; align-items: center; justify-content: center; gap: 6px; width: 100%;
   min-height: 40px; padding: 6px 12px; border: 0; border-radius: 10px; background: #fff; color: #3583da;
-  font: inherit; font-size: 13px; font-weight: 500; text-decoration: none; cursor: pointer;
-  box-shadow: 0 1px 3px rgba(60, 90, 140, .12);
+  font: inherit; font-size: 13px; font-weight: 600; text-decoration: none; cursor: pointer;
+  box-shadow: 0 1px 2px rgba(60, 90, 140, .10), 0 3px 8px rgba(60, 90, 140, .10);
 }
 .mbtn:active { background: #e6e9ee; }
 .mbtn:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
