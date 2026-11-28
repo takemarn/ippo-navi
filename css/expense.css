@@ -52,7 +52,9 @@
 .exp-item-row { display: grid; grid-template-columns: minmax(0, 15fr) minmax(0, 5fr) minmax(0, 10fr); gap: 8px; }
 .exp-item-row input { padding: 0 8px; text-align: left; -moz-appearance: textfield; }
 .exp-item-row input::-webkit-outer-spin-button, .exp-item-row input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
-.exp-total { margin: 0; text-align: right; font-size: 11px; color: #5B6572; font-variant-numeric: tabular-nums; }
+/* 物品の合計（金額を1つでも入れると出る） */
+.exp-total { margin: 0; align-self: flex-end; font-size: 12px; color: #12317D; font-weight: 700; background: rgba(255, 255, 255, .7); border-radius: 999px; padding: 3px 10px; font-variant-numeric: tabular-nums; }
+.exp-total[hidden] { display: none; }
 
 /* エラー: 項目の下に赤字、欄は赤枠 */
 .exp-err { margin: 0; font-size: 11px; color: #C0283A; line-height: 1.4; }
@@ -85,7 +87,11 @@
 .exp-dl dd { overflow-wrap: anywhere; white-space: pre-wrap; }
 .exp-none { color: #9AA5B1; }
 .exp-lines { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; white-space: normal; }
-.exp-lines li { display: flex; justify-content: space-between; gap: 8px; font-variant-numeric: tabular-nums; }
+.exp-lines li { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; font-variant-numeric: tabular-nums; }
+/* 長い物品名は左で折り返し、金額は右で1行のまま */
+.exp-lines li > span:first-child { min-width: 0; overflow-wrap: anywhere; }
+.exp-lines li > span:last-child { flex: none; white-space: nowrap; }
+.exp-lines .exp-qty { color: #5B6572; white-space: nowrap; }
 .exp-lines .exp-sum { border-top: 1px dashed #C9DBF5; padding-top: 4px; font-weight: 700; }
 .exp-senderr { background: #FCE1E4; color: #C0283A; border-radius: 10px; padding: 10px 12px; font-size: 13px; }
 .exp-senderr p, .exp-senderr ul { margin: 4px 0 0; }
@@ -103,3 +109,57 @@
 
 /* 共通の戻るリンク（core.js の backHtml）をフォームの下で詰めて置く */
 .exp-form > .ipp-back, .exp-actions > .ipp-back { align-self: center; min-height: 36px; margin-top: -8px; }
+
+/* ============================================================
+   タスク管理（views/task.js の 施設→本部事務 #task-office）
+   部品は上の exp-* を使い、ここではタスク専用のものだけを書く。
+   css/clients.css にも古い .tk-* があるため、.tk-form を頭に付けてこちらを優先させる
+   ============================================================ */
+/* 2つ並び（～ でつなぐ）。日付は半分ずつ、時刻は参考アプリと同じく短め（勤怠申請の時間と同じ幅） */
+.tk-form .tk-row { display: flex; align-items: center; gap: 8px; }
+.tk-form .tk-dates input { flex: 1 1 0; width: auto; min-width: 0; padding: 0 8px; }
+.tk-form .tk-times input { flex: 0 0 34%; width: 34%; min-width: 104px; padding: 0 8px; }
+.tk-form .tk-tilde { flex: none; font-size: 18px; line-height: 1; color: #333; }
+.tk-form .exp-off .tk-tilde { color: #9AA5B1; }
+.tk-form .exp-off .exp-lab .exp-lab-name { color: #9AA5B1; font-weight: 400; }
+.tk-form input[type=time]::-webkit-calendar-picker-indicator { opacity: .45; }
+.tk-form input[type=date]:disabled::-webkit-calendar-picker-indicator,
+.tk-form input[type=time]:disabled::-webkit-calendar-picker-indicator { display: none; }
+
+/* 利用者名: 左に かな（絞り込み）、右に選ぶ欄 */
+.tk-form .tk-name { display: grid; grid-template-columns: 76px minmax(0, 1fr); gap: 8px; }
+.tk-form .tk-name input { padding: 0 10px; }
+.tk-form .tk-name input::-webkit-search-cancel-button { -webkit-appearance: none; }
+.tk-form .tk-name select:disabled { -webkit-text-fill-color: #8A93A0; color: #8A93A0; }
+.tk-hint { margin: -2px 0 0; min-height: 0; font-size: 11px; color: #6E7782; line-height: 1.5; display: flex; align-items: center; flex-wrap: wrap; gap: 4px 6px; }
+.tk-hint:empty { display: none; }
+.tk-hint-bad { color: #C0283A; }
+.tk-retry {
+  font: inherit; font-size: 12px; font-weight: 700; color: #12317D; background: #fff; border: 1px solid #C9DBF5; border-radius: 9px;
+  min-height: 32px; padding: 0 10px; cursor: pointer; box-shadow: none; width: auto;
+}
+.tk-dots { width: 12px; height: 12px; border: 2px solid #C9DBF5; border-top-color: #12317D; border-radius: 50%; }
+@media (prefers-reduced-motion: no-preference) { .tk-dots { animation: exp-spin .8s linear infinite; } }
+
+/* 保険種類・生活保護: 白いボタンを並べ、選んだものが緑（参考アプリと同じ）。2つのときは3つのときと同じ幅で左寄せ */
+.tk-form .tk-tog { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.tk-form .tk-tog button {
+  font: inherit; min-height: 42px; padding: 4px 6px; border-radius: 12px; border: 1px solid #fff; background: #fff; color: #333;
+  font-size: 13px; font-weight: 700; cursor: pointer; box-shadow: 0 1px 3px rgba(60, 90, 140, .12); width: 100%;
+  transition: background-color .15s, color .15s, box-shadow .15s, transform .08s;
+}
+.tk-form .tk-tog button:active { transform: scale(.97); }
+.tk-form .tk-tog button.on { background: #22A846; border-color: #22A846; color: #fff; box-shadow: 0 3px 10px rgba(34, 168, 70, .28); }
+.tk-form .tk-tog button:focus-visible { outline: 2px solid #9DB6E8; outline-offset: 1px; }
+.tk-form .exp-bad .tk-tog button:not(.on) { border-color: #E0707E; }
+
+/* エラーの赤枠（2つ並び・利用者名の中の欄にも付ける） */
+.tk-form .exp-bad .tk-row input, .tk-form .exp-bad .tk-name select { border-color: #E0707E; }
+
+/* 確認カード: 「日程（期間）」「指示書変更」が1行に収まるよう見出しの幅を少し広く */
+.tk-dl { grid-template-columns: 6.5em minmax(0, 1fr); }
+.exp-done-sum { font-size: 13px; color: #1b1f24; overflow-wrap: anywhere; }
+
+@media (max-width: 340px) {
+  .tk-form .tk-times input { flex: 1 1 0; width: auto; min-width: 0; }
+}

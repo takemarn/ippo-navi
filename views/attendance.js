@@ -8,7 +8,16 @@
   'use strict';
   var I = window.IPPO, app = I.app, state = I.state, api = I.api, esc = I.esc, today = I.today, toast = I.toast;
 
-  var FACILITIES = ['モア一津屋']; // 施設は1つだけ。表示のみで、送るデータには入れない
+  // 施設名は options.施設 から（無ければ モア一津屋）。表示と確認のためだけで、送るデータには入れない（GAS の形を変えないため）。
+  // 1つだけなら最初から選んでおく。2つ以上なら参考アプリと同じく空から選ぶ
+  function facilities() { var f = state.options && state.options.施設; return f && f.length ? f : ['モア一津屋']; }
+  // 'YYYY-MM-DD' → '2026年11月28日（土）'。確認カードで日付の読み間違いを防ぐ
+  function fmtDate(v) {
+    var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(v || '');
+    if (!m) return v || '';
+    var d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+    return m[1] + '年' + Number(m[2]) + '月' + Number(m[3]) + '日（' + '日月火水木金土'.charAt(d.getDay()) + '）';
+  }
   var isStamp = function (k) { return /^打刻修正/.test(k || ''); };
 
   function sel(id, list, value, blank) {
@@ -39,6 +48,7 @@
 
   function viewAttendance() {
     var kinds = (state.options && state.options.勤怠項目) || [];
+    var FACILITIES = facilities(), oneFac = FACILITIES.length === 1;
 
     app.innerHTML =
       '<h1 class="att-title">勤怠申請</h1>' +
@@ -47,7 +57,7 @@
         '<div class="card att-card">' +
           field('申請者', head('att-申請者', '申請者' + overtimeLabel(), true) +
             '<input id="att-申請者" value="' + esc(state.me && state.me.氏名) + '" readonly aria-readonly="true">') +
-          field('施設名', head('att-施設名', '施設名', true) + sel('att-施設名', FACILITIES, FACILITIES[0], false)) +
+          field('施設名', head('att-施設名', '施設名', true) + (oneFac ? sel('att-施設名', FACILITIES, FACILITIES[0], false) : sel('att-施設名', FACILITIES, '', true).replace('<select', '<select class="att-empty"'))) +
           field('項目', head('att-項目', '項目', true) + sel('att-項目', kinds, '', true).replace('<select', '<select class="att-empty"')) +
           field('対象日', head('att-対象日', '対象日', true) + '<input type="date" id="att-対象日" value="' + today() + '">') +
           '<div class="att-field att-off" data-f="時間" role="group" aria-labelledby="att-時間-lab">' +
@@ -127,7 +137,10 @@
       p.textContent = msg; p.hidden = false; p.parentNode.classList.add('att-bad');
     }
     form.addEventListener('input', function (e) { clearErr(e.target); });
-    form.addEventListener('change', function (e) { clearErr(e.target); });
+    form.addEventListener('change', function (e) {
+      if (e.target.tagName === 'SELECT') e.target.classList.toggle('att-empty', !e.target.value);
+      clearErr(e.target);
+    });
 
     function readData() {
       var k = $('項目').value;
@@ -140,6 +153,7 @@
     }
     function validate(d) {
       var n = 0;
+      if (!$('施設名').value) { showErr('施設名', '施設名を選んでください'); n++; }
       if (!d.項目) { showErr('項目', '項目を選んでください'); n++; }
       if (!d.対象日) { showErr('対象日', '対象日を入れてください'); n++; }
       if (d.項目 && isStamp(d.項目)) {
@@ -184,7 +198,7 @@
             '<dt>申請者</dt><dd>' + esc(state.me && state.me.氏名) + '</dd>' +
             '<dt>施設名</dt><dd>' + esc($('施設名').value) + '</dd>' +
             '<dt>項目</dt><dd>' + esc(d.項目) + '</dd>' +
-            '<dt>対象日</dt><dd>' + esc(d.対象日) + '</dd>' +
+            '<dt>対象日</dt><dd>' + esc(fmtDate(d.対象日)) + '</dd>' +
             time +
             '<dt>備考</dt><dd>' + (d.備考 ? esc(d.備考) : '<span class="att-none">なし</span>') + '</dd>' +
             (f ? '<dt>遅延証明書</dt><dd>' + esc(f.name) + '<span class="att-note">添付ファイルの送信は準備中のため、今回は送られません。</span></dd>' : '') +
@@ -207,12 +221,15 @@
       go.innerHTML = '<span class="att-spin" aria-hidden="true"></span>送信中…';
       go.setAttribute('aria-busy', 'true');
       if (I.busy) I.busy(true); // 送信中は画面全体をぼかして「読み込み中・・・」（core.js）
+      var g = I.gen; // 送信中に別の画面へ移ったら、結果は画面に書かない
       api('submitAttendance', d).then(function (res) {
         if (I.busy) I.busy(false); // 完了カードを同じ画面に出すので自分で消す
-        showDone(res || {});
+        if (g !== I.gen) { toast('勤怠申請を送信しました'); return; }
+        showDone(res || {}, d);
         toast('送信しました');
       }).catch(function (e) {
         if (I.busy) I.busy(false);
+        if (g !== I.gen) { toast((e && e.message) || '送信できませんでした'); return; }
         go.disabled = false; fix.disabled = false; go.textContent = 'もう一度送信する'; go.removeAttribute('aria-busy');
         var list = e && e.details && e.details.length ? e.details : [];
         box.innerHTML = '<strong>' + esc((e && e.message) || '送信できませんでした') + '</strong>' +
@@ -221,11 +238,13 @@
       });
     }
 
-    function showDone(res) {
+    function showDone(res, d) {
+      var when = d.打刻時刻 ? '打刻 ' + d.打刻時刻 : d.開始 ? d.開始 + '～' + d.終了 : '';
       after.innerHTML =
         '<section class="card att-card att-done" aria-labelledby="att-done-h">' +
           '<svg class="att-done-ic" viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="21"/><path d="M14 24.5l7 7 13-14"/></svg>' +
           '<h2 id="att-done-h">勤怠申請を送信しました</h2>' +
+          '<p class="att-done-sum">' + esc(d.項目) + '　' + esc(fmtDate(d.対象日)) + (when ? '　' + esc(when) : '') + '</p>' +
           '<p class="att-done-id">申請番号 ' + esc(res.申請ID || '—') + '</p>' +
           (res.状態 ? '<p>' + I.pill(res.状態) + '</p>' : '') +
           '<p class="att-done-note">承認されると「自分の申請」の状態が変わります。</p>' +

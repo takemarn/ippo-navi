@@ -6,7 +6,16 @@
   'use strict';
   var I = window.IPPO, app = I.app, state = I.state, api = I.api, esc = I.esc, today = I.today, yen = I.yen, toast = I.toast;
 
-  var FACILITIES = ['モア一津屋']; // 施設は1つだけ。表示のみで、送るデータには入れない
+  // 施設名は options.施設 から（無ければ モア一津屋）。表示と確認のためだけで、送るデータには入れない（GAS の形を変えないため）。
+  // 1つだけなら最初から選んでおく。2つ以上なら参考アプリと同じく空から選ぶ
+  function facilities() { var f = state.options && state.options.施設; return f && f.length ? f : ['モア一津屋']; }
+  // 'YYYY-MM-DD' → '2026年11月28日（土）'。確認カードで日付の読み間違いを防ぐ
+  function fmtDate(v) {
+    var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(v || '');
+    if (!m) return v || '';
+    var d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+    return m[1] + '年' + Number(m[2]) + '月' + Number(m[3]) + '日（' + '日月火水木金土'.charAt(d.getDay()) + '）';
+  }
 
   // 空行を先頭に置くセレクト（参考アプリと同じく、未選択は空）
   function sel(id, list, value, first, disabled) {
@@ -28,6 +37,7 @@
     var goods = (o.物品 || []).slice();
     if (goods.indexOf('フリー入力') < 0) goods.unshift('フリー入力');
     var rows = [{}];
+    var FACILITIES = facilities(), oneFac = FACILITIES.length === 1;
 
     app.innerHTML =
       '<h1 class="exp-title">経費申請</h1>' +
@@ -39,7 +49,7 @@
           field('小口先出', head('exp-小口先出', '小口先出', true) + sel('exp-小口先出', o.小口先出 || [])) +
           // 参考アプリと同じく、小口先出を選ぶまで対象日は使えない
           field('対象日', head('exp-対象日', '対象日', true) + '<input type="date" id="exp-対象日" value="' + today() + '" disabled>') +
-          field('施設名', head('exp-施設名', '施設名', true) + sel('exp-施設名', FACILITIES, FACILITIES[0], null)) +
+          field('施設名', head('exp-施設名', '施設名', true) + (oneFac ? sel('exp-施設名', FACILITIES, FACILITIES[0], null) : sel('exp-施設名', FACILITIES, '').replace('<select', '<select class="exp-empty"'))) +
           field('経費区分', head('exp-経費区分', '経費区分', true) + sel('exp-経費区分', o.経費区分 || [])) +
           '<div class="exp-field" data-f="物品">' +
             '<div class="exp-lab"><span class="exp-lab-name" id="exp-物品-lab">物品</span>' +
@@ -90,7 +100,7 @@
       var sum = 0, any = false;
       rows.forEach(function (_, i) { var el = $('金額_' + i); if (el && el.value !== '') { any = true; sum += Number(el.value || 0); } });
       $('total').hidden = !any;
-      $('total').textContent = '合計 ' + yen(sum);
+      $('total').textContent = rows.length + '件　合計 ' + yen(sum);
     }
     drawItems();
 
@@ -198,6 +208,7 @@
       var n = 0;
       if (!d.小口先出) { showErr('小口先出', '小口先出を選んでください'); n++; }
       if (d.小口先出 && !d.対象日) { showErr('対象日', '対象日を入れてください'); n++; }
+      if (!$('施設名').value) { showErr('施設名', '施設名を選んでください'); n++; }
       if (!d.経費区分) { showErr('経費区分', '経費区分を選んでください'); n++; }
       d.物品.forEach(function (it, i) {
         var bad = function (k, kind) { var el = $(k + '_' + i); if (el) { el.classList.add('exp-bad-in'); el.dataset.err = kind || 'need'; } };
@@ -231,7 +242,7 @@
     function showConfirm(d) {
       var sum = d.物品.reduce(function (a, it) { return a + Number(it.金額 || 0); }, 0);
       var lines = d.物品.map(function (it) {
-        return '<li><span>' + esc(it.物品 === 'フリー入力' ? it.自由入力 : it.物品) + ' × ' + esc(it.個数) + '</span><span>' + esc(yen(it.金額)) + '</span></li>';
+        return '<li><span>' + esc(it.物品 === 'フリー入力' ? it.自由入力 : it.物品) + ' <span class="exp-qty">× ' + esc(it.個数) + '</span></span><span>' + esc(yen(it.金額)) + '</span></li>';
       }).join('');
       form.hidden = true;
       after.innerHTML =
@@ -240,7 +251,7 @@
           '<dl class="exp-dl">' +
             '<dt>申請者</dt><dd>' + esc(state.me && state.me.氏名) + '</dd>' +
             '<dt>小口先出</dt><dd>' + esc(d.小口先出) + '</dd>' +
-            '<dt>対象日</dt><dd>' + esc(d.対象日) + '</dd>' +
+            '<dt>対象日</dt><dd>' + esc(fmtDate(d.対象日)) + '</dd>' +
             '<dt>施設名</dt><dd>' + esc($('施設名').value) + '</dd>' +
             '<dt>経費区分</dt><dd>' + esc(d.経費区分) + '</dd>' +
             '<dt>物品</dt><dd><ul class="exp-lines">' + lines + '<li class="exp-sum"><span>合計</span><span>' + esc(yen(sum)) + '</span></li></ul></dd>' +
@@ -264,12 +275,15 @@
       go.innerHTML = '<span class="exp-spin" aria-hidden="true"></span>送信中…';
       go.setAttribute('aria-busy', 'true');
       if (I.busy) I.busy(true); // 送信中は画面全体をぼかして「読み込み中・・・」（core.js）
+      var g = I.gen; // 送信中に別の画面へ移ったら、結果は画面に書かない
       api('submitExpense', d).then(function (res) {
         if (I.busy) I.busy(false); // 完了カードを同じ画面に出すので自分で消す
-        showDone(res || {});
+        if (g !== I.gen) { toast('経費申請を送信しました'); return; }
+        showDone(res || {}, d);
         toast('送信しました');
       }).catch(function (e) {
         if (I.busy) I.busy(false);
+        if (g !== I.gen) { toast((e && e.message) || '送信できませんでした'); return; }
         go.disabled = false; fix.disabled = false; go.textContent = 'もう一度送信する'; go.removeAttribute('aria-busy');
         var list = e && e.details && e.details.length ? e.details : [];
         box.innerHTML = '<strong>' + esc((e && e.message) || '送信できませんでした') + '</strong>' +
@@ -278,11 +292,13 @@
       });
     }
 
-    function showDone(res) {
+    function showDone(res, d) {
+      var sum = d.物品.reduce(function (a, it) { return a + Number(it.金額 || 0); }, 0);
       after.innerHTML =
         '<section class="card exp-card exp-done" aria-labelledby="exp-done-h">' +
           '<svg class="exp-done-ic" viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="21"/><path d="M14 24.5l7 7 13-14"/></svg>' +
           '<h2 id="exp-done-h">経費申請を送信しました</h2>' +
+          '<p class="exp-done-sum">' + esc(fmtDate(d.対象日)) + '　' + esc(d.経費区分) + '　' + d.物品.length + '件　合計 ' + esc(yen(sum)) + '</p>' +
           '<p class="exp-done-id">申請番号 ' + esc(res.申請ID || '—') + '</p>' +
           (res.状態 ? '<p>' + I.pill(res.状態) + '</p>' : '') +
           '<p class="exp-done-note">承認されると「自分の申請」の状態が変わります。</p>' +
