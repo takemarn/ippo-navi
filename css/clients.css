@@ -196,3 +196,10 @@ button.cl-cc-link:active { background: #f6f8fd; border-color: #d9e0ee; }
 /* 承認待ち一覧・自分の申請での利用者申請・タスクの中身（項目名が長いので値は左寄せで折り返す） */
 .apv-dl.cl-body { grid-template-columns: minmax(5em, 40%) 1fr; }
 .apv-dl.cl-body dd { text-align: left; overflow-wrap: anywhere; }
+/* 見直し3周目: 指で押しやすい大きさ（40px 以上）と、主操作カードの淡いグラデーション */
+.cl-chip { min-height: 40px; }
+.cl-backpill { min-height: 40px; padding: 0 16px; }
+.cl-del { min-height: 40px; padding: 0 18px; }
+.cl-fold > summary { min-height: 44px; margin: -14px; padding: 14px; }
+.cl-fold[open] > summary { margin-bottom: -4px; }
+.cl-op { background: linear-gradient(180deg, #fff, #f3f2fc); box-shadow: 0 6px 16px rgba(110, 90, 220, .12); padding-bottom: 20px; }

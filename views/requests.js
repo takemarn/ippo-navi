@@ -91,7 +91,7 @@
     var body = document.getElementById('req-body'); if (!body) return;
     var list = view.filter === 'すべて' ? view.list : view.list.filter(function (r) { return r.状態 === view.filter; });
     var cards;
-    if (!view.list.length) cards = '<div class="apv-empty">まだ申請はありません。<br>経費・勤怠の申請は「申請する」から出せます。</div>';
+    if (!view.list.length) cards = '<div class="apv-empty">まだ申請はありません。<br>出した申請（経費・勤怠・利用者の登録や修正・タスク依頼）はここに一覧で出ます。</div>';
     else if (!list.length) cards = '<div class="apv-empty">「' + esc(view.filter) + '」の申請はありません。</div>';
     else cards = '<section class="apv-detail">' + list.map(item).join('') + '</section>';
     body.innerHTML = summary() + cards;
@@ -109,7 +109,7 @@
     view = { list: [], filter: 'すべて', confirm: null };
     app.innerHTML = '<h1 class="apv-title">自分の申請</h1>' +
       '<div class="apv-shell" id="req-body">' + loadingBar() + '</div>' +
-      '<a class="req-new" href="#apply">申請する</a>' + backHtml('#status');
+      '<a class="req-new" href="#apply">経費・勤怠を申請する</a>' + backHtml('#status');
     load();
     app.addEventListener('click', onClick);
     I.cleanup.push(function () { app.removeEventListener('click', onClick); });

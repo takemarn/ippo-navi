@@ -112,11 +112,13 @@
         ['時間', b.時間開始 || b.時間終了 ? (b.時間開始 || '') + '〜' + (b.時間終了 || '') : ''],
         ['訪問看護指示書変更', b.訪問看護指示書変更], ['期間', b.期間開始 ? b.期間開始 + '〜' + (b.期間終了 || '') : ''], ['状態', b.状態], ['備考', b.備考]];
     } else {
-      rows = [['種類', { 新規: '新規登録', 置換: '置換（内容を直す）', 削除: '削除（登録なしにする）' }[b.種類] || b.種類], ['利用者', b.利用者氏名]];
+      rows = [['種類', { 新規: '新規登録', 置換: '内容を直す（置換）', 削除: '登録をやめる（削除）' }[b.種類] || b.種類], ['利用者', b.利用者氏名]];
       Object.keys(b.項目 || {}).forEach(function (k) {
         var cat = k.split('/')[0], name = k.split('/').slice(1).join('/');
         if (b.種類 === '新規' && k === '利用者データ/氏名') return; // 「利用者」の行と同じなので出さない
-        rows.push([cat === '利用者データ' || name.indexOf(cat) === 0 ? name : cat + ' / ' + name, b.項目[k] || '（空にする）']);
+        var label = cat === '利用者データ' ? showLabel(cat, name) : name.indexOf(cat) === 0 ? name : cat + ' / ' + name;
+        var now = b.項目[k] || '（空にする）', old = (b.変更前 || {})[k];
+        rows.push([label, old !== undefined && b.種類 === '置換' ? (old || '（空）') + ' → ' + now : now]);
       });
       if (b.理由) rows.push(['理由', b.理由]);
     }
@@ -224,7 +226,7 @@
       if (!s) return;
       if (s.dataset.sub === 'edit') askEditKind();
       if (s.dataset.sub === 'photo') location.hash = '#user-photo';
-      if (s.dataset.sub === 'sheet') toast('フェイスシート出力は第4段階で作ります（準備中）');
+      if (s.dataset.sub === 'sheet') toast('フェイスシート出力は準備中です');
     });
   }
 
@@ -234,7 +236,7 @@
     wrap.className = 'cl-modal-wrap'; wrap.id = 'cl-modal';
     wrap.innerHTML = '<div class="cl-modal" role="dialog" aria-modal="true" aria-labelledby="cl-modal-h"><h2 id="cl-modal-h">データ修正</h2>' +
       '<p>書き換えは「置換」、利用者の登録をやめるときは「削除」を選んでください。どちらも申請になり、承認されると反映されます。</p>' +
-      '<div class="cl-modal-btns"><button type="button" data-k="置換">置換（内容を直す）</button><button type="button" class="danger" data-k="削除">削除（登録をやめる）</button>' +
+      '<div class="cl-modal-btns"><button type="button" data-k="置換">内容を直す（置換）</button><button type="button" class="danger" data-k="削除">登録をやめる（削除）</button>' +
       '<button type="button" class="sub" data-k="">キャンセル</button></div></div>';
     document.body.appendChild(wrap);
     wrap.querySelector('[data-k="置換"]').focus();
@@ -296,6 +298,8 @@
     }).join('') + '</div>';
   }
 
+  function toKata(t) { return String(t || '').replace(/[\u3041-\u3096]/g, function (ch) { return String.fromCharCode(ch.charCodeAt(0) + 0x60); }); }
+
   // 画面に出す項目名（参考アプリの表示に合わせる。シートの列名・送る名前は 氏名・ふりがな のまま）
   function showLabel(cat, k) { return cat === '利用者データ' ? ({ 氏名: '名前', ふりがな: 'フリガナ' }[k] || k) : k; }
 
@@ -340,10 +344,10 @@
     if (recQFor !== cur.id) { recQ = emptyRecQ(); recQFor = cur.id; } // 絞り込みは利用者ごと
     app.innerHTML = shell('記録一覧', '日付やキーワードで絞り込み、利用者の記録を確認します。', '#user',
       clientCard(cur.card) +
-      '<div class="cl-card"><p class="cl-label">検索条件</p>' + dateRange(recQ) +
+      '<details class="cl-card cl-fold"' + (recQ.開始日 || recQ.終了日 || recQ.単日 || recQ.文字 ? ' open' : '') + '><summary class="cl-label">絞り込み（日付・キーワード）</summary>' + dateRange(recQ) +
         '<label class="cl-lab">部分テキスト検索<input id="cl-text" class="cl-input" placeholder="記録種別・担当者・メモを検索" value="' + esc(recQ.文字) + '"></label>' +
         '<div id="cl-err"></div>' +
-        '<button type="button" class="cl-go" id="cl-find">検索</button><button type="button" class="cl-clear" id="cl-clear">条件をクリア</button></div>' +
+        '<button type="button" class="cl-go" id="cl-find">検索</button><button type="button" class="cl-clear" id="cl-clear">条件をクリア</button></details>' +
       '<p class="cl-label cl-out">記録一覧</p><div id="cl-recs" class="cl-list">' + loading('記録を読み込み中...') + '</div>');
     fillPhotos();
     trackClicks(function (e) {
@@ -444,7 +448,7 @@
     else if (cat === '生活保護' && f.項目 === '生活保護') inner = pick(['あり', 'なし'], '');
     else if (/(日|年月日)$/.test(f.項目) && !/期間/.test(f.項目) && (!v || /^\d{4}-\d{2}-\d{2}$/.test(v))) inner = '<input type="date" id="' + id + '" value="' + esc(v) + '">';
     else if (f.項目 === '既往歴') inner = '<textarea id="' + id + '" rows="2">' + esc(v) + '</textarea>';
-    else inner = '<input id="' + id + '" value="' + esc(v) + '"' + (/電話番号|連絡先|郵便番号/.test(f.項目) ? ' inputmode="tel"' : '') + '>';
+    else inner = '<input id="' + id + '" value="' + esc(v) + '"' + (/ふりがな$/.test(f.項目) ? ' placeholder="例: ヤマダ ハナコ"' : '') + (/電話番号|連絡先|郵便番号/.test(f.項目) ? ' inputmode="tel"' : '') + '>';
     var need = cat === '利用者データ' && /^(氏名|ふりがな|施設名)$/.test(f.項目);
     return '<label class="cl-lab" data-key="' + esc(key) + '" data-orig="' + esc(v) + '" data-id="' + id + '"><span>' + esc(showLabel(cat, f.項目)) +
       (need ? '<span class="req">(必須)</span>' : '') + '</span>' + inner + '</label>';
@@ -452,6 +456,14 @@
   function drawEdit(ed, cats) {
     var el = document.getElementById('cl-edit'); if (!el) return;
     var i = 0, del = ed.種類 === '削除';
+    // 新規登録は必須の項目を先に出し、退居日・ご逝去・ステータス（居住中で始まる）は出さない
+    if (ed.種類 === '新規') cats = cats.map(function (c) {
+      if (c.名前 !== '利用者データ') return c;
+      var first = ['氏名', 'ふりがな', '施設名', '部屋番号', '入居日'], skip = ['退居日', 'ご逝去', 'ステータス'];
+      var by = {}; c.項目.forEach(function (f) { by[f.項目] = f; });
+      return { 名前: c.名前, 項目: first.filter(function (k) { return by[k]; }).map(function (k) { return by[k]; })
+        .concat(c.項目.filter(function (f) { return first.indexOf(f.項目) < 0 && skip.indexOf(f.項目) < 0; })) };
+    });
     el.innerHTML = '<form id="f" class="cl-form" novalidate>' +
       (del ? '<div class="cl-card"><p class="cl-label">削除の申請</p><p class="cl-desc">記録は消えずに残ります。利用者のステータスだけ「登録なし」になります。</p></div>'
         : cats.map(function (c) {
@@ -463,10 +475,12 @@
       '<div id="err"></div><button type="submit" class="cl-go">' + (ed.種類 === '新規' ? '新規登録を申請する' : '申請する') + '</button></form>';
     document.getElementById('f').addEventListener('submit', function (e) {
       e.preventDefault();
-      var fields = {};
+      var fields = {}, before = {};
       el.querySelectorAll('[data-key]').forEach(function (lab) {
-        var v = document.getElementById(lab.dataset.id).value.trim();
-        if (ed.種類 === '新規' ? v : v !== lab.dataset.orig) fields[lab.dataset.key] = v;
+        var input = document.getElementById(lab.dataset.id), v = input.value.trim();
+        // フリガナはカタカナにそろえる（ひらがなで入れてもよい。今ある値には手を付けない）
+        if (/ふりがな$/.test(lab.dataset.key) && v !== lab.dataset.orig) { v = toKata(v); input.value = v; } // 直したときだけ
+        if (ed.種類 === '新規' ? v : v !== lab.dataset.orig) { fields[lab.dataset.key] = v; before[lab.dataset.key] = lab.dataset.orig; }
       });
       var why = document.getElementById('e-why').value.trim(), errs = [];
       if (ed.種類 === '新規') {
@@ -477,7 +491,7 @@
       var err = document.getElementById('err'), btn = e.target.querySelector('button[type=submit]');
       if (errs.length) { err.innerHTML = I.errorsBox(errs); err.scrollIntoView({ block: 'center' }); return; }
       btn.disabled = true; btn.textContent = '送信中…'; I.busy(true);
-      api('requestClientChange', { 種類: ed.種類, 利用者ID: ed.種類 === '新規' ? '' : cur.id, 項目: fields, 理由: why }).then(function () {
+      api('requestClientChange', { 種類: ed.種類, 利用者ID: ed.種類 === '新規' ? '' : cur.id, 項目: fields, 変更前: ed.種類 === '置換' ? before : {}, 理由: why }).then(function () {
         I.busy(false); toast('申請しました。承認されると反映されます'); location.hash = '#requests';
       }).catch(function (x) {
         I.busy(false); btn.disabled = false; btn.textContent = ed.種類 === '新規' ? '新規登録を申請する' : '申請する';
