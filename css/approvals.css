@@ -293,3 +293,17 @@
 .apv-del svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
 .apv-del:active { background: #FCE1E4; }
 .apv-del:focus-visible { outline: 2px solid #E0707E; outline-offset: 1px; }
+
+/* ---------- 見直し4周目（使う人の目）で足したもの ---------- */
+/* 最新にする: 文字で何をするボタンか分かるように。時刻はその下に小さく */
+.apv-reload { color: #1F5FB4; font-weight: 700; font-size: 12px; }
+.apv-reload-t { display: flex; flex-direction: column; align-items: flex-start; line-height: 1.25; }
+.apv-reload-t small { font-size: 11px; font-weight: 400; color: #5B6572; }
+/* 小さすぎ・うすすぎた文字を読める大きさ・濃さに（11px 以上、白地で 4.5:1 以上） */
+.apv-you, .apv-tag { font-size: 11px; }
+.apv-who-name { color: #1F5FB4; }
+.apv-chev { color: #6B7480; }
+.req-step-l { color: #5F6873; }
+.req-step-l small { font-size: 11px; }
+.req-new { color: #1F5FB4; }
+.req-cancelbtn { min-height: 40px; }

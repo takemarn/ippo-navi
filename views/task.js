@@ -12,7 +12,7 @@
   'use strict';
   var I = window.IPPO, app = I.app, state = I.state, api = I.api, esc = I.esc, toast = I.toast;
 
-  I.views.task = function () { I.subMenu([{ label: '施設→本部事務', href: '#task-office' }, { label: '介護タスク' }]); };
+  I.views.task = function () { I.subMenu([{ label: '本部事務へ依頼する', href: '#task-office' }, { label: '介護タスク' }]); };
 
   // ひらがな・カタカナ・空白の違いを無視して比べる（GAS の normName と同じ考え方）
   function norm(t) {
@@ -64,7 +64,9 @@
     var o = state.options || {}, facs = (state.me && state.me.見られる施設) || o.施設 || ['モア一津屋'];
     var clients = [], loadState = 'idle'; // idle（施設未選択）/ loading / ok / fail
     app.innerHTML =
-      '<h1 class="exp-title">施設→本部事務</h1>' +
+      // 題は「何をする画面か」で。参考アプリの名前（施設→本部事務）は下の一言に残す
+      '<h1 class="exp-title">本部事務へ依頼</h1>' +
+      '<p class="exp-lead">利用者の入居・退院・指示書などの手続きを、施設から本部事務へ依頼します（施設→本部事務）。<br>入れたあと「内容を確認する」を押すと、送る前に確認できます。</p>' +
       '<div id="tk-stage"><form id="tk-form" class="exp-form tk-form" novalidate><div class="card exp-card">' +
         field('担当者', head('who', '担当者', true, 'who') + '<input id="tk-who" value="' + esc(state.me && state.me.氏名) + '" readonly aria-readonly="true">') +
         field('施設名', head('fac', '施設名', true, 'fac') + sel('fac', facs)) +
@@ -74,7 +76,8 @@
           '<p class="tk-hint" id="tk-client-hint" aria-live="polite"></p>') +
         field('保険種類', head('ins', '保険種類', true) + toggles('ins', ['介護保険', '医療保険'])) +
         field('生活保護', head('wel', '生活保護', true) + toggles('wel', ['有', '無', '確認中'])) +
-        field('タスク', head('kind', 'タスク', true, 'kind') + sel('kind', o.タスク種類 || [])) +
+        field('タスク', head('kind', 'タスク', true, 'kind') + sel('kind', o.タスク種類 || []) +
+          '<p class="tk-hint" id="tk-kind-hint">タスクを選ぶと、下の日程などが入れられるようになります</p>') +
         field('日程期間', head('span', '日程（期間）', true) + pair('span', 'date', '日程の始まり', '日程の終わり', 'tk-dates'), 'span') +
         field('日程', head('day', '日程', true, 'day') + '<input type="date" id="tk-day">', 'day') +
         field('時間', head('time', '時間', false) + pair('time', 'time', '開始時刻', '終了時刻', 'tk-times'), 'any') +
@@ -84,7 +87,7 @@
         field('備考', head('memo', '備考', false, 'memo') + '<textarea id="tk-memo" placeholder="本部事務に伝えたいことがあれば"></textarea>') +
       '</div>' +
       '<p class="exp-formerr" id="tk-formerr" role="alert" hidden></p>' +
-      '<button type="submit" class="exp-send">送信</button>' +
+      '<button type="submit" class="exp-send">内容を確認する</button>' +
       I.backHtml('#task', 'タスク管理に戻る') +
       '</form><div id="tk-after"></div></div>';
 
@@ -116,6 +119,10 @@
     // ---------- タスクに応じた切り替え（選ぶまで日程から下は使えない） ----------
     function syncKind() {
       var k = $('kind').value, mode = dateMode(k), special = isSpecial(k);
+      // タスクを選んだら、何を入れればよいかを一言で（選ぶ前は「選ぶと入れられる」案内）
+      $('kind-hint').textContent = !k ? 'タスクを選ぶと、下の日程などが入れられるようになります'
+        : (mode === 'span' ? '日程は始まりと終わりの日を入れてください。' : '日程は1日を選んでください。') +
+          (special ? '特指示なので、指示書の変更・期間・状態も入れてください。' : '');
       form.querySelectorAll('[data-need]').forEach(function (box) {
         var n = box.dataset.need;
         var on = n === 'any' ? !!k : n === 'special' ? special : n === mode;
