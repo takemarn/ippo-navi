@@ -163,7 +163,7 @@
           field('打刻時間', head('att-打刻時刻', '打刻時間', true) + '<div class="att-range"><input type="time" id="att-打刻時刻" disabled></div>', 'att-off') +
           field('備考', head('att-備考', '備考', false) +
             // 前は「特別休暇の場合は備考欄に詳細を表示」（参考アプリの文）で、何を書くのか分かりにくかった
-            '<input id="att-備考" placeholder="例: 電車の遅れ、記録の入力" aria-describedby="att-備考-hint" value="' + esc(redo && (redo.備考 || rd.備考) || '') + '">' +
+            '<input id="att-備考" maxlength="500" placeholder="例: 電車の遅れ、記録の入力" aria-describedby="att-備考-hint" value="' + esc(redo && (redo.備考 || rd.備考) || '') + '">' +
             '<p class="att-hint" id="att-備考-hint">理由をひとこと書くと、承認が早く進みます。特別休暇のときは、何の休暇かを書いてください。</p>') +
           // 遅延証明書: カメラ・写真・PDF から1つ。選んだときに送れる形にしておき、送信のときに先にアップロードする
           field('遅延証明書', head('att-file', '遅延証明書', false) +
@@ -196,6 +196,7 @@
       else backToForm();
     }
     function onPop() {
+      if (location.hash !== '#attendance') return; // 別の画面へ移るときは何もしない（popstate は hashchange より先に来る）
       if (leaving || !document.getElementById('att-form')) return;
       if ($('done-h')) { leaving = true; location.replace('#apply'); return; }
       if (form.hidden && $('go') && !$('go').disabled) backToForm();

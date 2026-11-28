@@ -258,7 +258,7 @@
       '<p class="muted">コードがわからないときは、運営に「IPPO管理ナビの登録コード」を聞いてください。</p></div>';
     document.getElementById('regForm').addEventListener('submit', function (ev) {
       ev.preventDefault();
-      var code = document.getElementById('regCode').value.replace(/[０-９]/g, function (c) { return String.fromCharCode(c.charCodeAt(0) - 0xFEE0); }).replace(/\s/g, '');
+      var code = document.getElementById('regCode').value.replace(/[０-９]/g, function (c) { return String.fromCharCode(c.charCodeAt(0) - 0xFEE0); }).replace(/[\s\-‐－ー―]/g, '');
       var err = document.getElementById('regErr'), btn = document.getElementById('regBtn');
       if (!/^[1-9][0-9]{5}$/.test(code)) { err.innerHTML = '<div class="errors" role="alert">登録コードは6けたの数字です</div>'; return; }
       btn.disabled = true; btn.textContent = '登録中…'; busy(true);

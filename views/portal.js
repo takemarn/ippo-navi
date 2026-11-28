@@ -285,7 +285,7 @@
         '<p class="ptl-toclabel">このページの中身</p><nav class="ptl-chips" aria-label="このページの中身"><a href="#org" data-go="where">あなたはどこ？</a><a href="#org" data-go="help">困ったときは、ここへ</a></nav>' +
         '<h2 class="ptl-sec" id="where">あなたはどこ？</h2><p class="ptl-note">' + esc(d.説明 || '') + '</p>' +
         '<div class="list">' + (d.職種 || []).map(function (j) {
-          var me = mine && j.職種.indexOf(mine.replace(/・.*/, '')) >= 0;
+          var me = mine && String(j.職種 || '').indexOf(mine.replace(/・.*/, '')) >= 0;
           return '<section class="ptl-role' + (me ? ' me' : '') + '"><b>' + esc(j.職種) + (me ? ' <span class="ptl-you">あなた</span>' : '') + '</b>' +
             '<p>上長は <em>' + esc(j.上長) + '</em>。相談は <em>' + esc(j.相談先) + '</em>。</p>' +
             (j.説明 ? '<p class="ptl-role-d">' + esc(j.説明) + '</p>' : '') + '</section>';

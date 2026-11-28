@@ -56,7 +56,7 @@
     I.demo.deleteRequest = function (d) {
       if (!d || !d.申請ID || !String(d.理由 || '').trim()) throw demoBad('削除の理由を書いてください');
       var D = I.demoCore;
-      if (D && !D.pending.some(function (r) { return r.申請ID === d.申請ID; })) throw demoBad('この申請はもう承認待ちではありません');
+      if (D && !D.pending.some(function (r) { return r.申請ID === d.申請ID; })) throw demoBad('この申請はもう承認待ちではありません（承認待ちの申請だけ削除できます）');
       if (D) D.pending = D.pending.filter(function (r) { return r.申請ID !== d.申請ID; });
       return { 申請ID: d.申請ID, 状態: '取消' }; // GAS と同じく状態は「取消」
     };
@@ -431,13 +431,23 @@
       var url = String(r.添付), pdf = /pdf/i.test(r.種類 || '') || /^data:application\/pdf/i.test(url);
       // data: URL の画像だけ表示する（それ以外の文字はリンクにも入れない）
       if (!/^data:(image\/(jpeg|png|webp|gif|svg\+xml)|application\/pdf)[;,]/i.test(url)) { toast('添付ファイルを表示できませんでした'); return; }
+      // data: URL へのページ移動はブラウザ（LINE 内ブラウザ含む）が止めることが多いので、PDF は Blob にして blob: URL で開く
+      var blobUrl = null;
+      function pdfBlobUrl(u) {
+        try {
+          var b64 = u.slice(u.indexOf(',') + 1), bin = atob(b64), arr = new Uint8Array(bin.length);
+          for (var k = 0; k < bin.length; k++) arr[k] = bin.charCodeAt(k);
+          blobUrl = URL.createObjectURL(new Blob([arr], { type: 'application/pdf' }));
+          return blobUrl;
+        } catch (_) { return u; }
+      }
       var wrap = document.createElement('div');
       wrap.className = 'cl-modal-wrap'; wrap.setAttribute('role', 'dialog'); wrap.setAttribute('aria-modal', 'true'); wrap.setAttribute('aria-label', '遅延証明書');
       wrap.innerHTML = '<div class="cl-modal"><h2>遅延証明書</h2>' +
-        (pdf ? '<p>PDF のため、この画面では表示できません。下のボタンで開いてください。</p><a class="apv-btn apv-btn-ghost" href="' + esc(url) + '" download="遅延証明書.pdf" target="_blank" rel="noopener">PDF を開く</a>'
+        (pdf ? '<p>PDF のため、この画面では表示できません。下のボタンで開いてください。</p><a class="apv-btn apv-btn-ghost" href="' + esc(pdfBlobUrl(url)) + '" download="遅延証明書.pdf" target="_blank" rel="noopener">PDF を開く</a>'
           : '<img src="' + esc(url) + '" alt="遅延証明書の画像" style="display:block;max-width:100%;max-height:60vh;margin:0 auto;object-fit:contain">') +
         '<div class="cl-modal-btns"><button type="button" data-close>閉じる</button></div></div>';
-      function close() { wrap.remove(); document.removeEventListener('keydown', onKey); window.removeEventListener('hashchange', close); if (btn && btn.isConnected) btn.focus(); }
+      function close() { wrap.remove(); if (blobUrl) URL.revokeObjectURL(blobUrl); document.removeEventListener('keydown', onKey); window.removeEventListener('hashchange', close); if (btn && btn.isConnected) btn.focus(); }
       function onKey(e) { if (e.key === 'Escape') close(); }
       wrap.addEventListener('click', function (e) { if (e.target === wrap || e.target.closest('[data-close]')) close(); });
       document.addEventListener('keydown', onKey);

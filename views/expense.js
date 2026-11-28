@@ -100,7 +100,7 @@
             '<p class="exp-total" id="exp-total" hidden></p>' +
             '<p class="exp-hint">物品が2つ以上なら「＋ 追加」で行を増やします（「－ 削除」は最後の行を消す）。金額は個数ぶんの合計です。</p>' +
           '</div>' +
-          field('備考', head('exp-備考', '備考', false) + '<textarea id="exp-備考">' + esc(redo && (redo.備考 || rd.備考) || '') + '</textarea>') +
+          field('備考', head('exp-備考', '備考', false) + '<textarea id="exp-備考" maxlength="500">' + esc(redo && (redo.備考 || rd.備考) || '') + '</textarea>') +
         '</div>' +
         '<p class="exp-formerr" id="exp-formerr" role="alert" hidden></p>' +
         // 押すとすぐ送られるのではなく、まず確認カードが出る。そのことが分かる名前にした（前は「送信」）
@@ -124,6 +124,7 @@
       else backToForm();
     }
     function onPop() {
+      if (location.hash !== '#expense') return; // 別の画面へ移るときは何もしない（popstate は hashchange より先に来る）
       if (leaving || !document.getElementById('exp-form')) return;
       if ($('done-h')) { leaving = true; location.replace('#apply'); return; }
       if (form.hidden && $('go') && !$('go').disabled) backToForm();
@@ -145,7 +146,7 @@
           '<div class="exp-item-row">' +
             sel('exp-物品_' + i, goods, r.物品, '物品').replace('<select', '<select aria-label="物品 ' + (i + 1) + '行目"' + (r.物品 ? '' : ' class="exp-empty"')) +
             // 物品（と物品名）は1行全部を使い、個数と金額は次の行に並べる（幅320pxでも文字が切れないように）
-            (free ? '<input class="exp-free" id="exp-自由入力_' + i + '" placeholder="物品名を入力" aria-label="物品名 ' + (i + 1) + '行目" value="' + esc(r.自由入力 || '') + '">' : '') +
+            (free ? '<input class="exp-free" maxlength="100" id="exp-自由入力_' + i + '" placeholder="物品名を入力" aria-label="物品名 ' + (i + 1) + '行目" value="' + esc(r.自由入力 || '') + '">' : '') +
             // 個数・金額は、数を入れたあとも何の欄か分かるよう右端に「個」「円」を出す（exp-unit）
             '<span class="exp-unit" data-u="個"><input type="number" inputmode="numeric" min="1" max="' + MAX_QTY + '" step="1" id="exp-個数_' + i + '" placeholder="個数" aria-label="個数 ' + (i + 1) + '行目" value="' + esc(r.個数 || '') + '"></span>' +
             '<span class="exp-unit" data-u="円"><input type="number" inputmode="numeric" min="0" max="' + MAX_YEN + '" step="1" id="exp-金額_' + i + '" placeholder="金額" aria-label="金額（円） ' + (i + 1) + '行目" value="' + esc(r.金額 === undefined || r.金額 === null ? '' : r.金額) + '"></span>' +
@@ -202,7 +203,7 @@
       var cur = $('自由入力_' + i);
       if (on && !cur) {
         $('物品_' + i).insertAdjacentHTML('afterend',
-          '<input class="exp-free" id="exp-自由入力_' + i + '" placeholder="物品名を入力" aria-label="物品名 ' + (i + 1) + '行目">');
+          '<input class="exp-free" maxlength="100" id="exp-自由入力_' + i + '" placeholder="物品名を入力" aria-label="物品名 ' + (i + 1) + '行目">');
         // エラー表示中の行なら、出てきた物品名の欄も最初からエラー扱いにする（赤字は clearErr で書き直す）
         if ($('物品_' + i).closest('.exp-item').classList.contains('exp-bad')) {
           $('自由入力_' + i).classList.add('exp-bad-in'); $('自由入力_' + i).dataset.err = 'need';

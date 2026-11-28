@@ -112,6 +112,7 @@
       else backToForm();
     }
     function onPop() {
+      if (location.hash !== '#task-office') return; // 別の画面へ移るときは何もしない（popstate は hashchange より先に来る）
       if (leaving || !document.getElementById('tk-form')) return;
       if ($('done-h')) { leaving = true; location.replace('#task'); return; }
       if (form.hidden && $('go') && !$('go').disabled) backToForm();
