@@ -93,7 +93,7 @@
 .att-form input[type=time]:disabled::-webkit-calendar-picker-indicator { display: none; }
 
 /* 補足文（入力欄の下）: 10px グレー */
-.att-hint { margin: -2px 0 0; font-size: 10px; color: #6E7782; line-height: 1.4; }
+.att-hint { margin: -2px 0 0; font-size: 11px; color: #555f6c; line-height: 1.4; }
 
 /* 遅延証明書: 白い入力欄風の「ファイルを選択」 */
 .att-file { position: relative; display: flex; align-items: center; }
