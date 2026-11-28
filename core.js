@@ -155,12 +155,17 @@
     });
   }
 
-  // 開けなかったときのカード（参考アプリの「日報を開けませんでした」と同じ形: 理由＋再読み込み）
+  // 開けなかったときのカード（参考アプリの「日報を開けませんでした」と同じ形: 理由＋もう一度読み込む）。
+  // エラー表示は2つの形にそろえてある: 画面ごと開けない → この白いカード（views/portal.js の failBox も同じ）、
+  // 画面の一部（一覧など）が読めない → 赤い枠の「! 読み込めませんでした」（clients.js の showFail・shift.js の failBox）
   function showError(e) {
     busy(false);
     app.innerHTML = '<div class="card fail" role="alert"><h2>画面を開けませんでした</h2>' +
       '<p class="fail-msg">' + esc(e && e.message || 'エラーが起きました') + '</p>' +
-      (e && e.code === 401 ? '<p class="muted">LINE からもう一度開き直してください。</p>' : '<button onclick="location.reload()">再読み込み</button>') + '</div>';
+      // 言い方は画面ごとのエラー表示（承認待ち一覧・自分の申請など）とそろえる:「電波の良い所で…」＋「もう一度読み込む」
+      (e && e.code === 401 ? '<p class="fail-note">LINE からもう一度開き直してください。</p>'
+        : (/電波/.test(e && e.message || '') ? '' : '<p class="fail-note">電波の良い所で、もう一度読み込んでください。</p>') +
+          '<button type="button" onclick="location.reload()">もう一度読み込む</button>') + '</div>';
   }
 
   // ---------- 読み込み中の表示（参考 0-6） ----------

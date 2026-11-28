@@ -100,7 +100,7 @@
 
   // 上の戻る: 下の戻ると同じく、AIに聞く画面から来たときは そこへ
   function top() {
-    return I.portalFrom && I.portalFrom() === '#ai' ? T().topBack('#ai', 'AIに聞く画面に戻る') : T().topBack('#manual', 'マニュアルのトップ');
+    return I.portalFrom && I.portalFrom() === '#ai' ? T().topBack('#ai', 'AIに聞く画面に戻る') : T().topBack('#manual', 'マニュアルのトップに戻る');
   }
 
   function scenes(list) {

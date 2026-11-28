@@ -247,7 +247,7 @@
   function detail(list) {
     var g = groups(list).filter(function (x) { return x.name === view.who; })[0];
     var items = g ? g.items : [];
-    return '<button type="button" class="apv-backpill" data-act="戻る"><span aria-hidden="true">‹</span> 承認者一覧へ戻る</button>' +
+    return '<button type="button" class="apv-backpill" data-act="戻る"><span aria-hidden="true">‹</span> 承認者一覧に戻る</button>' +
       '<section class="apv-detail" aria-label="' + esc(view.who) + 'さんの承認待ち"><h2>' + esc(view.who) + '（' + items.length + '件）</h2>' +
       '<p class="apv-detail-sub">' + (g && g.mine ? '予定日が近いもの、古い申請の順に並べています。' : 'ほかの承認者の分です。見るだけで、承認はできません。') + '</p>' +
       (items.length ? items.map(item).join('') : '<div class="apv-empty">この承認者の承認待ちはありません。</div>') +

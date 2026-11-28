@@ -51,7 +51,9 @@
   function loadingBar(text) { return '<div class="loading sft-loading" role="status"><span class="sft-spin" aria-hidden="true"></span>' + esc(text || '読み込み中...') + '</div>'; }
   // retry を付けると「もう一度読み込む」ボタンを出す（押されたら data-retry を拾って呼び直す）
   function failBox(e, retry) {
-    return '<div class="errors sft-fail" role="alert"><p>' + esc(e && e.message || 'エラーが起きました') + '</p>' +
+    // clients.js の showFail と同じ形・言い方（! 読み込めませんでした＋理由＋電波の案内＋もう一度読み込む）
+    return '<div class="errors sft-fail" role="alert"><p class="sft-fail-h">読み込めませんでした</p><p>' + esc(e && e.message || 'エラーが起きました') + '</p>' +
+      (/電波/.test(e && e.message || '') ? '' : '<p class="sft-fail-n">電波の良い所で、もう一度読み込んでください。</p>') +
       (retry ? '<button type="button" class="sft-retry" data-retry="' + retry + '">もう一度読み込む</button>' : '') + '</div>';
   }
   function emptyBox(title, text) {
