@@ -4,7 +4,7 @@
    検索のしくみ（searchDocs）は kiroku-app の gas/src/util.js と同じ決まり
    【GAS側にも要る】画面の作り込みで足した項目（どれも空なら今までどおりに出る）:
      manual の 連絡先[].施設 … 施設ごとに電話番号がちがうとき。2つ以上あると急変の画面で「どの施設ですか？」を出す。空の行はどの施設でも出す
-     manual の ガイド[].絵   … 場面カードの絵文字（任意。空なら題やキーワードから画面が選ぶ）
+     manual の ガイド[].絵   … 場面カードの絵の名前（任意。fall・note・pill・home・bath・thermo・bandage・eye・phone・ambulance・steth・sprout・book のどれか。空なら題やキーワードから画面が選ぶ）
      parking の 駐車場[].区画 は今までどおり。並べた順に「区画の並び」を描く */
 (function () {
   'use strict';

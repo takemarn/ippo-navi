@@ -107,9 +107,9 @@
           return '<button type="button" class="' + k + (flt === k ? ' on' : '') + '" data-flt="' + k + '" aria-pressed="' + (flt === k) + '"' + (c[k] ? '' : ' disabled') + '><b>' + c[k] + '</b><small>' + LABEL[k] + '</small></button>';
         }).join('') + '</div></section>' +
       '<div class="pk-best' + (best.name ? '' : ' none') + '" role="status">' + (best.name
-        ? '<p><span class="pk-okic" aria-hidden="true">✓</span>今すぐ停めるなら <b>' + esc(best.name) + '</b> が空いています。</p><small>空き ' + c.free + ' 台 ／ 場所は各カードの「地図で開く」から</small>'
+        ? '<p><span class="pk-okic" aria-hidden="true">' + T().ic('check') + '</span>今すぐ停めるなら <b>' + esc(best.name) + '</b> が空いています。</p><small>空き ' + c.free + ' 台 ／ 場所は各カードの「地図で開く」から</small>'
         : '<p>いま空いている場所はありません。「まもなく」の場所を見てください。</p>') + '</div>' +
-      '<div class="pk-listhead"><h2 class="ptl-sec">駐車場一覧 <small>どこに・だれが・いつから</small></h2><button type="button" class="sub pk-reload" data-reload="1">↻ 更新</button></div>' +
+      '<div class="pk-listhead"><h2 class="ptl-sec">駐車場一覧 <small>どこに・だれが・いつから</small></h2><button type="button" class="sub pk-reload" data-reload="1">' + T().ic('reload') + '更新</button></div>' +
       (flt ? '<div class="pk-flt" role="status"><span>「' + LABEL[flt] + '」だけ表示中（' + c[flt] + '台）</span><button type="button" class="small sub" data-flt="' + flt + '">すべて表示</button></div>' : '') +
       (lots.length ? lots.filter(function (x) { return !flt || x.rows.some(function (r) { return r.s.k === flt; }); }).map(function (x) {
         var map = T().safeUrl(x.l.地図), photo = T().safeUrl(x.l.写真);
@@ -118,7 +118,7 @@
             (x.l.目安 ? '<span class="pk-cap">' + esc(x.l.目安) + '</span>' : '') + '</div>' : '') +
           '<div class="pk-lot-h"><div><b>' + esc(x.l.名前) + '</b><small>' + esc(x.l.説明 || '') + '</small>' +
             (!photo && x.l.目安 ? '<span class="pk-cap inline">' + esc(x.l.目安) + '</span>' : '') + '</div>' +
-          (map ? '<a class="pk-map" href="' + esc(map) + '" target="_blank" rel="noopener">📍 地図で開く</a>' : '') + '</div>' +
+          (map ? '<a class="pk-map" href="' + esc(map) + '" target="_blank" rel="noopener">' + T().ic('pin') + '地図で開く</a>' : '') + '</div>' +
           strip(x.l, x.rows) +
           x.rows.filter(function (r) { return !flt || r.s.k === flt; }).map(function (r) { return slotRow(x.l, r, me); }).join('') + '</section>';
       }).join('') : '<div class="loading">駐車場がまだ登録されていません。</div>') +
@@ -143,7 +143,7 @@
 
   function slotRow(l, r, me) {
     var p = r.p, s = r.s;
-    var no = r.name ? '<span class="pk-no">' + esc(r.name) + '</span>' : '<span class="pk-no" aria-hidden="true">' + (p ? '🚗' : '＋') + '</span>';
+    var no = r.name ? '<span class="pk-no">' + esc(r.name) + '</span>' : '<span class="pk-no" aria-hidden="true">' + (p ? T().ic('car') : '＋') + '</span>';
     if (!p) {
       return '<div class="pk-slot free">' + no + '<div class="pk-who"><b>' + (r.space ? '空きスペースあり' : '空き') + '</b>' +
         '<small>' + (r.space ? 'あと約' + r.space + '台（番号なし）' : 'すぐ停められます') + '</small></div>' +
