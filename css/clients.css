@@ -408,3 +408,23 @@ button.cl-cc-link:active { transform: scale(.985); }
 }
 /* 閉じた折りたたみは、隠れた中身との間の gap が残って下が空くので 0 にする */
 .cl-fold:not([open]) { gap: 0; }
+
+/* ============================================================
+   見直し2周目 r2b（参考動画 1:48〜4:14 と並べて見比べ）
+   ============================================================ */
+/* 入口: 見出しは上の絵（利用者一覧）だけ。枠の上は小さな説明1行にして、見出しが2つ並ばないようにする */
+.cl-shell-top { padding-top: 12px; }
+.cl-lead {
+  display: flex; gap: 8px; align-items: flex-start; font-size: 12px; color: #4a5160; line-height: 1.65; padding: 2px 4px 0;
+}
+.cl-lead::before {
+  content: "i"; flex: none; display: inline-grid; place-items: center; width: 18px; height: 18px; margin-top: 1px; border-radius: 50%;
+  background: #e6e3fb; color: var(--cl-label); font-size: 11px; font-weight: 800; font-style: italic; font-family: Georgia, serif;
+}
+/* 利用者操作のカード: 参考アプリは英字・名前・説明の3行で低めのカード。下の余白を詰め、矢印は右の真ん中に置く */
+.cl-ops { gap: 12px; }
+.cl-op { padding: 14px 56px 16px 18px; min-height: 84px; justify-content: center; }
+.cl-op span { padding-right: 0; line-height: 1.55; }
+.cl-op-go { top: 50%; bottom: auto; margin-top: -14px; }
+/* 日本語の説明文が1〜2文字だけ次の行に落ちないよう、対応する端末では文節で折り返す */
+.cl-sub, .cl-desc, .cl-lead, .cl-empty span, .cl-op span { word-break: auto-phrase; text-wrap: pretty; }
