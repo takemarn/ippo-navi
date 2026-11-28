@@ -44,8 +44,8 @@ const cards = TILES.map((t, i) => {
   return `<div class="t" style="left:${x}px;top:${y}px;width:${w}px;height:${h}px;--c:${t.color};--b:${t.badge};--tint:${t.tint}">
     ${uniq(i, `<svg class="bg" viewBox="0 0 ${Math.round(w)} ${Math.round(h)}" preserveAspectRatio="none"><defs>
       <linearGradient id="g1" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${t.tint}"/><stop offset="1" stop-color="${t.color}" stop-opacity=".3"/></linearGradient>
-      <linearGradient id="gc" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#e6bd7c"/><stop offset=".6" stop-color="#e6bd7c" stop-opacity=".55"/><stop offset="1" stop-color="#e6bd7c" stop-opacity="0"/></linearGradient>
-      <filter id="s" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="18"/></filter><filter id="sb"><feGaussianBlur stdDeviation="6"/></filter></defs>
+      <linearGradient id="gc" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#e6bd7c"/><stop offset=".75" stop-color="#e6bd7c" stop-opacity=".8"/><stop offset="1" stop-color="#e6bd7c" stop-opacity="0"/></linearGradient>
+      <filter id="s" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="18"/></filter><filter id="sb"><feGaussianBlur stdDeviation="2"/></filter></defs>
       ${DECO[i](t)}</svg>`)}
     <svg class="art" viewBox="0 0 240 200">${ART[i]}</svg>
     <b>${t.label}</b><small>${t.en}</small>

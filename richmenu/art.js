@@ -91,22 +91,22 @@ const ART = [
   <rect x="58" y="86" width="60" height="6" rx="3" fill="#8fb3a0"/>
   <rect x="58" y="104" width="46" height="6" rx="3" fill="#8fb3a0"/>
   <g transform="rotate(32 128 110)"><rect x="122" y="48" width="13" height="92" rx="6" fill="url(#a3k)"/><path d="M122 140h13l-6.5 18z" fill="#d9b26a"/><rect x="122" y="66" width="13" height="5" fill="#d9b26a"/><rect x="133" y="52" width="3" height="34" rx="1.5" fill="#d9b26a"/></g>
-  <rect x="168" y="68" width="44" height="74" rx="16" fill="url(#a3w)"/>
-  <rect x="176" y="62" width="28" height="10" fill="#dfe6e2"/><rect x="170" y="50" width="40" height="16" rx="5" fill="url(#a3g)"/>
-  <rect x="168" y="96" width="44" height="22" fill="#6fae8f"/>
+  <path d="M176 70h28q8 0 8 10v52a10 10 0 01-10 10h-24a10 10 0 01-10-10V80q0-10 8-10z" fill="url(#a3w)"/><rect x="173" y="78" width="5" height="56" rx="2.5" fill="#fff" opacity=".85"/>
+  <rect x="176" y="62" width="28" height="10" fill="#dfe6e2"/><rect x="170" y="50" width="40" height="16" rx="5" fill="url(#a3g)"/><path d="M176 54v8M183 54v8M190 54v8M197 54v8M204 54v8" stroke="#fff" stroke-opacity=".35" stroke-width="2"/>
+  <rect x="168" y="96" width="44" height="22" rx="2" fill="#6fae8f" opacity=".85"/>
   <g transform="rotate(-14 182 166)"><rect x="140" y="146" width="86" height="40" rx="9" fill="url(#a3s)" stroke="#c4ccd5" stroke-width="1.5"/>
     ${[0, 1, 2, 3].map(i => `<circle cx="${153 + i * 20}" cy="158" r="7" fill="#fff" stroke="#d6dce3" stroke-width="1.5"/><circle cx="${153 + i * 20}" cy="175" r="7" fill="#fff" stroke="#d6dce3" stroke-width="1.5"/>`).join('')}</g>`,
 
   // 4 利用者一覧: 車いすの人（左向き）と、うしろから押して歩く人（紫）
   `<defs>
     <linearGradient id="a4p" gradientUnits="userSpaceOnUse" x1="140" y1="20" x2="200" y2="180"><stop offset="0" stop-color="#9a7de8"/><stop offset="1" stop-color="#5a3db3"/></linearGradient>
-    <linearGradient id="a4q" gradientUnits="userSpaceOnUse" x1="60" y1="50" x2="110" y2="160"><stop offset="0" stop-color="#b9a2f0"/><stop offset="1" stop-color="#7a5bd0"/></linearGradient>
+    <linearGradient id="a4q" gradientUnits="userSpaceOnUse" x1="60" y1="50" x2="110" y2="160"><stop offset="0" stop-color="#8f72e0"/><stop offset="1" stop-color="#5a3db3"/></linearGradient>
   </defs>
-  <circle cx="104" cy="80" r="48" fill="#efe9fb"/>
+  <circle cx="128" cy="92" r="52" fill="#f2edfc"/>
   ${dots(176, 36, 5, 6, '#b8a8e0')}
   <ellipse cx="122" cy="180" rx="76" ry="6" fill="#5a3db3" opacity=".1"/>
-  <circle cx="96" cy="136" r="36" fill="none" stroke="#b9a2f0" stroke-width="5"/>
-  <path d="M116 120V80l12-4" fill="none" stroke="#6b4cc4" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="96" cy="136" r="36" fill="none" stroke="#7a5bd0" stroke-width="7"/>
+  <path d="M116 120V84l18-2" fill="none" stroke="#6b4cc4" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
   <path d="M70 124h46M72 126l-12 38" fill="none" stroke="#6b4cc4" stroke-width="5" stroke-linecap="round"/>
   <circle cx="60" cy="170" r="7" fill="none" stroke="#6b4cc4" stroke-width="4.5"/>
   <circle cx="96" cy="136" r="5" fill="#6b4cc4"/>
@@ -114,10 +114,10 @@ const ART = [
   <path d="M100 82l4 34H72l-4 34" fill="none" stroke="url(#a4q)" stroke-width="18" stroke-linecap="round" stroke-linejoin="round"/>
   <path d="M62 152h-10" stroke="#7a5bd0" stroke-width="9" stroke-linecap="round"/>
   <path d="M98 88l-6 18h-14" fill="none" stroke="#8a6cdc" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
-  <circle cx="168" cy="30" r="15" fill="url(#a4p)"/>
+  <g transform="translate(14 14) scale(.92)"><circle cx="168" cy="30" r="15" fill="url(#a4p)"/>
   <path d="M174 112l-24 62M174 112l10 30 12 32" fill="none" stroke="url(#a4p)" stroke-width="15" stroke-linecap="round" stroke-linejoin="round"/>
   <path d="M164 56l10 56" stroke="url(#a4p)" stroke-width="26" stroke-linecap="round"/>
-  <path d="M160 62l-14 16-16 0" fill="none" stroke="#7a5bd0" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>`,
+  <path d="M160 62l-14 16-16 0" fill="none" stroke="#7a5bd0" stroke-width="11" stroke-linecap="round" stroke-linejoin="round"/></g>`,
 
   // 5 シフト管理: オレンジのカレンダー＋チェックのボード＋時計
   `<defs>
