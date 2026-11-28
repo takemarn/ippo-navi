@@ -6,6 +6,7 @@
 | `richmenu.json` | タップ先の設定（Messaging API のリッチメニュー定義） |
 | `tiles.js` | 6 タイルのラベル・色・アイコン。画面の入口（`#menu`）もこれを使う |
 | `art.js` | メニュー画像用の立体風イラスト（自作 SVG）。`make.js` だけが使う |
+| `register.sh` | 定義と画像を LINE に登録して既定メニューにする（`LINE_TOKEN=… sh richmenu/register.sh`） |
 | `make.js` | 画像を作り直す道具（`FONT_DIR=<フォント置き場> node richmenu/make.js`、playwright と ImageMagick が必要。フォントは Noto Sans JP の 500/800 を `noto500.woff2` / `noto800.woff2` という名前で置く。npm の `@fontsource/noto-sans-jp` の `files/noto-sans-jp-japanese-{500,800}-normal.woff2` が使える） |
 
 並び: 上段「経費勤怠申請 `#apply`」「申請状況 `#status`」「タスク管理 `#task`」、下段「利用者一覧 `#users`」「シフト管理 `#shift`」「相談AI `#portal`」。
