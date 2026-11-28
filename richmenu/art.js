@@ -1,4 +1,4 @@
-/* リッチメニュー画像（richmenu.jpg）用の立体風イラスト。make.js だけが使う。
+/* リッチメニュー画像（richmenu.jpg）用の立体風イラスト。make.js と画面の入口（views/menu.js）が使う。
    どれも自作の SVG（viewBox 0 0 240 200）。グラデーションと影で「ふっくら」見せる。
    並びは tiles.js と同じ: 1 経費勤怠申請 / 2 申請状況 / 3 タスク管理 / 4 利用者一覧 / 5 シフト管理 / 6 相談AI */
 
@@ -156,4 +156,5 @@ const ART = [
   <rect x="138" y="162" width="16" height="11" rx="5.5" fill="#2b3549"/>`
 ];
 
-module.exports = ART;
+// make.js（node）からは require で、画面（ブラウザ）からは window.IPPO_ART で使う（入口 #menu と各メニューの見出し）
+if (typeof module === 'object' && module.exports) module.exports = ART; else window.IPPO_ART = ART;

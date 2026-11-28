@@ -198,7 +198,7 @@
     var appr = canApprove()
       ? '<a class="mbtn" href="#approvals">承認待ち一覧<span id="pcount"></span></a>'
       : '<button type="button" class="mbtn locked" data-locked="1">承認待ち一覧<span class="mtag">承認者のみ</span></button>';
-    app.innerHTML = '<h1>メニュー</h1><nav class="mgroup" aria-label="メニュー">' + items.map(btn).join('') + '</nav>' +
+    app.innerHTML = (IPPO.menuHead ? IPPO.menuHead() : '<h1>メニュー</h1>') + '<nav class="mgroup" aria-label="メニュー">' + items.map(btn).join('') + '</nav>' +
       '<div class="msolo">' + appr + '</div>' +
       backHtml('#menu', 'メニュー一覧に戻る');
     function onTap(e) {
