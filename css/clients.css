@@ -203,3 +203,37 @@ button.cl-cc-link:active { background: #f6f8fd; border-color: #d9e0ee; }
 .cl-fold > summary { min-height: 44px; margin: -14px; padding: 14px; }
 .cl-fold[open] > summary { margin-bottom: -4px; }
 .cl-op { background: linear-gradient(180deg, #fff, #f3f2fc); box-shadow: 0 6px 16px rgba(110, 90, 220, .12); padding-bottom: 20px; }
+
+/* 見直し4周目: 参考アプリと並べて見比べた大きさ・色に合わせる。
+   見た目は小さくし、押せる範囲は ::after で上下に広げて 40px 前後を保つ */
+:root { --cl-label: #3f3796; }
+.cl-head h1 { font-size: 20px; }
+.cl-chips { gap: 10px 8px; }
+.cl-chip { min-height: 30px; padding: 0 10px; font-size: 11px; border-color: transparent; position: relative; }
+.cl-chip::after { content: ""; position: absolute; inset: -5px 0; }
+.cl-backpill { min-height: 28px; padding: 0 12px; font-size: 11px; background: #eef2f8; border-color: transparent; box-shadow: none; position: relative; }
+.cl-backpill::after { content: ""; position: absolute; inset: -6px -4px; }
+.cl-rec-h span { color: #2f2a7a; }
+.cl-del { min-height: 28px; padding: 0 12px; font-size: 10px; background: #fff; border-color: #f1b8bf; position: relative; }
+.cl-del::after { content: ""; position: absolute; inset: -6px -2px; }
+.cl-del[data-sure] { color: #fff; background: var(--danger); border-color: var(--danger); }
+.cl-fields { gap: 12px; }
+.cl-field { background: #fff; border-radius: 16px; padding: 12px 14px; box-shadow: var(--cl-card-shadow); }
+.cl-field small { margin-bottom: 4px; }
+.cl-ops { gap: 14px; }
+.cl-op { padding: 16px 16px 34px; }
+.cl-op b { font-size: 15px; }
+.cl-cc-name b { font-size: 15px; }
+.cl-fold .cl-lab + .cl-lab { margin-top: 12px; }
+.cl-form input, .cl-form select { min-height: 44px; }
+.cl-lab, .cl-form label { font-size: 12px; font-weight: 700; }
+.tk-tog { grid-template-columns: repeat(3, 1fr); }
+.tk-name { grid-template-columns: 68px 1fr; }
+.cl-photo { width: 72px; height: 72px; border-radius: 14px; }
+.cl-photo:not(.none) { box-shadow: 0 4px 10px rgba(30, 40, 70, .18); }
+.cl-photo.big { width: 160px; height: 160px; }
+@media (max-width: 360px) {
+  .cl-head h1 { font-size: 19px; }
+  .cl-photo { width: 56px; height: 56px; }
+  .cl-photo.big { width: 140px; height: 140px; }
+}
