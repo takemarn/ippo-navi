@@ -56,7 +56,7 @@
     var colors = ['#c9dcf6', '#f6d9c9', '#d9f0d9', '#e6d9f6'];
     var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120"><rect width="120" height="120" rx="18" fill="' + colors[i % 4] + '"/>' +
       '<circle cx="60" cy="48" r="22" fill="#fff" opacity=".9"/><rect x="26" y="76" width="68" height="36" rx="18" fill="#fff" opacity=".9"/>' +
-      '<text x="60" y="56" font-size="22" text-anchor="middle" fill="#55657a" font-family="sans-serif">' + c.氏名.slice(-2, -1) + '</text></svg>';
+      '<text x="60" y="56" font-size="22" text-anchor="middle" fill="#55657a" font-family="sans-serif">' + (c.ふりがな.split(' ')[1] || c.ふりがな).charAt(0) + '</text></svg>';
     return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
   }
   clients.forEach(function (c, i) { if (i % 3 !== 1) photos[c.利用者ID] = fakePhoto(c, i); });
