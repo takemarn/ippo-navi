@@ -28,19 +28,22 @@
     try { return sessionStorage.getItem('ippo.guide'); } catch (_) { return null; }
   }
 
-  // ガイドの絵（参考アプリと同じく、場面ごとに色つきの丸に絵文字）。シートに 絵 の列があればそれを使う
+  // ガイドの絵（参考アプリと同じく、場面ごとに色つきの丸に絵）。絵は portal.js の線画（I.portalTools.ic）。
+  // 絵文字は端末ごとに絵柄がちがい、ホームの線画・立体風の絵から浮くので使わない。
+  // シートに 絵 の列があれば、線画の名前（fall / note / pill / home / bath / thermo / bandage / eye / phone / ambulance / steth / sprout / book）として使う
   var ICONS = [
-    [/転倒|転落/, '🤕', 'pink'], [/記録|SOAP/, '📝', 'blue'], [/服薬|点滴|薬/, '💊', 'green'], [/入居/, '🏠', 'amber'],
-    [/入浴/, '🛁', 'amber'], [/発熱|熱|血圧/, '🌡️', 'amber'], [/皮膚|けが|外傷/, '🩹', 'blue'], [/様子/, '👀', 'pink'],
-    [/オンコール|電話/, '📞', 'pink'], [/救急|搬送/, '🚑', 'pink'], [/目安|呼ぶ/, '🩺', 'green'], [/最初|はじめ|新人/, '🔰', 'green']
+    [/転倒|転落/, 'fall', 'pink'], [/記録|SOAP/, 'note', 'blue'], [/服薬|点滴|薬/, 'pill', 'green'], [/入居/, 'home', 'amber'],
+    [/入浴/, 'bath', 'amber'], [/発熱|熱|血圧/, 'thermo', 'amber'], [/皮膚|けが|外傷/, 'bandage', 'blue'], [/様子/, 'eye', 'pink'],
+    [/オンコール|電話/, 'phone', 'pink'], [/救急|搬送/, 'ambulance', 'pink'], [/目安|呼ぶ/, 'steth', 'green'], [/最初|はじめ|新人/, 'sprout', 'green']
   ];
   function iconOf(g) {
     // 場面・題で先に探し、当たらなければキーワードで（キーワードには ほかの場面の言葉も入るため）
     var head = [g.場面, g.題].join(' '), kw = String(g.キーワード || '');
     var hit = ICONS.filter(function (x) { return x[0].test(head); })[0] || ICONS.filter(function (x) { return x[0].test(kw); })[0];
-    return { e: g.絵 || (hit ? hit[1] : '📘'), c: hit ? hit[2] : 'blue' };
+    var own = /^[a-z]+$/.test(String(g.絵 || '')) ? g.絵 : '';
+    return { e: own || (hit ? hit[1] : 'book'), c: hit ? hit[2] : 'blue' };
   }
-  function icon(g, cls) { var i = iconOf(g); return '<span class="mnl-ic ' + i.c + (cls ? ' ' + cls : '') + '" aria-hidden="true">' + esc(i.e) + '</span>'; }
+  function icon(g, cls) { var i = iconOf(g); return '<span class="mnl-ic ' + i.c + (cls ? ' ' + cls : '') + '" aria-hidden="true">' + T().ic(i.e) + '</span>'; }
   // 要点の「場面 → こうする」を色つきのカードにするときの色（危ない順に 赤 → 黄 → 青 → 緑）
   function tone(t) {
     return /転倒|転落|様子|意識|呼吸|SpO2|119|急/.test(t) ? 'pink' : /熱|血圧|入浴/.test(t) ? 'amber' : /皮膚|けが|外傷|写真/.test(t) ? 'blue' : 'green';
@@ -55,9 +58,9 @@
   function tabBar(kind) {
     var backTo = kind === 'home' ? I.lastMenu() : (I.portalFrom && I.portalFrom() === '#ai' ? '#ai' : I.portalFrom && I.portalFrom() === '#portal' && kind === 'urgent' ? '#portal' : '#manual');
     return '<nav class="mnl-tabs" aria-label="マニュアルの移動">' +
-      '<a href="' + esc(backTo) + '"><span aria-hidden="true">←</span>もどる</a>' +
-      '<button type="button" data-tab="search"><span aria-hidden="true">🔍</span>さがす</button>' +
-      '<button type="button" data-tab="toc"><span aria-hidden="true">≡</span>目次</button></nav>';
+      '<a href="' + esc(backTo) + '">' + T().ic('back') + 'もどる</a>' +
+      '<button type="button" data-tab="search">' + T().ic('search') + 'さがす</button>' +
+      '<button type="button" data-tab="toc">' + T().ic('list') + '目次</button></nav>';
   }
   function doJump(to) {
     var el = document.getElementById(to === 'search' ? 'mnl-f' : 'mnl-toc');
@@ -142,7 +145,7 @@
   function toc(all, restN) {
     var cats = [];
     all.forEach(function (g) { var c = g.分類 || 'そのほか'; if (cats.indexOf(c) < 0) cats.push(c); });
-    return '<details class="mnl-toc" id="mnl-toc"><summary><span>≡ 目次（すべてのページ ' + all.length + '）</span>' +
+    return '<details class="mnl-toc" id="mnl-toc"><summary><span>' + T().ic('list') + '目次（すべてのページ ' + all.length + '）</span>' +
         (restN ? '<small>ほかのページ ' + restN + ' もここにあります</small>' : '') + '</summary>' +
       cats.map(function (c) {
         return '<p class="mnl-toc-c">' + esc(c) + '</p>' + all.filter(function (g) { return (g.分類 || 'そのほか') === c; }).map(function (g) {
@@ -200,7 +203,7 @@
     list.forEach(function (c) { if (c.施設 && facs.indexOf(c.施設) < 0) facs.push(c.施設); });
     var cur = facs.length === 1 ? facs[0] : facility();
     if (facs.indexOf(cur) < 0) cur = '';
-    var pick = facs.length > 1 ? '<section class="mnl-fac"><b>🏠 どの施設ですか？<small>（施設で連絡先がちがいます）</small></b><div class="mnl-fac-btns">' +
+    var pick = facs.length > 1 ? '<section class="mnl-fac"><b>' + T().ic('home') + 'どの施設ですか？<small>（施設で連絡先がちがいます）</small></b><div class="mnl-fac-btns">' +
       facs.map(function (f) { return '<button type="button" data-fac="' + esc(f) + '" aria-pressed="' + (f === cur) + '">' + esc(f) + '</button>'; }).join('') + '</div></section>' : '';
     if (facs.length > 1 && !cur) {
       // 施設を選ぶまでは、どの施設でも同じ連絡先（施設 が空の行）だけ先に出す
@@ -209,7 +212,7 @@
     return pick + list.filter(function (c) { return !c.施設 || c.施設 === cur; }).map(callBtn).join('');
   }
   function callBtn(c) {
-    return '<a class="mnl-call" href="tel:' + esc(String(c.電話).replace(/#/g, '%23')) + '"><span class="mnl-call-ic" aria-hidden="true">📞</span><span><b>' + esc(c.名前) + 'に電話する</b><small>' +
+    return '<a class="mnl-call" href="tel:' + esc(String(c.電話).replace(/#/g, '%23')) + '"><span class="mnl-call-ic" aria-hidden="true">' + T().ic('phone') + '</span><span><b>' + esc(c.名前) + 'に電話する</b><small>' +
       (c.施設 ? esc(c.施設) + '　' : '') + esc(c.電話) + '</small></span></a>';
   }
 
@@ -233,7 +236,7 @@
       '<div class="mnl-gh">' + icon(g, 'lg') + '<div><p class="mnl-cat' + (urgentCat ? ' red' : '') + '">' + esc(g.分類) + '</p><h2>' + esc(g.題) + '</h2>' +
       '<p class="muted">' + meta(g) + '</p></div></div>' +
       ((g.要点 || []).length ? '<h3>パッと見</h3>' + points(g.要点) : '') +
-      (body ? '<details class="mnl-full"' + (compact ? '' : ' open') + '><summary>📖 くわしく読む（原文）</summary>' +
+      (body ? '<details class="mnl-full"' + (compact ? '' : ' open') + '><summary>' + T().ic('book') + 'くわしく読む（原文）</summary>' +
         body.split('\n').map(function (l) { return '<p>' + esc(l) + '</p>'; }).join('') + '</details>' : '') +
       (!(g.要点 || []).length && !body ? '<p class="muted">このページは、まだ中身が書かれていません。</p>' : '') +
       '</article>';
