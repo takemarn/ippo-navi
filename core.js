@@ -38,7 +38,7 @@
   function api(action, data, retried) {
     if (DEMO) return Demo.call(action, data || {});
     var ctl = window.AbortController ? new AbortController() : null;
-    var timer = ctl && setTimeout(function () { ctl.abort(); }, 30000);
+    var timer = ctl && setTimeout(function () { ctl.abort(); }, 60000); // GAS は順番待ち（最大20秒）＋処理があるので長めに
     return fetch(CFG.API_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
@@ -57,24 +57,24 @@
       var e = new Error(res.message || 'エラーが起きました'); e.code = res.code; e.details = res.details || []; e.reason = res.reason || '';
       // LINE の本人確認の期限切れは、1回だけ取り直してやり直す
       if (e.reason === 'token' && !retried && renewToken()) return api(action, data, true);
+      if (e.reason === 'token') e.message = 'LINE の本人確認の期限が切れました。LINE を閉じて、もう一度開いてください';
       throw e;
     });
   }
-  // LINE の IDトークン。期限が近ければ（1分以内）取り直す
+  // LINE の IDトークン。送る前には取り直さない（入力中に画面が読み直されないように）。期限切れは GAS の 401（reason: token）で知る
   function freshToken() {
     if (DEMO || !window.liff) return state.idToken;
-    try {
-      var d = liff.getDecodedIDToken();
-      if (d && d.exp * 1000 < Date.now() + 60000) renewToken();
-      return liff.getIDToken() || state.idToken;
-    } catch (_) { return state.idToken; }
+    try { return liff.getIDToken() || state.idToken; } catch (_) { return state.idToken; }
   }
-  // 取り直し: LINE の中なら開き直し、ブラウザならログインし直す。すぐ使えるトークンが無ければ false
+  // 取り直し: まだ使えるトークンがあればそれ。無ければ LINE の中は開き直し、ブラウザはログインし直す。
+  // 開き直しが2分以内に2回続いたら止めて「LINE を閉じて開き直して」と出す（読み直しが止まらなくなるのを防ぐ）
   function renewToken() {
     try {
-      var t = liff.getIDToken();
-      var d = liff.getDecodedIDToken();
-      if (t && d && d.exp * 1000 > Date.now() + 60000) { state.idToken = t; return true; }
+      var t = liff.getIDToken(), d = liff.getDecodedIDToken();
+      if (t && t !== state.idToken && d && d.exp * 1000 > Date.now() + 60000) { state.idToken = t; return true; }
+      var last = 0;
+      try { last = Number(sessionStorage.getItem('ippo.renewAt') || 0); sessionStorage.setItem('ippo.renewAt', String(Date.now())); } catch (_) {}
+      if (Date.now() - last < 120000) return false;
       if (liff.isInClient()) location.reload(); else { liff.logout(); liff.login({ redirectUri: location.href }); }
     } catch (_) {}
     return false;
